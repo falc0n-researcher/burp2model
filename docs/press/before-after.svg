@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <style>
+      .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+      .h{font-weight:700}
+    </style>
+  </defs>
+  <rect width="1200" height="700" fill="#ffffff"/>
+
+  <!-- title -->
+  <text x="600" y="52" text-anchor="middle" font-size="30" class="h" fill="#141924">Same Burp capture. Two outputs.</text>
+  <text x="600" y="82" text-anchor="middle" font-size="16" fill="#6b7580">One asks the AI to guess. The other gives it a model to reason over.</text>
+
+  <!-- LEFT: raw traffic to AI -->
+  <g>
+    <rect x="40" y="112" width="540" height="536" rx="14" fill="#fff" stroke="#e7eaef"/>
+    <rect x="40" y="112" width="540" height="52" rx="14" fill="#fdece3"/>
+    <rect x="40" y="140" width="540" height="24" fill="#fdece3"/>
+    <text x="64" y="145" font-size="13" class="h mono" fill="#d64545" letter-spacing="1">THE COMMON PROMPT TRAP</text>
+    <text x="64" y="192" font-size="15" fill="#141924" class="mono">$ &#8220;find bugs in this traffic&#8221; + 4 MB dump</text>
+
+    <text x="64" y="234" font-size="14" fill="#6b7580">Returns a generic checklist, the same for any target:</text>
+    <g font-size="14" fill="#141924" class="mono">
+      <text x="64" y="266">• Test all inputs for SQL injection</text>
+      <text x="64" y="292">• Check for XSS on every parameter</text>
+      <text x="64" y="318">• Verify CSRF tokens are present</text>
+      <text x="64" y="344">• Look for IDOR on numeric IDs</text>
+      <text x="64" y="370">• Ensure security headers are set</text>
+      <text x="64" y="396">• Add rate limiting to endpoints</text>
+    </g>
+
+    <rect x="64" y="418" width="492" height="66" rx="8" fill="#fff5f5" stroke="#f0c0c0"/>
+    <text x="80" y="443" font-size="12.5" class="h" fill="#d64545">Invented, not in the capture:</text>
+    <text x="80" y="467" font-size="14" class="mono" fill="#d64545">GET /api/v2/users/{id}/profile  &#8592; hallucinated</text>
+
+    <g font-size="13.5" fill="#6b7580">
+      <text x="64" y="516">No evidence. No idea what this app actually is.</text>
+      <text x="64" y="540">No way to tell what the AI missed — or made up.</text>
+      <text x="64" y="564">Every hunter running the same prompt gets the</text>
+      <text x="64" y="586">same surface. Duplicates rise, signal drops.</text>
+    </g>
+    <text x="64" y="626" font-size="13" class="h" fill="#d64545">Result: confident errors, buried in noise.</text>
+  </g>
+
+  <!-- arrow -->
+  <text x="600" y="392" text-anchor="middle" font-size="30" fill="#98a1ac">&#8594;</text>
+
+  <!-- RIGHT: burp2model to AI -->
+  <g>
+    <rect x="620" y="112" width="540" height="536" rx="14" fill="#fff" stroke="#e7eaef"/>
+    <rect x="620" y="112" width="540" height="52" rx="14" fill="#e8f6ee"/>
+    <rect x="620" y="140" width="540" height="24" fill="#e8f6ee"/>
+    <text x="644" y="145" font-size="13" class="h mono" fill="#0fa79a" letter-spacing="1">A MODEL THE AI REASONS OVER</text>
+    <text x="644" y="192" font-size="15" fill="#141924" class="mono">$ burp2model history.xml &#8594; methodology</text>
+
+    <text x="644" y="234" font-size="14" fill="#6b7580">A plan built from what was actually observed:</text>
+
+    <g font-size="13.5" class="mono">
+      <text x="644" y="264" fill="#141924" class="h">62 endpoints &#183; 40 found only in main.js &#183; 3 privileged</text>
+
+      <text x="644" y="298" fill="#e85002" class="h">RECON &#8212; walk the 40 code-only paths first</text>
+      <text x="662" y="320" fill="#6b7580">the surface a click-through never reaches</text>
+
+      <text x="644" y="354" fill="#e85002" class="h">#1  /rest/admin        [leverage 5]</text>
+      <text x="662" y="376" fill="#141924">referenced in code, never called</text>
+      <text x="662" y="397" fill="#0e8fd6">&#8594; who is allowed through this door?</text>
+      <text x="662" y="418" fill="#6b7580">next: request it in an authorised session</text>
+
+      <text x="644" y="452" fill="#e85002" class="h">#2  /api/Challenges/{param}   [ev_1]</text>
+      <text x="662" y="474" fill="#141924">named in main.js, purpose unknown</text>
+      <text x="662" y="495" fill="#0e8fd6">&#8594; what is it, and which role calls it?</text>
+    </g>
+
+    <rect x="644" y="516" width="492" height="52" rx="8" fill="#eef7ec" stroke="#bfe0c4"/>
+    <text x="660" y="539" font-size="12.5" class="h" fill="#0fa79a">Every line cites a real request. Nothing invented.</text>
+    <text x="660" y="559" font-size="12.5" fill="#3a7d52">Absence = a gap in the capture, never a claim about the target.</text>
+
+    <text x="644" y="600" font-size="13" class="h" fill="#0fa79a">Result: a testable, target-specific research plan.</text>
+    <text x="644" y="624" font-size="12.5" fill="#6b7580">Hypotheses to verify on the wire &#8212; never payloads.</text>
+  </g>
+
+  <!-- footer -->
+  <text x="600" y="678" text-anchor="middle" font-size="13" fill="#98a1ac">burp2model &#183; AI as an intelligence engine, not an exploit button &#183; built from a real OWASP Juice Shop capture</text>
+</svg>

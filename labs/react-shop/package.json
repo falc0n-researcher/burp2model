@@ -1,0 +1,3 @@
+{"name": "b2m-react-shop", "version": "1.0.0", "private": true, "description": "A small React 18 SPA + Express API with JWT auth, roles and history routing, used to test burp2model's crawler against a known route and API table.",
+ "scripts": {"start": "mkdir -p public && cp node_modules/react/umd/react.production.min.js public/react.js && cp node_modules/react-dom/umd/react-dom.production.min.js public/react-dom.js && node server.js"},
+ "dependencies": {"express": "^4.19.0", "react": "^18.3.0", "react-dom": "^18.3.0"}}

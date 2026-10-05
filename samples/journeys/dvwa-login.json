@@ -1,0 +1,38 @@
+{
+ "name": "DVWA: log in as the default admin",
+ "steps": [
+  {
+   "goto": "/login.php"
+  },
+  {
+   "fill": {
+    "selector": "input[name=username]",
+    "value": "${env:DVWA_USER}"
+   }
+  },
+  {
+   "fill": {
+    "selector": "input[name=password]",
+    "value": "${env:DVWA_PASS}"
+   }
+  },
+  {
+   "click": {
+    "selector": "input[type=submit]"
+   },
+   "required": true
+  },
+  {
+   "wait_idle": true
+  },
+  {
+   "goto": "/security.php"
+  },
+  {
+   "assert": {
+    "not_text": "Login failed"
+   },
+   "required": true
+  }
+ ]
+}

@@ -1,0 +1,119 @@
+{
+  "_note": "Synthetic external-recon record for the bundled demo. Nothing here was collected from a real host; it exists so the sample report can show the infrastructure layer without touching the network.",
+  "host": "shop.example.com",
+  "domain": "example.com",
+  "generated_at": "2026-09-20T09:14:02Z",
+  "dns": {
+    "A": ["203.0.113.10", "203.0.113.11"],
+    "AAAA": ["2001:db8:10::10"],
+    "MX": ["10 mx1.example.com", "20 mx2.example.com"],
+    "NS": ["ns1.example.com", "ns2.example.com"],
+    "TXT": ["v=spf1 include:_spf.example.com -all"],
+    "CNAME": ["edge.example-cdn.net"],
+    "CAA": ["0 issue \"letsencrypt.org\""]
+  },
+  "tls": {
+    "tls_version": "TLSv1.3",
+    "cipher": "TLS_AES_256_GCM_SHA384",
+    "subject_cn": "shop.example.com",
+    "issuer": "Let's Encrypt",
+    "not_before": "Aug 12 00:00:00 2026 GMT",
+    "not_after": "Nov 10 23:59:59 2026 GMT",
+    "days_until_expiry": 45,
+    "san": ["shop.example.com", "www.example.com", "api.example.com", "cdn.example.com"]
+  },
+  "http": {
+    "status": 200,
+    "final_url": "https://shop.example.com/",
+    "security_headers_present": {
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY"
+    },
+    "security_headers_missing": [
+      "content-security-policy",
+      "referrer-policy",
+      "permissions-policy",
+      "cross-origin-opener-policy",
+      "cross-origin-resource-policy"
+    ],
+    "headers": {
+      "server": "nginx",
+      "x-powered-by": "Express",
+      "via": "1.1 edge.example-cdn.net",
+      "content-type": "text/html; charset=utf-8"
+    },
+    "cookies": [
+      {"name": "session", "secure": true, "httponly": true, "samesite": true},
+      {"name": "cart", "secure": false, "httponly": false, "samesite": false}
+    ]
+  },
+  "technology": [
+    {"name": "nginx", "evidence": "header:server"},
+    {"name": "Express", "evidence": "header:x-powered-by"},
+    {"name": "React", "evidence": "body"},
+    {"name": "reCAPTCHA", "evidence": "body"}
+  ],
+  "email_security": {
+    "spf": "v=spf1 include:_spf.example.com -all",
+    "spf_note": "restrictive all qualifier present",
+    "dmarc": "v=DMARC1; p=none; rua=mailto:dmarc@example.com",
+    "dmarc_policy": "none",
+    "dmarc_note": "policy p=none only monitors, does not block spoofing",
+    "dkim_selector_found": "google"
+  },
+  "subdomains": {
+    "count": 7,
+    "source": "certificate transparency logs",
+    "names": [
+      "api.example.com",
+      "cdn.example.com",
+      "mail.example.com",
+      "shop.example.com",
+      "staging.example.com",
+      "status.example.com",
+      "www.example.com"
+    ]
+  },
+  "registration": {
+    "registration": "2011-03-04T12:00:00Z",
+    "expiration": "2028-03-04T12:00:00Z",
+    "last_changed": "2026-02-18T08:30:00Z",
+    "status": ["client transfer prohibited"],
+    "registrar": "Example Registrar, Inc.",
+    "nameservers": ["ns1.example.com", "ns2.example.com"]
+  },
+  "files": {
+    "robots": {
+      "present": true,
+      "disallow": ["/admin/", "/internal/", "/api/export"],
+      "sitemaps": ["https://shop.example.com/sitemap.xml"]
+    },
+    "security_txt": {"present": true, "fields": ["Contact", "Expires", "Policy"]},
+    "sitemap": {"present": true, "bytes": 18422}
+  },
+  "archive": {
+    "archived": true,
+    "last_snapshot": "20260901143012",
+    "url": "http://web.archive.org/web/20260901143012/http://shop.example.com/"
+  },
+  "ports": {
+    "scanned": 22,
+    "open": [
+      {"port": 80, "service": "http"},
+      {"port": 443, "service": "https"}
+    ],
+    "note": "TCP connect only; a closed probe is not proof a service is absent"
+  },
+  "ip_geo": {
+    "ip": "203.0.113.10",
+    "network": "EXAMPLE-CDN-EDGE",
+    "handle": "NET-203-0-113-0-1",
+    "country": "NL",
+    "type": "ALLOCATED PA"
+  },
+  "notes": [
+    "5 common security header(s) not sent on the front page",
+    "Email: policy p=none only monitors, does not block spoofing"
+  ]
+}

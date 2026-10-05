@@ -1,0 +1,1429 @@
+{
+  "app": "shop",
+  "directed": true,
+  "nodes": [
+    {
+      "id": "role:admin",
+      "label": "role: admin",
+      "type": "role",
+      "layer": 5,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "host:shop.example.com",
+      "label": "shop.example.com",
+      "type": "host",
+      "layer": 1,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        0,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "id": "tech:nginx/1.24.0",
+      "label": "nginx/1.24.0",
+      "type": "tech",
+      "layer": 1,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        0,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "id": "route:shop.example.com/admin",
+      "label": "shop.example.com/admin",
+      "type": "route",
+      "layer": 2,
+      "api_state": null,
+      "roles": [
+        "admin"
+      ],
+      "evidence": [
+        0
+      ]
+    },
+    {
+      "id": "host:api.example.com",
+      "label": "api.example.com",
+      "type": "host",
+      "layer": 1,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        10
+      ]
+    },
+    {
+      "id": "tech:gunicorn/21.2",
+      "label": "gunicorn/21.2",
+      "type": "tech",
+      "layer": 1,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        10
+      ]
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/me",
+      "label": "GET /api/me",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "BOTH",
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "evidence": [
+        1,
+        8,
+        11
+      ]
+    },
+    {
+      "id": "auth:bearer",
+      "label": "Authorization: bearer",
+      "type": "auth",
+      "layer": 5,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        11
+      ]
+    },
+    {
+      "id": "auth:cookie:session",
+      "label": "session cookie session",
+      "type": "auth",
+      "layer": 5,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        11
+      ]
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/admin/users",
+      "label": "GET /api/admin/users",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "RUNTIME_ONLY",
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "evidence": [
+        2,
+        18
+      ]
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/api/admin/users",
+      "label": "POST /api/admin/users",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "RUNTIME_ONLY",
+      "roles": [
+        "admin"
+      ],
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/admin/users:$.email",
+      "label": "$.email",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/admin/users:$.role",
+      "label": "$.role",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/admin/audit",
+      "label": "GET /api/admin/audit",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "BOTH",
+      "roles": [
+        "admin"
+      ],
+      "evidence": [
+        4,
+        8
+      ]
+    },
+    {
+      "id": "role:user",
+      "label": "role: user",
+      "type": "role",
+      "layer": 5,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "id": "tech:Express",
+      "label": "Express",
+      "type": "tech",
+      "layer": 1,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "id": "cookie:session",
+      "label": "session",
+      "type": "cookie",
+      "layer": 5,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        5,
+        10
+      ]
+    },
+    {
+      "id": "cookie:cart",
+      "label": "cart",
+      "type": "cookie",
+      "layer": 5,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "id": "route:shop.example.com/",
+      "label": "shop.example.com/",
+      "type": "route",
+      "layer": 2,
+      "api_state": null,
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "id": "route:shop.example.com/login",
+      "label": "shop.example.com/login",
+      "type": "route",
+      "layer": 2,
+      "api_state": null,
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        6
+      ]
+    },
+    {
+      "id": "route:shop.example.com/dashboard",
+      "label": "shop.example.com/dashboard",
+      "type": "route",
+      "layer": 2,
+      "api_state": null,
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        7
+      ]
+    },
+    {
+      "id": "host:cdn.example.com",
+      "label": "cdn.example.com",
+      "type": "host",
+      "layer": 1,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        8,
+        9
+      ]
+    },
+    {
+      "id": "tech:cloudflare",
+      "label": "cloudflare",
+      "type": "tech",
+      "layer": 1,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        8,
+        9
+      ]
+    },
+    {
+      "id": "script:cdn.example.com/static/app.js",
+      "label": "app.js",
+      "type": "script",
+      "layer": 3,
+      "api_state": null,
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/auth/login",
+      "label": "POST /auth/login",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "BOTH",
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        6,
+        10
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/auth/login:username",
+      "label": "username",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/auth/login:password",
+      "label": "password",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/auth/login:remember",
+      "label": "remember",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/orders",
+      "label": "GET /api/orders",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "BOTH",
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        8,
+        12
+      ]
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "label": "GET /api/orders/{id}",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "BOTH",
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        8,
+        13
+      ]
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/api/checkout",
+      "label": "POST /api/checkout",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "BOTH",
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        8,
+        14
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/checkout:$.order",
+      "label": "$.order",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/checkout:$.card",
+      "label": "$.card",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/checkout:$.cvv",
+      "label": "$.cvv",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/api/export",
+      "label": "POST /api/export",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "RUNTIME_ONLY",
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/export:$.format",
+      "label": "$.format",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/graphql",
+      "label": "POST /graphql",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "BOTH",
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        8,
+        17
+      ]
+    },
+    {
+      "id": "op:endpoint:POST:api.example.com:/graphql:GetProfile",
+      "label": "GetProfile",
+      "type": "operation",
+      "layer": 4,
+      "api_state": null,
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/graphql:$.operationName",
+      "label": "$.operationName",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/graphql:$.query",
+      "label": "$.query",
+      "type": "parameter",
+      "layer": 4,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "label": "GET /api/reset/{email}/{token}",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "RUNTIME_ONLY",
+      "roles": [
+        "user"
+      ],
+      "evidence": [
+        19
+      ]
+    },
+    {
+      "id": "host:cdn.analytics.test",
+      "label": "cdn.analytics.test",
+      "type": "third_party",
+      "layer": 5,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        20
+      ]
+    },
+    {
+      "id": "script:cdn.analytics.test/tag.js",
+      "label": "tag.js",
+      "type": "script",
+      "layer": 3,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        20
+      ]
+    },
+    {
+      "id": "host:www.googletagmanager.com",
+      "label": "www.googletagmanager.com",
+      "type": "third_party",
+      "layer": 5,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        21
+      ]
+    },
+    {
+      "id": "script:www.googletagmanager.com/gtm.js",
+      "label": "gtm.js",
+      "type": "script",
+      "layer": 3,
+      "api_state": null,
+      "roles": [],
+      "evidence": [
+        21
+      ]
+    }
+  ],
+  "links": [
+    {
+      "source": "host:shop.example.com",
+      "target": "tech:nginx/1.24.0",
+      "type": "RUNS",
+      "state": "OBSERVED",
+      "evidence": [
+        0,
+        5,
+        6
+      ]
+    },
+    {
+      "source": "host:shop.example.com",
+      "target": "route:shop.example.com/admin",
+      "type": "SERVES",
+      "state": "OBSERVED",
+      "evidence": [
+        0
+      ]
+    },
+    {
+      "source": "role:admin",
+      "target": "route:shop.example.com/admin",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        0
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "tech:gunicorn/21.2",
+      "type": "RUNS",
+      "state": "OBSERVED",
+      "evidence": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:GET:api.example.com:/api/me",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        1,
+        11
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/me",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        1,
+        11
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/me",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        1,
+        11
+      ]
+    },
+    {
+      "source": "role:admin",
+      "target": "endpoint:GET:api.example.com:/api/me",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        1
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        2,
+        18
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/admin/users",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        2,
+        18
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/admin/users",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        2,
+        18
+      ]
+    },
+    {
+      "source": "role:admin",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        2
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:POST:api.example.com:/api/admin/users",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/admin/users",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/admin/users",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "source": "role:admin",
+      "target": "endpoint:POST:api.example.com:/api/admin/users",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/admin/users",
+      "target": "param:endpoint:POST:api.example.com:/api/admin/users:$.email",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/admin/users",
+      "target": "param:endpoint:POST:api.example.com:/api/admin/users:$.role",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/admin/audit",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/admin/audit",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "source": "role:admin",
+      "target": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "source": "host:shop.example.com",
+      "target": "tech:Express",
+      "type": "RUNS",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "source": "host:shop.example.com",
+      "target": "cookie:session",
+      "type": "SETS_COOKIE",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "source": "host:shop.example.com",
+      "target": "cookie:cart",
+      "type": "SETS_COOKIE",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "source": "host:shop.example.com",
+      "target": "route:shop.example.com/",
+      "type": "SERVES",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "route:shop.example.com/",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "source": "host:shop.example.com",
+      "target": "route:shop.example.com/login",
+      "type": "SERVES",
+      "state": "OBSERVED",
+      "evidence": [
+        6
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "route:shop.example.com/login",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        6
+      ]
+    },
+    {
+      "source": "host:shop.example.com",
+      "target": "route:shop.example.com/dashboard",
+      "type": "SERVES",
+      "state": "OBSERVED",
+      "evidence": [
+        7
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "route:shop.example.com/dashboard",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        7
+      ]
+    },
+    {
+      "source": "host:cdn.example.com",
+      "target": "tech:cloudflare",
+      "type": "RUNS",
+      "state": "OBSERVED",
+      "evidence": [
+        8,
+        9
+      ]
+    },
+    {
+      "source": "host:cdn.example.com",
+      "target": "script:cdn.example.com/static/app.js",
+      "type": "LOADS",
+      "state": "OBSERVED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "script:cdn.example.com/static/app.js",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "cookie:session",
+      "type": "SETS_COOKIE",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:POST:api.example.com:/auth/login",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:POST:api.example.com:/auth/login",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/auth/login",
+      "target": "param:endpoint:POST:api.example.com:/auth/login:username",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/auth/login",
+      "target": "param:endpoint:POST:api.example.com:/auth/login:password",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/auth/login",
+      "target": "param:endpoint:POST:api.example.com:/auth/login:remember",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:GET:api.example.com:/api/me",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        11
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:GET:api.example.com:/api/orders",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/orders",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/orders",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:GET:api.example.com:/api/orders",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "param:endpoint:POST:api.example.com:/api/checkout:$.order",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "param:endpoint:POST:api.example.com:/api/checkout:$.card",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "param:endpoint:POST:api.example.com:/api/checkout:$.cvv",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:POST:api.example.com:/api/export",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/export",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/export",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:POST:api.example.com:/api/export",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/export",
+      "target": "param:endpoint:POST:api.example.com:/api/export:$.format",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:POST:api.example.com:/graphql",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/graphql",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/graphql",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/graphql",
+      "target": "op:endpoint:POST:api.example.com:/graphql:GetProfile",
+      "type": "USES_OPERATION",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:POST:api.example.com:/graphql",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/graphql",
+      "target": "param:endpoint:POST:api.example.com:/graphql:$.operationName",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/graphql",
+      "target": "param:endpoint:POST:api.example.com:/graphql:$.query",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        18
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        19
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        19
+      ]
+    },
+    {
+      "source": "host:cdn.analytics.test",
+      "target": "script:cdn.analytics.test/tag.js",
+      "type": "LOADS",
+      "state": "OBSERVED",
+      "evidence": [
+        20
+      ]
+    },
+    {
+      "source": "host:www.googletagmanager.com",
+      "target": "script:www.googletagmanager.com/gtm.js",
+      "type": "LOADS",
+      "state": "OBSERVED",
+      "evidence": [
+        21
+      ]
+    },
+    {
+      "source": "route:shop.example.com/admin",
+      "target": "endpoint:GET:api.example.com:/api/me",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        1
+      ]
+    },
+    {
+      "source": "route:shop.example.com/admin",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        2
+      ]
+    },
+    {
+      "source": "route:shop.example.com/admin",
+      "target": "endpoint:POST:api.example.com:/api/admin/users",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "source": "route:shop.example.com/admin",
+      "target": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "source": "route:shop.example.com/login",
+      "target": "endpoint:POST:api.example.com:/auth/login",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "source": "route:shop.example.com/dashboard",
+      "target": "endpoint:GET:api.example.com:/api/me",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        11
+      ]
+    },
+    {
+      "source": "route:shop.example.com/dashboard",
+      "target": "endpoint:GET:api.example.com:/api/orders",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "source": "route:shop.example.com/dashboard",
+      "target": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "source": "route:shop.example.com/dashboard",
+      "target": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "source": "route:shop.example.com/dashboard",
+      "target": "endpoint:POST:api.example.com:/api/export",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "source": "route:shop.example.com/dashboard",
+      "target": "endpoint:POST:api.example.com:/graphql",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "source": "route:shop.example.com/dashboard",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        18
+      ]
+    },
+    {
+      "source": "route:shop.example.com/login",
+      "target": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        19
+      ]
+    },
+    {
+      "source": "route:shop.example.com/login",
+      "target": "endpoint:POST:api.example.com:/auth/login",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        6
+      ]
+    },
+    {
+      "source": "script:cdn.example.com/static/app.js",
+      "target": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "source": "script:cdn.example.com/static/app.js",
+      "target": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "source": "script:cdn.example.com/static/app.js",
+      "target": "endpoint:GET:api.example.com:/api/me",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "source": "script:cdn.example.com/static/app.js",
+      "target": "endpoint:GET:api.example.com:/api/orders",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "source": "script:cdn.example.com/static/app.js",
+      "target": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "source": "script:cdn.example.com/static/app.js",
+      "target": "endpoint:POST:api.example.com:/graphql",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    }
+  ]
+}

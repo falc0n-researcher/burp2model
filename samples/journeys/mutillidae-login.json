@@ -1,0 +1,35 @@
+{
+ "name": "Mutillidae: log in",
+ "steps": [
+  {
+   "goto": "/index.php?page=login.php"
+  },
+  {
+   "fill": {
+    "selector": "input[name=username]",
+    "value": "${env:MUT_USER}"
+   }
+  },
+  {
+   "fill": {
+    "selector": "input[name=password]",
+    "value": "${env:MUT_PASS}"
+   }
+  },
+  {
+   "click": {
+    "selector": "input[type=submit],button[type=submit]"
+   },
+   "required": true
+  },
+  {
+   "wait_idle": true
+  },
+  {
+   "assert": {
+    "not_text": "Authentication Error"
+   },
+   "required": true
+  }
+ ]
+}

@@ -1,0 +1,3169 @@
+{
+  "tool": "burp2model",
+  "version": "1.0.0",
+  "schema": 1,
+  "app": "shop",
+  "scope": [
+    "example.com"
+  ],
+  "counts": {
+    "nodes": 45,
+    "edges": 93,
+    "hosts": 3,
+    "routes": 4,
+    "scripts": 3,
+    "endpoints": 11,
+    "parameters": 11,
+    "operations": 1,
+    "third_parties": 2,
+    "auth": 2,
+    "cookies": 2,
+    "tech": 4,
+    "roles": 2,
+    "unknowns": 11,
+    "api_state": {
+      "BOTH": 7,
+      "RUNTIME_ONLY": 4
+    },
+    "secrets": 16
+  },
+  "stats": {
+    "items": 22,
+    "parsed": 22,
+    "skipped": 0,
+    "exchanges": 22,
+    "static_assets": 1,
+    "preflight": 1,
+    "third_party_requests": 2
+  },
+  "nodes": [
+    {
+      "id": "role:admin",
+      "type": "role",
+      "layer": 5,
+      "label": "role: admin",
+      "attrs": {},
+      "evidence": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "roles": []
+    },
+    {
+      "id": "host:shop.example.com",
+      "type": "host",
+      "layer": 1,
+      "label": "shop.example.com",
+      "attrs": {
+        "scope": "first-party",
+        "schemes": [
+          "https"
+        ],
+        "ports": [
+          443
+        ],
+        "tech": {
+          "server": "nginx/1.24.0",
+          "x-powered-by": "Express"
+        }
+      },
+      "evidence": [
+        0,
+        5,
+        6,
+        7
+      ],
+      "roles": []
+    },
+    {
+      "id": "tech:nginx/1.24.0",
+      "type": "tech",
+      "layer": 1,
+      "label": "nginx/1.24.0",
+      "attrs": {
+        "header": "server"
+      },
+      "evidence": [
+        0,
+        5,
+        6,
+        7
+      ],
+      "roles": []
+    },
+    {
+      "id": "route:shop.example.com/admin",
+      "type": "route",
+      "layer": 2,
+      "label": "shop.example.com/admin",
+      "attrs": {
+        "host": "shop.example.com",
+        "path": "/admin",
+        "statuses": [
+          200
+        ]
+      },
+      "evidence": [
+        0
+      ],
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "id": "host:api.example.com",
+      "type": "host",
+      "layer": 1,
+      "label": "api.example.com",
+      "attrs": {
+        "scope": "first-party",
+        "schemes": [
+          "https"
+        ],
+        "ports": [
+          443
+        ],
+        "tech": {
+          "server": "gunicorn/21.2"
+        }
+      },
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "roles": []
+    },
+    {
+      "id": "tech:gunicorn/21.2",
+      "type": "tech",
+      "layer": 1,
+      "label": "gunicorn/21.2",
+      "attrs": {
+        "header": "server"
+      },
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19
+      ],
+      "roles": []
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/me",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "GET /api/me",
+      "attrs": {
+        "method": "GET",
+        "host": "api.example.com",
+        "path": "/api/me",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "admin": [
+            200
+          ],
+          "user": [
+            200
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 2,
+        "api_state": "BOTH"
+      },
+      "evidence": [
+        1,
+        8,
+        11
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ]
+    },
+    {
+      "id": "auth:bearer",
+      "type": "auth",
+      "layer": 5,
+      "label": "Authorization: bearer",
+      "attrs": {},
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18
+      ],
+      "roles": []
+    },
+    {
+      "id": "auth:cookie:session",
+      "type": "auth",
+      "layer": 5,
+      "label": "session cookie session",
+      "attrs": {},
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18
+      ],
+      "roles": []
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "GET /api/admin/users",
+      "attrs": {
+        "method": "GET",
+        "host": "api.example.com",
+        "path": "/api/admin/users",
+        "status": 200,
+        "statuses": [
+          200,
+          403
+        ],
+        "status_by_role": {
+          "admin": [
+            200
+          ],
+          "user": [
+            403
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 2,
+        "api_state": "RUNTIME_ONLY"
+      },
+      "evidence": [
+        2,
+        18
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ]
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/api/admin/users",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "POST /api/admin/users",
+      "attrs": {
+        "method": "POST",
+        "host": "api.example.com",
+        "path": "/api/admin/users",
+        "status": 201,
+        "statuses": [
+          201
+        ],
+        "status_by_role": {
+          "admin": [
+            201
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 1,
+        "api_state": "RUNTIME_ONLY"
+      },
+      "evidence": [
+        3
+      ],
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/admin/users:$.email",
+      "type": "parameter",
+      "layer": 4,
+      "label": "$.email",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        3
+      ],
+      "roles": []
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/admin/users:$.role",
+      "type": "parameter",
+      "layer": 4,
+      "label": "$.role",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        3
+      ],
+      "roles": []
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "GET /api/admin/audit",
+      "attrs": {
+        "method": "GET",
+        "host": "api.example.com",
+        "path": "/api/admin/audit",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "admin": [
+            200
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 1,
+        "api_state": "BOTH"
+      },
+      "evidence": [
+        4,
+        8
+      ],
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "id": "role:user",
+      "type": "role",
+      "layer": 5,
+      "label": "role: user",
+      "attrs": {},
+      "evidence": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "roles": []
+    },
+    {
+      "id": "tech:Express",
+      "type": "tech",
+      "layer": 1,
+      "label": "Express",
+      "attrs": {
+        "header": "x-powered-by"
+      },
+      "evidence": [
+        5
+      ],
+      "roles": []
+    },
+    {
+      "id": "cookie:session",
+      "type": "cookie",
+      "layer": 5,
+      "label": "session",
+      "attrs": {
+        "httponly": true,
+        "secure": true,
+        "samesite": null
+      },
+      "evidence": [
+        5,
+        10
+      ],
+      "roles": []
+    },
+    {
+      "id": "cookie:cart",
+      "type": "cookie",
+      "layer": 5,
+      "label": "cart",
+      "attrs": {
+        "httponly": false,
+        "secure": false,
+        "samesite": null
+      },
+      "evidence": [
+        5
+      ],
+      "roles": []
+    },
+    {
+      "id": "route:shop.example.com/",
+      "type": "route",
+      "layer": 2,
+      "label": "shop.example.com/",
+      "attrs": {
+        "host": "shop.example.com",
+        "path": "/",
+        "statuses": [
+          200
+        ]
+      },
+      "evidence": [
+        5
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "route:shop.example.com/login",
+      "type": "route",
+      "layer": 2,
+      "label": "shop.example.com/login",
+      "attrs": {
+        "host": "shop.example.com",
+        "path": "/login",
+        "statuses": [
+          200
+        ]
+      },
+      "evidence": [
+        6
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "route:shop.example.com/dashboard",
+      "type": "route",
+      "layer": 2,
+      "label": "shop.example.com/dashboard",
+      "attrs": {
+        "host": "shop.example.com",
+        "path": "/dashboard",
+        "statuses": [
+          200
+        ]
+      },
+      "evidence": [
+        7
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "host:cdn.example.com",
+      "type": "host",
+      "layer": 1,
+      "label": "cdn.example.com",
+      "attrs": {
+        "scope": "first-party",
+        "schemes": [
+          "https"
+        ],
+        "ports": [
+          443
+        ],
+        "tech": {
+          "server": "cloudflare"
+        }
+      },
+      "evidence": [
+        8,
+        9
+      ],
+      "roles": []
+    },
+    {
+      "id": "tech:cloudflare",
+      "type": "tech",
+      "layer": 1,
+      "label": "cloudflare",
+      "attrs": {
+        "header": "server"
+      },
+      "evidence": [
+        8,
+        9
+      ],
+      "roles": []
+    },
+    {
+      "id": "script:cdn.example.com/static/app.js",
+      "type": "script",
+      "layer": 3,
+      "label": "app.js",
+      "attrs": {
+        "host": "cdn.example.com",
+        "scope": "first-party"
+      },
+      "evidence": [
+        8
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/auth/login",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "POST /auth/login",
+      "attrs": {
+        "method": "POST",
+        "host": "api.example.com",
+        "path": "/auth/login",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "user": [
+            200
+          ]
+        },
+        "credentials": [],
+        "anonymous_requests": 1,
+        "requests": 1,
+        "api_state": "BOTH"
+      },
+      "evidence": [
+        6,
+        10
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/auth/login:username",
+      "type": "parameter",
+      "layer": 4,
+      "label": "username",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        10
+      ],
+      "roles": []
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/auth/login:password",
+      "type": "parameter",
+      "layer": 4,
+      "label": "password",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        10
+      ],
+      "roles": []
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/auth/login:remember",
+      "type": "parameter",
+      "layer": 4,
+      "label": "remember",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        10
+      ],
+      "roles": []
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/orders",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "GET /api/orders",
+      "attrs": {
+        "method": "GET",
+        "host": "api.example.com",
+        "path": "/api/orders",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "user": [
+            200
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 1,
+        "api_state": "BOTH"
+      },
+      "evidence": [
+        8,
+        12
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "GET /api/orders/{id}",
+      "attrs": {
+        "method": "GET",
+        "host": "api.example.com",
+        "path": "/api/orders/{id}",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "user": [
+            200
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 1,
+        "api_state": "BOTH"
+      },
+      "evidence": [
+        8,
+        13
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "POST /api/checkout",
+      "attrs": {
+        "method": "POST",
+        "host": "api.example.com",
+        "path": "/api/checkout",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "user": [
+            200
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 1,
+        "api_state": "BOTH"
+      },
+      "evidence": [
+        8,
+        14
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/checkout:$.order",
+      "type": "parameter",
+      "layer": 4,
+      "label": "$.order",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        14
+      ],
+      "roles": []
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/checkout:$.card",
+      "type": "parameter",
+      "layer": 4,
+      "label": "$.card",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        14
+      ],
+      "roles": []
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/checkout:$.cvv",
+      "type": "parameter",
+      "layer": 4,
+      "label": "$.cvv",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        14
+      ],
+      "roles": []
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/api/export",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "POST /api/export",
+      "attrs": {
+        "method": "POST",
+        "host": "api.example.com",
+        "path": "/api/export",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "user": [
+            200
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 1,
+        "api_state": "RUNTIME_ONLY"
+      },
+      "evidence": [
+        16
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/api/export:$.format",
+      "type": "parameter",
+      "layer": 4,
+      "label": "$.format",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        16
+      ],
+      "roles": []
+    },
+    {
+      "id": "endpoint:POST:api.example.com:/graphql",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "POST /graphql",
+      "attrs": {
+        "method": "POST",
+        "host": "api.example.com",
+        "path": "/graphql",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "user": [
+            200
+          ]
+        },
+        "credentials": [
+          "bearer",
+          "cookie:session"
+        ],
+        "anonymous_requests": 0,
+        "requests": 1,
+        "api_state": "BOTH"
+      },
+      "evidence": [
+        8,
+        17
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "op:endpoint:POST:api.example.com:/graphql:GetProfile",
+      "type": "operation",
+      "layer": 4,
+      "label": "GetProfile",
+      "attrs": {},
+      "evidence": [
+        17
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/graphql:$.operationName",
+      "type": "parameter",
+      "layer": 4,
+      "label": "$.operationName",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        17
+      ],
+      "roles": []
+    },
+    {
+      "id": "param:endpoint:POST:api.example.com:/graphql:$.query",
+      "type": "parameter",
+      "layer": 4,
+      "label": "$.query",
+      "attrs": {
+        "location": "body"
+      },
+      "evidence": [
+        17
+      ],
+      "roles": []
+    },
+    {
+      "id": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "endpoint",
+      "layer": 4,
+      "label": "GET /api/reset/{email}/{token}",
+      "attrs": {
+        "method": "GET",
+        "host": "api.example.com",
+        "path": "/api/reset/{email}/{token}",
+        "status": 200,
+        "statuses": [
+          200
+        ],
+        "status_by_role": {
+          "user": [
+            200
+          ]
+        },
+        "credentials": [],
+        "anonymous_requests": 1,
+        "requests": 1,
+        "api_state": "RUNTIME_ONLY"
+      },
+      "evidence": [
+        19
+      ],
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "id": "host:cdn.analytics.test",
+      "type": "third_party",
+      "layer": 5,
+      "label": "cdn.analytics.test",
+      "attrs": {
+        "scope": "external",
+        "requests": 1
+      },
+      "evidence": [
+        20
+      ],
+      "roles": []
+    },
+    {
+      "id": "script:cdn.analytics.test/tag.js",
+      "type": "script",
+      "layer": 3,
+      "label": "tag.js",
+      "attrs": {
+        "host": "cdn.analytics.test",
+        "scope": "external"
+      },
+      "evidence": [
+        20
+      ],
+      "roles": []
+    },
+    {
+      "id": "host:www.googletagmanager.com",
+      "type": "third_party",
+      "layer": 5,
+      "label": "www.googletagmanager.com",
+      "attrs": {
+        "scope": "external",
+        "requests": 1
+      },
+      "evidence": [
+        21
+      ],
+      "roles": []
+    },
+    {
+      "id": "script:www.googletagmanager.com/gtm.js",
+      "type": "script",
+      "layer": 3,
+      "label": "gtm.js",
+      "attrs": {
+        "host": "www.googletagmanager.com",
+        "scope": "external"
+      },
+      "evidence": [
+        21
+      ],
+      "roles": []
+    }
+  ],
+  "edges": [
+    {
+      "src": "host:shop.example.com",
+      "dst": "tech:nginx/1.24.0",
+      "type": "RUNS",
+      "state": "OBSERVED",
+      "evidence": [
+        0,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "src": "host:shop.example.com",
+      "dst": "route:shop.example.com/admin",
+      "type": "SERVES",
+      "state": "OBSERVED",
+      "evidence": [
+        0
+      ]
+    },
+    {
+      "src": "role:admin",
+      "dst": "route:shop.example.com/admin",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        0
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "tech:gunicorn/21.2",
+      "type": "RUNS",
+      "state": "OBSERVED",
+      "evidence": [
+        1,
+        2,
+        3,
+        4,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:GET:api.example.com:/api/me",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        1,
+        11
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/me",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        1,
+        11
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/me",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        1,
+        11
+      ]
+    },
+    {
+      "src": "role:admin",
+      "dst": "endpoint:GET:api.example.com:/api/me",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        1
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        2,
+        18
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/admin/users",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        2,
+        18
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/admin/users",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        2,
+        18
+      ]
+    },
+    {
+      "src": "role:admin",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        2
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:POST:api.example.com:/api/admin/users",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/admin/users",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/admin/users",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "src": "role:admin",
+      "dst": "endpoint:POST:api.example.com:/api/admin/users",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/admin/users",
+      "dst": "param:endpoint:POST:api.example.com:/api/admin/users:$.email",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/admin/users",
+      "dst": "param:endpoint:POST:api.example.com:/api/admin/users:$.role",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/admin/audit",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/admin/audit",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "src": "role:admin",
+      "dst": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "src": "host:shop.example.com",
+      "dst": "tech:Express",
+      "type": "RUNS",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "src": "host:shop.example.com",
+      "dst": "cookie:session",
+      "type": "SETS_COOKIE",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "src": "host:shop.example.com",
+      "dst": "cookie:cart",
+      "type": "SETS_COOKIE",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "src": "host:shop.example.com",
+      "dst": "route:shop.example.com/",
+      "type": "SERVES",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "route:shop.example.com/",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "src": "host:shop.example.com",
+      "dst": "route:shop.example.com/login",
+      "type": "SERVES",
+      "state": "OBSERVED",
+      "evidence": [
+        6
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "route:shop.example.com/login",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        6
+      ]
+    },
+    {
+      "src": "host:shop.example.com",
+      "dst": "route:shop.example.com/dashboard",
+      "type": "SERVES",
+      "state": "OBSERVED",
+      "evidence": [
+        7
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "route:shop.example.com/dashboard",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        7
+      ]
+    },
+    {
+      "src": "host:cdn.example.com",
+      "dst": "tech:cloudflare",
+      "type": "RUNS",
+      "state": "OBSERVED",
+      "evidence": [
+        8,
+        9
+      ]
+    },
+    {
+      "src": "host:cdn.example.com",
+      "dst": "script:cdn.example.com/static/app.js",
+      "type": "LOADS",
+      "state": "OBSERVED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "script:cdn.example.com/static/app.js",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "cookie:session",
+      "type": "SETS_COOKIE",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:POST:api.example.com:/auth/login",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:POST:api.example.com:/auth/login",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/auth/login",
+      "dst": "param:endpoint:POST:api.example.com:/auth/login:username",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/auth/login",
+      "dst": "param:endpoint:POST:api.example.com:/auth/login:password",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/auth/login",
+      "dst": "param:endpoint:POST:api.example.com:/auth/login:remember",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:GET:api.example.com:/api/me",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        11
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:GET:api.example.com:/api/orders",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/orders",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/orders",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:GET:api.example.com:/api/orders",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "param:endpoint:POST:api.example.com:/api/checkout:$.order",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "param:endpoint:POST:api.example.com:/api/checkout:$.card",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "param:endpoint:POST:api.example.com:/api/checkout:$.cvv",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:POST:api.example.com:/api/export",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/export",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/export",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:POST:api.example.com:/api/export",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/export",
+      "dst": "param:endpoint:POST:api.example.com:/api/export:$.format",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:POST:api.example.com:/graphql",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/graphql",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/graphql",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/graphql",
+      "dst": "op:endpoint:POST:api.example.com:/graphql:GetProfile",
+      "type": "USES_OPERATION",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:POST:api.example.com:/graphql",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/graphql",
+      "dst": "param:endpoint:POST:api.example.com:/graphql:$.operationName",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/graphql",
+      "dst": "param:endpoint:POST:api.example.com:/graphql:$.query",
+      "type": "USES_PARAMETER",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        18
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        19
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        19
+      ]
+    },
+    {
+      "src": "host:cdn.analytics.test",
+      "dst": "script:cdn.analytics.test/tag.js",
+      "type": "LOADS",
+      "state": "OBSERVED",
+      "evidence": [
+        20
+      ]
+    },
+    {
+      "src": "host:www.googletagmanager.com",
+      "dst": "script:www.googletagmanager.com/gtm.js",
+      "type": "LOADS",
+      "state": "OBSERVED",
+      "evidence": [
+        21
+      ]
+    },
+    {
+      "src": "route:shop.example.com/admin",
+      "dst": "endpoint:GET:api.example.com:/api/me",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        1
+      ]
+    },
+    {
+      "src": "route:shop.example.com/admin",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        2
+      ]
+    },
+    {
+      "src": "route:shop.example.com/admin",
+      "dst": "endpoint:POST:api.example.com:/api/admin/users",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "src": "route:shop.example.com/admin",
+      "dst": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        4
+      ]
+    },
+    {
+      "src": "route:shop.example.com/login",
+      "dst": "endpoint:POST:api.example.com:/auth/login",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "src": "route:shop.example.com/dashboard",
+      "dst": "endpoint:GET:api.example.com:/api/me",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        11
+      ]
+    },
+    {
+      "src": "route:shop.example.com/dashboard",
+      "dst": "endpoint:GET:api.example.com:/api/orders",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        12
+      ]
+    },
+    {
+      "src": "route:shop.example.com/dashboard",
+      "dst": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        13
+      ]
+    },
+    {
+      "src": "route:shop.example.com/dashboard",
+      "dst": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "src": "route:shop.example.com/dashboard",
+      "dst": "endpoint:POST:api.example.com:/api/export",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "src": "route:shop.example.com/dashboard",
+      "dst": "endpoint:POST:api.example.com:/graphql",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        17
+      ]
+    },
+    {
+      "src": "route:shop.example.com/dashboard",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        18
+      ]
+    },
+    {
+      "src": "route:shop.example.com/login",
+      "dst": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        19
+      ]
+    },
+    {
+      "src": "route:shop.example.com/login",
+      "dst": "endpoint:POST:api.example.com:/auth/login",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        6
+      ]
+    },
+    {
+      "src": "script:cdn.example.com/static/app.js",
+      "dst": "endpoint:GET:api.example.com:/api/admin/audit",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "src": "script:cdn.example.com/static/app.js",
+      "dst": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "src": "script:cdn.example.com/static/app.js",
+      "dst": "endpoint:GET:api.example.com:/api/me",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "src": "script:cdn.example.com/static/app.js",
+      "dst": "endpoint:GET:api.example.com:/api/orders",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "src": "script:cdn.example.com/static/app.js",
+      "dst": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    },
+    {
+      "src": "script:cdn.example.com/static/app.js",
+      "dst": "endpoint:POST:api.example.com:/graphql",
+      "type": "REFERENCES",
+      "state": "INFERRED",
+      "evidence": [
+        8
+      ]
+    }
+  ],
+  "unknowns": [
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:GET:api.example.com:/api/me",
+      "we_know": [
+        "reached by role(s): admin, user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:GET:api.example.com:/api/admin/users",
+      "we_know": [
+        "reached by role(s): admin, user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:POST:api.example.com:/api/admin/users",
+      "we_know": [
+        "reached by role(s): admin"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:GET:api.example.com:/api/admin/audit",
+      "we_know": [
+        "reached by role(s): admin"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:POST:api.example.com:/auth/login",
+      "we_know": [
+        "reached by role(s): user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:GET:api.example.com:/api/orders",
+      "we_know": [
+        "reached by role(s): user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "we_know": [
+        "reached by role(s): user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:POST:api.example.com:/api/checkout",
+      "we_know": [
+        "reached by role(s): user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:POST:api.example.com:/api/export",
+      "we_know": [
+        "reached by role(s): user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:POST:api.example.com:/graphql",
+      "we_know": [
+        "reached by role(s): user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    },
+    {
+      "type": "AUTHORIZATION_UNKNOWN",
+      "entity": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "we_know": [
+        "reached by role(s): user"
+      ],
+      "we_dont_know": "whether access is authorization-checked",
+      "next_step": "replay across two in-scope accounts and compare"
+    }
+  ],
+  "roles": [
+    "admin",
+    "user"
+  ],
+  "secrets": [
+    {
+      "kind": "authorization",
+      "hmac_12": "005543c434bd",
+      "length": 84,
+      "entropy": 4.8,
+      "count": 5,
+      "evidence": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "kind": "cookie",
+      "hmac_12": "7385ae92d689",
+      "length": 44,
+      "entropy": 4.88,
+      "count": 5,
+      "evidence": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "kind": "email",
+      "hmac_12": "db372f7a6361",
+      "length": 22,
+      "entropy": 3.79,
+      "count": 1,
+      "evidence": [
+        1
+      ]
+    },
+    {
+      "kind": "email",
+      "hmac_12": "bc3c5688192d",
+      "length": 15,
+      "entropy": 3.46,
+      "count": 2,
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "kind": "authorization",
+      "hmac_12": "991582d44e46",
+      "length": 68,
+      "entropy": 5.08,
+      "count": 10,
+      "evidence": [
+        5,
+        6,
+        7,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18
+      ]
+    },
+    {
+      "kind": "cookie",
+      "hmac_12": "8871d5a38908",
+      "length": 43,
+      "entropy": 4.65,
+      "count": 10,
+      "evidence": [
+        5,
+        6,
+        7,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18
+      ]
+    },
+    {
+      "kind": "set-cookie",
+      "hmac_12": "c2ddd3e9697a",
+      "length": 72,
+      "entropy": 4.82,
+      "count": 1,
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "kind": "set-cookie",
+      "hmac_12": "58d4c0d76500",
+      "length": 17,
+      "entropy": 3.57,
+      "count": 1,
+      "evidence": [
+        5
+      ]
+    },
+    {
+      "kind": "set-cookie",
+      "hmac_12": "6f18416e61bd",
+      "length": 58,
+      "entropy": 4.78,
+      "count": 1,
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "kind": "password",
+      "hmac_12": "c6acf83c0950",
+      "length": 12,
+      "entropy": 3.08,
+      "count": 1,
+      "evidence": [
+        10
+      ]
+    },
+    {
+      "kind": "email",
+      "hmac_12": "c8fa58cd2d35",
+      "length": 21,
+      "entropy": 3.69,
+      "count": 1,
+      "evidence": [
+        11
+      ]
+    },
+    {
+      "kind": "card",
+      "hmac_12": "269e0a6c4d15",
+      "length": 19,
+      "entropy": 0.91,
+      "count": 2,
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "kind": "$.cvv",
+      "hmac_12": "e36df4e6ad12",
+      "length": 3,
+      "entropy": 1.58,
+      "count": 1,
+      "evidence": [
+        14
+      ]
+    },
+    {
+      "kind": "aws_key",
+      "hmac_12": "0cf6d59e2b46",
+      "length": 20,
+      "entropy": 3.68,
+      "count": 1,
+      "evidence": [
+        16
+      ]
+    },
+    {
+      "kind": "path:email",
+      "hmac_12": "7d35297de88b",
+      "length": 17,
+      "entropy": 3.34,
+      "count": 1,
+      "evidence": [
+        19
+      ]
+    },
+    {
+      "kind": "path:token",
+      "hmac_12": "72d44278564f",
+      "length": 12,
+      "entropy": 3.58,
+      "count": 1,
+      "evidence": [
+        19
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": 0,
+      "source": "burp-history-admin-sample.xml",
+      "item": 0,
+      "method": "GET",
+      "host": "shop.example.com",
+      "path": "/admin",
+      "status": 200,
+      "mime": "HTML",
+      "role": "admin",
+      "request": {
+        "line": "GET /admin HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "shop.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "text/html"
+          ],
+          [
+            "Server",
+            "nginx/1.24.0"
+          ]
+        ],
+        "body": "<!doctype html><html><body>admin console</body></html>",
+        "truncated": false
+      }
+    },
+    {
+      "id": 1,
+      "source": "burp-history-admin-sample.xml",
+      "item": 1,
+      "method": "GET",
+      "host": "api.example.com",
+      "path": "/api/me",
+      "status": 200,
+      "mime": "JSON",
+      "role": "admin",
+      "request": {
+        "line": "GET /api/me HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/admin"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"id\":99,\"email\":\"[REDACTED:email]\",\"role\":\"admin\"}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 2,
+      "source": "burp-history-admin-sample.xml",
+      "item": 2,
+      "method": "GET",
+      "host": "api.example.com",
+      "path": "/api/admin/users",
+      "status": 200,
+      "mime": "JSON",
+      "role": "admin",
+      "request": {
+        "line": "GET /api/admin/users HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/admin"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"users\":[{\"id\":1},{\"id\":2}]}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 3,
+      "source": "burp-history-admin-sample.xml",
+      "item": 3,
+      "method": "POST",
+      "host": "api.example.com",
+      "path": "/api/admin/users",
+      "status": 201,
+      "mime": "JSON",
+      "role": "admin",
+      "request": {
+        "line": "POST /api/admin/users HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/admin"
+          ],
+          [
+            "Content-Type",
+            "application/json"
+          ]
+        ],
+        "body": "{\"email\":\"[REDACTED:email]\",\"role\":\"staff\"}",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 201 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"id\":3}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 4,
+      "source": "burp-history-admin-sample.xml",
+      "item": 4,
+      "method": "GET",
+      "host": "api.example.com",
+      "path": "/api/admin/audit",
+      "status": 200,
+      "mime": "JSON",
+      "role": "admin",
+      "request": {
+        "line": "GET /api/admin/audit HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/admin"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"events\":[{\"actor\":1,\"action\":\"login\"}]}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 5,
+      "source": "burp-history-sample.xml",
+      "item": 0,
+      "method": "GET",
+      "host": "shop.example.com",
+      "path": "/",
+      "status": 200,
+      "mime": "HTML",
+      "role": "user",
+      "request": {
+        "line": "GET / HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "shop.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "text/html"
+          ],
+          [
+            "Server",
+            "nginx/1.24.0"
+          ],
+          [
+            "X-Powered-By",
+            "Express"
+          ],
+          [
+            "Set-Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Set-Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Strict-Transport-Security",
+            "max-age=63072000"
+          ]
+        ],
+        "body": "<!doctype html><html><body><h1>Example Shop</h1></body></html>",
+        "truncated": false
+      }
+    },
+    {
+      "id": 6,
+      "source": "burp-history-sample.xml",
+      "item": 1,
+      "method": "GET",
+      "host": "shop.example.com",
+      "path": "/login",
+      "status": 200,
+      "mime": "HTML",
+      "role": "user",
+      "request": {
+        "line": "GET /login HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "shop.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "text/html"
+          ],
+          [
+            "Server",
+            "nginx/1.24.0"
+          ]
+        ],
+        "body": "<!doctype html><html><head><title>Sign in</title><script src=\"https://cdn.example.com/static/app.js\"></script></head><body><form method=\"post\" action=\"https://api.example.com/auth/login\"><input name=\"username\"><input name=\"password\" type=\"password\"></form></body></html>",
+        "truncated": false
+      }
+    },
+    {
+      "id": 7,
+      "source": "burp-history-sample.xml",
+      "item": 2,
+      "method": "GET",
+      "host": "shop.example.com",
+      "path": "/dashboard",
+      "status": 200,
+      "mime": "HTML",
+      "role": "user",
+      "request": {
+        "line": "GET /dashboard HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "shop.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "text/html"
+          ],
+          [
+            "Server",
+            "nginx/1.24.0"
+          ]
+        ],
+        "body": "<!doctype html><html><body>dashboard<script src=\"https://cdn.example.com/static/app.js\"></script></body></html>",
+        "truncated": false
+      }
+    },
+    {
+      "id": 8,
+      "source": "burp-history-sample.xml",
+      "item": 3,
+      "method": "GET",
+      "host": "cdn.example.com",
+      "path": "/static/app.js",
+      "status": 200,
+      "mime": "script",
+      "role": "user",
+      "request": {
+        "line": "GET /static/app.js HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "cdn.example.com"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/javascript"
+          ],
+          [
+            "Server",
+            "cloudflare"
+          ]
+        ],
+        "body": "\nconst API = \"https://api.example.com\";\nexport async function boot(id) {\n  await fetch(\"https://api.example.com/api/me\", {headers:{Authorization:token}});\n  await fetch(\"https://api.example.com/api/orders\");\n  await fetch(`https://api.example.com/api/orders/${id}`);\n  await axios.post(\"https://api.example.com/api/checkout\", body);\n  await fetch(\"https://api.example.com/graphql\", {method:\"POST\", body:q});\n  // referenced but never called in this capture \u2014 the interesting column\n  const AUDIT_URL = \"https://api.example.com/api/admin/audit\";\n  return AUDIT_URL;\n}\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle",
+        "truncated": true
+      }
+    },
+    {
+      "id": 9,
+      "source": "burp-history-sample.xml",
+      "item": 4,
+      "method": "GET",
+      "host": "cdn.example.com",
+      "path": "/static/style.css",
+      "status": 200,
+      "mime": "CSS",
+      "role": "user",
+      "request": {
+        "line": "GET /static/style.css HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "cdn.example.com"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "text/css"
+          ],
+          [
+            "Server",
+            "cloudflare"
+          ]
+        ],
+        "body": "body{color:#111}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 10,
+      "source": "burp-history-sample.xml",
+      "item": 5,
+      "method": "POST",
+      "host": "api.example.com",
+      "path": "/auth/login",
+      "status": 200,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "POST /auth/login HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/login"
+          ],
+          [
+            "Content-Type",
+            "application/x-www-form-urlencoded"
+          ]
+        ],
+        "body": "username=shopper&password=[REDACTED]&remember=1",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ],
+          [
+            "Set-Cookie",
+            "[REDACTED]"
+          ]
+        ],
+        "body": "{\"ok\":true}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 11,
+      "source": "burp-history-sample.xml",
+      "item": 6,
+      "method": "GET",
+      "host": "api.example.com",
+      "path": "/api/me",
+      "status": 200,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "GET /api/me HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/dashboard"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"id\":1,\"email\":\"[REDACTED:email]\",\"name\":\"Test Shopper\"}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 12,
+      "source": "burp-history-sample.xml",
+      "item": 7,
+      "method": "GET",
+      "host": "api.example.com",
+      "path": "/api/orders",
+      "status": 200,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "GET /api/orders HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/dashboard"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"orders\":[{\"id\":42}]}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 13,
+      "source": "burp-history-sample.xml",
+      "item": 8,
+      "method": "GET",
+      "host": "api.example.com",
+      "path": "/api/orders/{id}",
+      "status": 200,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "GET /api/orders/42 HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/dashboard"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"id\":42,\"total\":1999}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 14,
+      "source": "burp-history-sample.xml",
+      "item": 9,
+      "method": "POST",
+      "host": "api.example.com",
+      "path": "/api/checkout",
+      "status": 200,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "POST /api/checkout HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/dashboard"
+          ],
+          [
+            "Content-Type",
+            "application/json"
+          ]
+        ],
+        "body": "{\"order\":42,\"card\":\"[REDACTED:card]\",\"cvv\":\"[REDACTED]\"}",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"paid\":true}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 15,
+      "source": "burp-history-sample.xml",
+      "item": 10,
+      "method": "OPTIONS",
+      "host": "api.example.com",
+      "path": "/api/checkout",
+      "status": 204,
+      "mime": "",
+      "role": "user",
+      "request": {
+        "line": "OPTIONS /api/checkout HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Origin",
+            "https://shop.example.com"
+          ],
+          [
+            "Access-Control-Request-Method",
+            "POST"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 204 X",
+        "headers": [
+          [
+            "Access-Control-Allow-Origin",
+            "https://shop.example.com"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      }
+    },
+    {
+      "id": 16,
+      "source": "burp-history-sample.xml",
+      "item": 11,
+      "method": "POST",
+      "host": "api.example.com",
+      "path": "/api/export",
+      "status": 200,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "POST /api/export HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/dashboard"
+          ],
+          [
+            "Content-Type",
+            "application/json"
+          ]
+        ],
+        "body": "{\"format\":\"csv\"}",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"url\":\"https://storage.example.net/e/[REDACTED:aws_key].csv\"}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 17,
+      "source": "burp-history-sample.xml",
+      "item": 12,
+      "method": "POST",
+      "host": "api.example.com",
+      "path": "/graphql",
+      "status": 200,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "POST /graphql HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/dashboard"
+          ],
+          [
+            "Content-Type",
+            "application/json"
+          ]
+        ],
+        "body": "{\"operationName\":\"GetProfile\",\"query\":\"query GetProfile { me { id email } }\"}",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"data\":{\"me\":{\"id\":1}}}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 18,
+      "source": "burp-history-sample.xml",
+      "item": 13,
+      "method": "GET",
+      "host": "api.example.com",
+      "path": "/api/admin/users",
+      "status": 403,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "GET /api/admin/users HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Authorization",
+            "[REDACTED]"
+          ],
+          [
+            "Cookie",
+            "[REDACTED]"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/dashboard"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 403 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"error\":\"forbidden\"}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 19,
+      "source": "burp-history-sample.xml",
+      "item": 14,
+      "method": "GET",
+      "host": "api.example.com",
+      "path": "/api/reset/{email}/{token}",
+      "status": 200,
+      "mime": "JSON",
+      "role": "user",
+      "request": {
+        "line": "GET /api/reset/{email}/{token} HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "api.example.com"
+          ],
+          [
+            "Referer",
+            "https://shop.example.com/login"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Server",
+            "gunicorn/21.2"
+          ]
+        ],
+        "body": "{\"valid\":true}",
+        "truncated": false
+      }
+    },
+    {
+      "id": 20,
+      "source": "burp-history-sample.xml",
+      "item": 15,
+      "method": "GET",
+      "host": "cdn.analytics.test",
+      "path": "/tag.js",
+      "status": 200,
+      "mime": "script",
+      "role": "user",
+      "request": {
+        "line": "GET /tag.js HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "cdn.analytics.test"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/javascript"
+          ]
+        ],
+        "body": "// analytics",
+        "truncated": false
+      }
+    },
+    {
+      "id": 21,
+      "source": "burp-history-sample.xml",
+      "item": 16,
+      "method": "GET",
+      "host": "www.googletagmanager.com",
+      "path": "/gtm.js",
+      "status": 200,
+      "mime": "script",
+      "role": "user",
+      "request": {
+        "line": "GET /gtm.js?id=GTM-XXXX HTTP/1.1",
+        "headers": [
+          [
+            "Host",
+            "www.googletagmanager.com"
+          ]
+        ],
+        "body": "",
+        "truncated": false
+      },
+      "response": {
+        "line": "HTTP/1.1 200 X",
+        "headers": [
+          [
+            "Content-Type",
+            "application/javascript"
+          ]
+        ],
+        "body": "// gtm",
+        "truncated": false
+      }
+    }
+  ]
+}

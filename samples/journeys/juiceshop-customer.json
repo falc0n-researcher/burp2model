@@ -1,0 +1,30 @@
+{
+  "name": "juice shop customer: register, log in, shop, pay",
+  "vars": {"email": "journey.${env:JS_SUFFIX}@b2m-test.dev"},
+  "steps": [
+    {"request": {"method": "POST", "path": "/api/Users", "expect": [200, 201],
+                 "json": {"email": "${email}", "password": "${env:JS_PASSWORD}", "passwordRepeat": "${env:JS_PASSWORD}",
+                          "securityQuestion": {"id": 1}, "securityAnswer": "Marlowe"}}, "required": true},
+    {"request": {"method": "POST", "path": "/rest/user/login", "expect": 200,
+                 "json": {"email": "${email}", "password": "${env:JS_PASSWORD}"},
+                 "extract": {"token": "authentication.token", "bid": "authentication.bid"}}, "required": true},
+    {"set_header": {"Authorization": "Bearer ${token}"}},
+    {"set_storage": {"token": "${token}"}},
+    {"set_cookie": {"token": "${token}"}},
+    {"goto": "/#/search"},
+    {"wait_idle": true},
+    {"request": {"method": "POST", "path": "/api/BasketItems", "json": {"ProductId": 1, "BasketId": "${bid}", "quantity": 1}}},
+    {"request": {"method": "POST", "path": "/api/Addresss",
+                 "json": {"country": "Testland", "fullName": "Test Er", "mobileNum": 5551234567, "zipCode": "12345",
+                          "streetAddress": "1 Probe Street", "city": "Examplia"},
+                 "extract": {"aid": "data.id"}}},
+    {"request": {"method": "POST", "path": "/api/Cards",
+                 "json": {"fullName": "Test Er", "cardNum": 4111111111111111, "expMonth": 12, "expYear": 2090},
+                 "extract": {"cid": "data.id"}}},
+    {"request": {"method": "POST", "path": "/rest/basket/${bid}/checkout",
+                 "json": {"orderDetails": {"paymentId": "${cid}", "addressId": "${aid}", "deliveryMethodId": "1"}}}},
+    {"request": {"method": "GET", "path": "/rest/order-history"}},
+    {"goto": "/#/order-history"},
+    {"wait_idle": true}
+  ]
+}

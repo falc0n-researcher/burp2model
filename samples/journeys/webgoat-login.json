@@ -1,0 +1,16 @@
+{"name": "WebGoat: register (once), then log in",
+ "steps": [
+  {"goto": "/WebGoat/registration"},
+  {"fill": {"selector": "input[name=username]", "value": "${env:WG_USER}"}},
+  {"fill": {"selector": "input[name=password]", "value": "${env:WG_PASS}"}},
+  {"fill": {"selector": "input[name=matchingPassword]", "value": "${env:WG_PASS}"}},
+  {"click": {"selector": "input[name=agree],#agree"}},
+  {"click": {"selector": "button[type=submit]"}},
+  {"wait_idle": true},
+  {"goto": "/WebGoat/login"},
+  {"fill": {"selector": "input[name=username]", "value": "${env:WG_USER}"}},
+  {"fill": {"selector": "input[name=password]", "value": "${env:WG_PASS}"}},
+  {"click": {"selector": "button[type=submit]"}},
+  {"wait_idle": true},
+  {"assert": {"not_text": "Invalid username"}, "required": true}
+ ]}

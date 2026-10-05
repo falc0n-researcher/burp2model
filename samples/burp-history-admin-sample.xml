@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<!DOCTYPE items [<!ELEMENT items ANY>]>
+<items burpVersion="2026.1" exportTime="Wed Sep 23 22:10:00 IST 2026">
+  <item>
+    <url>https://shop.example.com/admin</url>
+    <host ip="203.0.113.10">shop.example.com</host>
+    <port>443</port>
+    <protocol>https</protocol>
+    <method>GET</method>
+    <path>/admin</path>
+    <status>200</status>
+    <mimetype>HTML</mimetype>
+    <request base64="true">R0VUIC9hZG1pbiBIVFRQLzEuMQ0KSG9zdDogc2hvcC5leGFtcGxlLmNvbQ0KQXV0aG9yaXphdGlvbjogQmVhcmVyIGV5SmhiR2NpT2lKSVV6STFOaUo5LmV5SnpkV0lpT2lJNU9TSXNJbkp2YkdVaU9pSmhaRzFwYmlKOS5abTl2WW1GeVlXUnRhVzV6YVdjDQpDb29raWU6IHNlc3Npb249YWRtMW5TRVNTSU9OOXhWQUxVRXF3ZXJ0eTQyOyBjYXJ0PTAwDQoNCg==</request>
+    <response base64="true">SFRUUC8xLjEgMjAwIFgNCkNvbnRlbnQtVHlwZTogdGV4dC9odG1sDQpTZXJ2ZXI6IG5naW54LzEuMjQuMA0KDQo8IWRvY3R5cGUgaHRtbD48aHRtbD48Ym9keT5hZG1pbiBjb25zb2xlPC9ib2R5PjwvaHRtbD4=</response>
+  </item>
+  <item>
+    <url>https://api.example.com/api/me</url>
+    <host ip="203.0.113.10">api.example.com</host>
+    <port>443</port>
+    <protocol>https</protocol>
+    <method>GET</method>
+    <path>/api/me</path>
+    <status>200</status>
+    <mimetype>JSON</mimetype>
+    <request base64="true">R0VUIC9hcGkvbWUgSFRUUC8xLjENCkhvc3Q6IGFwaS5leGFtcGxlLmNvbQ0KQXV0aG9yaXphdGlvbjogQmVhcmVyIGV5SmhiR2NpT2lKSVV6STFOaUo5LmV5SnpkV0lpT2lJNU9TSXNJbkp2YkdVaU9pSmhaRzFwYmlKOS5abTl2WW1GeVlXUnRhVzV6YVdjDQpDb29raWU6IHNlc3Npb249YWRtMW5TRVNTSU9OOXhWQUxVRXF3ZXJ0eTQyOyBjYXJ0PTAwDQpSZWZlcmVyOiBodHRwczovL3Nob3AuZXhhbXBsZS5jb20vYWRtaW4NCg0K</request>
+    <response base64="true">SFRUUC8xLjEgMjAwIFgNCkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vanNvbg0KU2VydmVyOiBndW5pY29ybi8yMS4yDQoNCnsiaWQiOjk5LCJlbWFpbCI6ImFkbWluQHNob3AuZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4ifQ==</response>
+  </item>
+  <item>
+    <url>https://api.example.com/api/admin/users</url>
+    <host ip="203.0.113.10">api.example.com</host>
+    <port>443</port>
+    <protocol>https</protocol>
+    <method>GET</method>
+    <path>/api/admin/users</path>
+    <status>200</status>
+    <mimetype>JSON</mimetype>
+    <request base64="true">R0VUIC9hcGkvYWRtaW4vdXNlcnMgSFRUUC8xLjENCkhvc3Q6IGFwaS5leGFtcGxlLmNvbQ0KQXV0aG9yaXphdGlvbjogQmVhcmVyIGV5SmhiR2NpT2lKSVV6STFOaUo5LmV5SnpkV0lpT2lJNU9TSXNJbkp2YkdVaU9pSmhaRzFwYmlKOS5abTl2WW1GeVlXUnRhVzV6YVdjDQpDb29raWU6IHNlc3Npb249YWRtMW5TRVNTSU9OOXhWQUxVRXF3ZXJ0eTQyOyBjYXJ0PTAwDQpSZWZlcmVyOiBodHRwczovL3Nob3AuZXhhbXBsZS5jb20vYWRtaW4NCg0K</request>
+    <response base64="true">SFRUUC8xLjEgMjAwIFgNCkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vanNvbg0KU2VydmVyOiBndW5pY29ybi8yMS4yDQoNCnsidXNlcnMiOlt7ImlkIjoxfSx7ImlkIjoyfV19</response>
+  </item>
+  <item>
+    <url>https://api.example.com/api/admin/users</url>
+    <host ip="203.0.113.10">api.example.com</host>
+    <port>443</port>
+    <protocol>https</protocol>
+    <method>POST</method>
+    <path>/api/admin/users</path>
+    <status>201</status>
+    <mimetype>JSON</mimetype>
+    <request base64="true">UE9TVCAvYXBpL2FkbWluL3VzZXJzIEhUVFAvMS4xDQpIb3N0OiBhcGkuZXhhbXBsZS5jb20NCkF1dGhvcml6YXRpb246IEJlYXJlciBleUpoYkdjaU9pSklVekkxTmlKOS5leUp6ZFdJaU9pSTVPU0lzSW5KdmJHVWlPaUpoWkcxcGJpSjkuWm05dlltRnlZV1J0YVc1emFXYw0KQ29va2llOiBzZXNzaW9uPWFkbTFuU0VTU0lPTjl4VkFMVUVxd2VydHk0MjsgY2FydD0wMA0KUmVmZXJlcjogaHR0cHM6Ly9zaG9wLmV4YW1wbGUuY29tL2FkbWluDQpDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24NCg0KeyJlbWFpbCI6Im5ld0BleGFtcGxlLmNvbSIsInJvbGUiOiJzdGFmZiJ9</request>
+    <response base64="true">SFRUUC8xLjEgMjAxIFgNCkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vanNvbg0KU2VydmVyOiBndW5pY29ybi8yMS4yDQoNCnsiaWQiOjN9</response>
+  </item>
+  <item>
+    <url>https://api.example.com/api/admin/audit</url>
+    <host ip="203.0.113.10">api.example.com</host>
+    <port>443</port>
+    <protocol>https</protocol>
+    <method>GET</method>
+    <path>/api/admin/audit</path>
+    <status>200</status>
+    <mimetype>JSON</mimetype>
+    <request base64="true">R0VUIC9hcGkvYWRtaW4vYXVkaXQgSFRUUC8xLjENCkhvc3Q6IGFwaS5leGFtcGxlLmNvbQ0KQXV0aG9yaXphdGlvbjogQmVhcmVyIGV5SmhiR2NpT2lKSVV6STFOaUo5LmV5SnpkV0lpT2lJNU9TSXNJbkp2YkdVaU9pSmhaRzFwYmlKOS5abTl2WW1GeVlXUnRhVzV6YVdjDQpDb29raWU6IHNlc3Npb249YWRtMW5TRVNTSU9OOXhWQUxVRXF3ZXJ0eTQyOyBjYXJ0PTAwDQpSZWZlcmVyOiBodHRwczovL3Nob3AuZXhhbXBsZS5jb20vYWRtaW4NCg0K</request>
+    <response base64="true">SFRUUC8xLjEgMjAwIFgNCkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vanNvbg0KU2VydmVyOiBndW5pY29ybi8yMS4yDQoNCnsiZXZlbnRzIjpbeyJhY3RvciI6MSwiYWN0aW9uIjoibG9naW4ifV19</response>
+  </item>
+</items>

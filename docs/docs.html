@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs — burp2model</title>
+<meta name="description" content="burp2model reference: install, quickstart, outputs, the six-layer model, query intents, redaction and limits.">
+<meta name="theme-color" content="#0a0d12">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="./" aria-label="burp2model home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 21.5 16 26l10-4.5" fill="none" stroke="#39d0ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 16.5 16 21l10-4.5" fill="none" stroke="#a594ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6 6 10.5 16 15l10-4.5z" fill="#ff6a1a"/></svg>
+      <span>burp<b>2</b>model</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a class="hide-sm" href="./#how">How it works</a>
+      <a href="docs.html" aria-current="page">Docs</a>
+      <a href="https://github.com/falc0n-researcher/burp2model" aria-label="GitHub repository">GitHub</a>
+      <button class="icon-btn theme-toggle" type="button" aria-label="Toggle light and dark theme">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap docs">
+
+<div>
+  <button class="btn side-toggle" type="button" aria-expanded="false" aria-controls="sidebar">On this page <span aria-hidden="true">▾</span></button>
+  <nav class="sidebar" id="sidebar" aria-label="Documentation">
+    <h4>Start</h4>
+    <a href="#overview">Overview</a>
+    <a href="#install">Install</a>
+    <a href="#quickstart">Quickstart</a>
+    <h4>Reference</h4>
+    <a href="#outputs">Outputs</a>
+    <a href="#layers">The six layers</a>
+    <a href="#query">Query intents</a>
+    <a href="#redaction">Redaction</a>
+    <h4>More</h4>
+    <a href="#limits">Limits</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+</div>
+
+<main id="main" class="prose">
+
+<div class="doc-section" id="overview">
+  <span class="kicker">Documentation · v1.0.0</span>
+  <h1>burp2model</h1>
+  <p class="lead">burp2model turns Burp traffic into an evidence-backed model of a web app. It is a model builder, not a scanner.</p>
+  <ul>
+    <li>Pure Python, no runtime dependencies. It never replays your capture.</li>
+    <li>Every node and edge cites the requests it came from (<code>ev_N</code>).</li>
+    <li>Secret values are masked before anything is written.</li>
+    <li>It names what the capture could not tell you, and never calls anything a vulnerability.</li>
+  </ul>
+</div>
+
+<div class="doc-section" id="install">
+  <h2>Install <a class="anchor" href="#install" aria-label="Link to Install">#</a></h2>
+  <p>Python 3.9 or newer.</p>
+  <div class="code"><span class="label">shell</span><button class="copy" type="button" data-copy aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><pre>pip install burp2model
+burp2model --version</pre></div>
+  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (288 tests).</p>
+</div>
+
+<div class="doc-section" id="quickstart">
+  <h2>Quickstart <a class="anchor" href="#quickstart" aria-label="Link to Quickstart">#</a></h2>
+  <p>In Burp, open <b>Proxy → HTTP history</b>, select all, right-click, <b>Save items</b>. Keep base64 encoding on. Burp Community works. Only capture traffic you are authorized to record.</p>
+  <div class="code"><span class="label">shell</span><button class="copy" type="button" data-copy aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><pre><span class="c"># build: writes burp2model-out/shop/</span>
+burp2model history.xml --webapp shop
+
+<span class="c"># ask: no AI, every line cited</span>
+burp2model query shop "code vs runtime"
+burp2model query shop help
+
+<span class="c"># two accounts: one build per role, then compare</span>
+burp2model user.xml  -w shop --role user
+burp2model admin.xml -w shop --role admin
+burp2model cross-role shop --low user --high admin</pre></div>
+  <p>No Burp? <code>burp2model crawl URL --yes -w shop</code> crawls a running app and builds the same model. It sends live requests, so use it only on apps you are authorized to test. <code>--read-only</code> blocks anything but GET, HEAD and OPTIONS.</p>
+  <p>Output of <code>query shop "code vs runtime"</code> on the bundled sample:</p>
+  <div class="code"><pre>APIs: 10 endpoints
+  BOTH         6
+  STATIC_ONLY  1
+  RUNTIME_ONLY 3
+    static-only  * /api/admin/audit  ev_3</pre></div>
+  <p><code>STATIC_ONLY</code> means the code names the path but the capture never requested it. The <code>*</code> means the code gave no HTTP method, so none is guessed.</p>
+</div>
+
+<div class="doc-section" id="outputs">
+  <h2>Outputs <a class="anchor" href="#outputs" aria-label="Link to Outputs">#</a></h2>
+  <p>Every build writes <code>burp2model-out/WEBAPP/</code>. The default <code>--webapp</code> name is <code>app</code>.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>File</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><code>report.html</code></td><td>Offline dashboard with a map, a query console and an evidence drawer. <a href="demo/report.html">Demo</a></td></tr>
+      <tr><td><code>model.json</code></td><td>The full graph, unknowns and the evidence table. <a href="demo/model.json">Example</a></td></tr>
+      <tr><td><code>context.json</code></td><td>A compact package of the model. <a href="demo/context.json">Example</a></td></tr>
+      <tr><td><code>graph.db</code></td><td>One SQLite file with the graph and redacted exchanges. <code>burp2model q WEBAPP</code> queries it.</td></tr>
+      <tr><td><code>graph.json</code> · <code>graph.graphml</code></td><td>The graph for D3, Cytoscape, Gephi and yEd.</td></tr>
+      <tr><td><code>build.svg</code></td><td>The build animation.</td></tr>
+      <tr><td><code>inputs/&lt;role&gt;.jsonl</code></td><td>Redacted per-role records. Role builds merge from these.</td></tr>
+    </tbody>
+  </table></div>
+  <p>By default a build also runs light recon on the primary public host and saves <code>osint.json</code>. It fails soft. Use <code>--no-osint</code> or <code>BURP2MODEL_OFFLINE=1</code> to stay offline.</p>
+</div>
+
+<div class="doc-section" id="layers">
+  <h2>The six layers <a class="anchor" href="#layers" aria-label="Link to The six layers">#</a></h2>
+  <div class="layers" style="margin:20px 0">
+    <div class="layer" style="--c:var(--l6)"><span class="n">6</span><span class="name">unknowns</span><span class="desc">Named blind spots, each with a next step.</span></div>
+    <div class="layer" style="--c:var(--l5)"><span class="n">5</span><span class="name">trust</span><span class="desc"><code>third_party</code>, <code>role</code>, <code>auth</code>, <code>cookie</code></span></div>
+    <div class="layer" style="--c:var(--l4)"><span class="n">4</span><span class="name">apis</span><span class="desc"><code>endpoint</code>, <code>parameter</code>, <code>operation</code> (GraphQL)</span></div>
+    <div class="layer" style="--c:var(--l3)"><span class="n">3</span><span class="name">code</span><span class="desc"><code>script</code>, plus the workers it spawns and the source map it names.</span></div>
+    <div class="layer" style="--c:var(--l2)"><span class="n">2</span><span class="name">routes</span><span class="desc"><code>route</code>: pages, redirects and other GET resources</span></div>
+    <div class="layer" style="--c:var(--l1)"><span class="n">1</span><span class="name">edge</span><span class="desc"><code>host</code>: schemes, ports, server headers</span></div>
+  </div>
+  <ul>
+    <li>Every edge is <span class="pill obs">OBSERVED</span> (seen in traffic) or <span class="pill inf">INFERRED</span> (read from code). Recon edges are <code>EXTERNAL</code>.</li>
+    <li>Layer 3: a script that starts a worker gets a <code>SPAWNS</code> edge (inferred). A script that names a source map gets a <code>sourcemap</code> attribute. If the map is not in the capture, the model raises the unknown <code>SOURCE_MAP_NOT_CAPTURED</code>.</li>
+    <li>Reconciliation compares endpoints named in code with endpoints seen at runtime: <span class="pill both">BOTH</span>, <span class="pill static">STATIC_ONLY</span> or <span class="pill runtime">RUNTIME_ONLY</span>.</li>
+    <li>Scope: the busiest host sets the first-party domain (by Public Suffix List). Everything else is a third party. Override with <code>--scope</code>.</li>
+    <li>Unknowns include <code>AUTHENTICATED_STATE_NOT_OBSERVED</code>, <code>ROLE_NOT_TAGGED</code>, <code>API_PURPOSE_UNKNOWN</code>, <code>AUTHORIZATION_UNKNOWN</code> and <code>CAPTURE_ITEMS_SKIPPED</code>.</li>
+  </ul>
+  <div class="callout"><span class="i">i</span><p>An absence in the model is an absence in the capture, not a statement about the target.</p></div>
+</div>
+
+<div class="doc-section" id="query">
+  <h2>Query intents <a class="anchor" href="#query" aria-label="Link to Query intents">#</a></h2>
+  <p><code>burp2model query WEBAPP "INTENT"</code> answers from the model with no language model. Every line is cited and ends with <code>Model call: none</code>.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Intent</th><th>Answers</th></tr></thead>
+    <tbody>
+      <tr><td><code>list-apis</code></td><td>Every endpoint with state, statuses and evidence.</td></tr>
+      <tr><td><code>reconcile</code></td><td>Code vs runtime counts. <code>code vs runtime</code> also works.</td></tr>
+      <tr><td><code>list-routes</code></td><td>Every route.</td></tr>
+      <tr><td><code>route-apis /x</code></td><td>The APIs a route calls, directly or through its scripts.</td></tr>
+      <tr><td><code>provenance /api/orders</code></td><td>Where an endpoint was seen: evidence, statuses, roles, callers.</td></tr>
+      <tr><td><code>third-parties</code></td><td>Off-scope hosts.</td></tr>
+      <tr><td><code>auth-surface</code></td><td>Credentials, roles and cookie flags.</td></tr>
+      <tr><td><code>unknowns</code></td><td>What the capture could not answer.</td></tr>
+      <tr><td><code>entity-evidence NAME</code></td><td>The evidence ids behind any node, by label.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Also available: <code>parameters</code>, <code>secrets</code> (masked), <code>privileged</code>, <code>errors</code> and <code>shape</code>. Any question that matches no intent is refused, not guessed.</p>
+  <p>For filters over <code>graph.db</code>, use <code>burp2model q WEBAPP 'req.method:POST AND resp.code.gte:400'</code>. <code>q WEBAPP help</code> lists the language.</p>
+</div>
+
+<div class="doc-section" id="redaction">
+  <h2>Redaction <a class="anchor" href="#redaction" aria-label="Link to Redaction">#</a></h2>
+  <p>Before an exchange leaves the parser, every value is masked and every name and shape is kept. <code>password=hunter2</code> becomes <code>password=[REDACTED]</code>.</p>
+  <ul>
+    <li>Headers such as <code>Authorization</code>, <code>Cookie</code> and <code>Set-Cookie</code>.</li>
+    <li>Sensitive parameter names, plus JWTs, API keys, private keys, card numbers and emails wherever they appear.</li>
+    <li>Value-like URL segments: <code>/reset/alice@corp.com/Zx9kQ2pLm7Rt</code> becomes <code>/reset/{email}/{token}</code>.</li>
+  </ul>
+  <p>Bodies are never written to disk. A masked value is kept only as a keyed HMAC fingerprint (kind, length, entropy, count). The key lives at <code>~/.config/burp2model/fingerprint.key</code>. Tests check that no planted secret reaches any output file. The HTML report escapes every string from the target and blocks network requests with a strict CSP.</p>
+</div>
+
+<div class="doc-section" id="limits">
+  <h2>Limits <a class="anchor" href="#limits" aria-label="Link to Limits">#</a></h2>
+  <ul>
+    <li>Endpoint extraction from code is pattern-based, not a JavaScript parser. URLs built at runtime can be missed.</li>
+    <li>Path-token masking uses shape and entropy. A short token can survive, and an odd slug can be masked.</li>
+    <li>Default scope uses the busiest host. A capture dominated by a CDN can pick the wrong site. Use <code>--scope</code>.</li>
+    <li>"Privileged-looking" in <code>cross-role</code> is a path-name heuristic.</li>
+    <li>Page-to-API edges depend on the Referer header. Strict policies give fewer <code>CALLS</code> edges.</li>
+    <li>The model covers only what was captured. Nothing it reports is a finding.</li>
+  </ul>
+</div>
+
+<div class="doc-section" id="faq">
+  <h2>FAQ <a class="anchor" href="#faq" aria-label="Link to FAQ">#</a></h2>
+  <h3>Is this a scanner?</h3>
+  <p>No. It reads a capture you already made. It never sends requests to build a model from a Burp export. Only <code>crawl</code>, <code>osint</code> and the default build recon touch the network.</p>
+  <h3>Is it safe to share the outputs?</h3>
+  <p>They hold no secret values or bodies. They do hold hostnames, paths and parameter names, so treat them as engagement material. Never share the fingerprint key.</p>
+  <h3>My API subdomain shows as a third party.</h3>
+  <p>It is under a different registrable domain. Pass <code>--scope</code> with both domains.</p>
+  <h3>cross-role says a role is missing.</h3>
+  <p>Build each capture with <code>--role</code> into the same <code>--out</code> and <code>--webapp</code>. A build without <code>--role</code> starts over.</p>
+  <h3>Can I open <code>graph.db</code> directly?</h3>
+  <p>Yes. It is plain SQLite. <code>burp2model q WEBAPP schema</code> lists the tables.</p>
+</div>
+
+</main>
+
+<aside class="toc-right" aria-label="Quick links">
+  <h4>Quick links</h4>
+  <a href="demo/report.html">Live report demo</a>
+  <a href="demo/context.json">Sample context.json</a>
+  <a href="demo/model.json">Sample model.json</a>
+  <a href="https://github.com/falc0n-researcher/burp2model/blob/main/CHANGELOG.md">Changelog</a>
+  <a href="https://github.com/falc0n-researcher/burp2model/issues">Report an issue</a>
+</aside>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>Built by <a href="https://falc0n.tech">falc0n</a> · Apache-2.0 · <span data-year>2026</span></span>
+    <nav aria-label="Footer">
+      <a href="./">Home</a>
+      <a href="https://github.com/falc0n-researcher/burp2model">GitHub</a>
+      <a href="https://pypi.org/project/burp2model/">PyPI</a>
+      <a href="https://x.com/0xfa1c0n">@0xfa1c0n</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

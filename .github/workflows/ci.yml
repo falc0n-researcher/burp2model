@@ -1,0 +1,83 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+        env:
+          BURP2MODEL_CHROME_NO_SANDBOX: "1"
+      - name: No planted secret in any derived file
+        env:
+          BURP2MODEL_FP_KEY: ci
+          BURP2MODEL_OFFLINE: "1"
+        run: |
+          burp2model samples/burp-history-sample.xml       -w shop --role user  --out out
+          burp2model samples/burp-history-admin-sample.xml -w shop --role admin --out out
+          burp2model cross-role shop --low user --high admin --out out
+          burp2model query shop "code vs runtime" --out out
+          burp2model q shop 'req.method:POST AND resp.code.gte:200' --out out
+          burp2model q shop 'reach "POST /api/checkout"' --out out
+          for s in s3cr3tSESSIONv4lue123456 AKIAIOSFODNN7EXAMPLE user@shop.example.com eyJhbGciOiJIUzI1NiJ9; do
+            if grep -r -- "$s" out/; then echo "LEAK: $s"; exit 1; fi
+          done
+      - name: Planted body/fragment secrets never survive redaction
+        env:
+          BURP2MODEL_FP_KEY: ci
+        run: |
+          python - <<'EOF'
+          from burp2model.redact import redact_named
+          panes = [
+              "old_password=hunter1&new_password=hunter2",
+              '{"access_token":"opaqueABCdef","newPassword":"hunter2"}',
+              "Location: /cb#access_token=opaqueXYZ",
+          ]
+          for p in panes:
+              out = redact_named(p)
+              for v in ("hunter1", "hunter2", "opaqueABCdef", "opaqueXYZ"):
+                  assert v not in out, f"LEAK in {out!r}"
+          print("redaction pane checks passed")
+          EOF
+      - name: Same export builds a byte-identical model
+        env:
+          BURP2MODEL_FP_KEY: ci
+          BURP2MODEL_OFFLINE: "1"
+          SOURCE_DATE_EPOCH: "0"
+        run: |
+          burp2model samples/burp-history-sample.xml -w shop --out det1
+          sleep 2
+          burp2model samples/burp-history-sample.xml -w shop --out det2
+          diff -r det1 det2
+
+  wheel:
+    name: clean-venv install from the built wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build && python -m build --wheel
+      - name: Install into a fresh venv and run the demo
+        env:
+          BURP2MODEL_FP_KEY: ci
+          BURP2MODEL_OFFLINE: "1"
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install dist/*.whl
+          /tmp/clean/bin/burp2model --version
+          /tmp/clean/bin/burp2model samples/burp-history-sample.xml -w shop --out wheel-out
+          /tmp/clean/bin/burp2model query shop "code vs runtime" --out wheel-out | grep "Model call: none"

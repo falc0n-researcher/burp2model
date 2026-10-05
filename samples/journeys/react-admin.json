@@ -1,0 +1,10 @@
+{"name": "React shop: the admin",
+ "steps": [
+  {"goto": "/login"},
+  {"fill": {"selector": "input[name=email]", "value": "${env:RSA_EMAIL}"}},
+  {"fill": {"selector": "input[name=password]", "value": "${env:RSA_PASS}"}},
+  {"click": {"text": "Sign in", "selector": "button"}, "required": true},
+  {"wait_idle": true},
+  {"goto": "/admin"},
+  {"wait_idle": true}
+ ]}
