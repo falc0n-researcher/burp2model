@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the demo report from the bundled samples and open it.
+# Build the demo report from the bundled samples (no network).
 # Usage: ./demo.sh [output-dir]
 set -euo pipefail
 
