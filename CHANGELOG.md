@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 — 2026-10-08
+
+- **`build` is fully offline by default.** External recon (DNS, TLS, headers) no longer runs
+  unless you pass `--osint` to `build` or `crawl`, or run the `osint` command.
+  `BURP2MODEL_OFFLINE=1` still forces it off. The `--no-osint` flag is gone, since it is now
+  the default.
+- Docs trimmed and corrected to match.
+
 ## 1.0.0 — 2026-10-06 (first release)
 
 burp2model turns a web app's traffic into an evidence-backed model of its attack surface that
@@ -49,7 +57,7 @@ unknown instead of guessed.
 - A self-contained interactive HTML report, `model.json`, `graph.json`, `graph.graphml`,
   Cypher export, and an animated build SVG.
 - `cross-role`, `gaps`, `changes` (drift between two models, grouped by feature area) and
-  `osint` (opt-in: `build --osint`, or the `osint` command; `BURP2MODEL_OFFLINE=1` forces it off).
+  `osint` (run by `build` unless `--no-osint`; `BURP2MODEL_OFFLINE=1` disables it).
 
 ### Validated on
 OWASP Juice Shop, DVWA, Mutillidae II, WebGoat, a React SPA and three real Logger++ exports.
