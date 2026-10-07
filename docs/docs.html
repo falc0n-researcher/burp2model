@@ -176,6 +176,7 @@ burp2model cross-role shop --low user --high admin</pre></div>
     <li>Path-token masking uses shape and entropy. A short token can survive, and an odd slug can be masked.</li>
     <li>Default scope uses the busiest host. A capture dominated by a CDN can pick the wrong site. Use <code>--scope</code>.</li>
     <li>"Privileged-looking" in <code>cross-role</code> is a path-name heuristic.</li>
+    <li>The export is parsed as a stream, but the model and the outputs are built in memory. Expect roughly 10x the export size: a 40 MB export with 20,000 requests peaked near 440 MB and built in about 8 seconds.</li>
     <li>Page-to-API edges depend on the Referer header. Strict policies give fewer <code>CALLS</code> edges.</li>
     <li>The model covers only what was captured. Nothing it reports is a finding.</li>
   </ul>
