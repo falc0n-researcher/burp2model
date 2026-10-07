@@ -315,3 +315,15 @@ def test_same_export_builds_byte_identical_output(tmp_path, monkeypatch):
         return {os.path.relpath(os.path.join(d, f), root): open(os.path.join(d, f), "rb").read()
                 for d, _, fs in os.walk(root) for f in fs}
     assert snapshot(tmp_path / "a") == snapshot(tmp_path / "b")
+
+
+def test_plain_build_makes_no_network_recon(tmp_path, monkeypatch):
+    from burp2model import osint
+    monkeypatch.delenv("BURP2MODEL_OFFLINE", raising=False)
+    monkeypatch.setenv("BURP2MODEL_FP_KEY", "ci")
+
+    def boom(*a, **k):
+        raise AssertionError("recon ran without --osint")
+    monkeypatch.setattr(osint, "run", boom)
+    xml = export(tmp_path, [item(host="shop.example.com", path="/", resp_ct="text/html", resp_body="hi")])
+    assert main([xml, "-w", "app", "--out", str(tmp_path / "o")]) == 0

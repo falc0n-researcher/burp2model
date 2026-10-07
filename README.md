@@ -10,7 +10,7 @@ to your own AI instead of raw traffic.
 
 [![PyPI](https://img.shields.io/badge/pip-burp2model-e85002?style=for-the-badge)](https://pypi.org/project/burp2model/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a424e?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-288_passing-0fa79a?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/tests-289_passing-0fa79a?style=for-the-badge)](tests/)
 [![Secrets masked](https://img.shields.io/badge/secrets-masked_before_write-0e8fd6?style=for-the-badge)](#boundaries)
 [![Docs](https://img.shields.io/badge/docs-github_pages-7a5cff?style=for-the-badge)](https://falc0n-researcher.github.io/burp2model/)
 
@@ -99,9 +99,9 @@ Run `burp2model <command> --help` for options.
 | Say what it could not observe | Claim coverage it did not have |
 | Offer hypotheses and the evidence to test them | Call anything a vulnerability |
 
-`build` also runs light external recon (DNS, TLS, headers) on the primary host. Turn it off
-with `--no-osint` or `BURP2MODEL_OFFLINE=1`. Only use `crawl` and `osint` on systems you are
-authorized to test.
+A plain `build` is fully offline. External recon (DNS, TLS, headers) runs only if you pass
+`--osint` or run the `osint` command, and `BURP2MODEL_OFFLINE=1` forces it off. Only use
+`crawl` and `osint` on systems you are authorized to test.
 
 CI plants fake secrets in the bundled samples and fails if any appears in any output.
 

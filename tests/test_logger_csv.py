@@ -89,7 +89,7 @@ def test_a_cut_off_response_does_not_break_parsing_and_is_flagged(tmp_path):
 def test_not_a_logger_csv_is_a_clear_error(tmp_path, capsys):
     p = tmp_path / "x.csv"
     p.write_text("a,b\n1,2\n")
-    assert main(["build", str(p), "-w", "t", "--out", str(tmp_path / "o"), "--no-osint"]) == 2
+    assert main(["build", str(p), "-w", "t", "--out", str(tmp_path / "o")]) == 2
     assert "Logger++" in capsys.readouterr().err
 
 
@@ -98,7 +98,7 @@ def test_cli_builds_from_a_csv_and_reports_the_tool_mix(tmp_path, capsys):
            [row(100, "Proxy", "GET", "/", 200, '<a href="/about">a</a>'), row(101, "Proxy", "GET", "/about", 200)]
     p = write(tmp_path, rows)
     out = str(tmp_path / "o")
-    assert main(["build", p, "-w", "t", "--out", out, "--no-osint", "--skip-tools", "Scanner"]) == 0
+    assert main(["build", p, "-w", "t", "--out", out, "--skip-tools", "Scanner"]) == 0
     err = capsys.readouterr().err
     assert "Scanner 25" in err and "skipped 25 by tool" in err
     c = bql.connect(out + "/t/graph.db")
@@ -107,5 +107,5 @@ def test_cli_builds_from_a_csv_and_reports_the_tool_mix(tmp_path, capsys):
 
 def test_scanner_notice_when_unfiltered(tmp_path, capsys):
     p = write(tmp_path, [row(i, "Scanner", "GET", f"/p{i}", 404) for i in range(25)] + [row(99, "Proxy", "GET", "/", 200)])
-    assert main(["build", p, "-w", "t", "--out", str(tmp_path / "o"), "--no-osint"]) == 0
+    assert main(["build", p, "-w", "t", "--out", str(tmp_path / "o")]) == 0
     assert "--skip-tools Scanner" in capsys.readouterr().err

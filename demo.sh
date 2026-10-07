@@ -13,8 +13,8 @@ run() { if command -v burp2model >/dev/null 2>&1; then burp2model "$@"; else pyt
 mkdir -p "$out/shop"
 cp "$here/samples/osint-sample.json" "$out/shop/osint.json"
 
-run "$here/samples/burp-history-sample.xml"       -w shop --role user  --out "$out" --no-osint
-run "$here/samples/burp-history-admin-sample.xml" -w shop --role admin --out "$out" --no-osint
+run "$here/samples/burp-history-sample.xml"       -w shop --role user  --out "$out"
+run "$here/samples/burp-history-admin-sample.xml" -w shop --role admin --out "$out"
 
 report="$out/shop/report.html"
 echo "wrote $report"

@@ -160,7 +160,7 @@ def test_cli_validates_journeys_and_takes_vars_and_env(base, tmp_path, monkeypat
     path = write(tmp_path, [{"request": {"method": "POST", "path": "/api/login",
                                          "json": {"email": "${who}", "password": "${env:B2M_JPW}"}}}])
     out = str(tmp_path / "o")
-    common = ["--yes", "--delay", "0", "--browser", "off", "--no-osint", "--out", out, "-w", "app"]
+    common = ["--yes", "--delay", "0", "--browser", "off", "--out", out, "-w", "app"]
     assert main(["crawl", base + "/", "--journey", path, "--var", "who=a@b2m.test"] + common) == 0
     login = next(e for e in App.log if e["p"] == "/api/login")
     assert "pw-from-env-1" in login["body"] and "a@b2m.test" in login["body"]

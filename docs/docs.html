@@ -72,7 +72,7 @@
   <p>Python 3.9 or newer.</p>
   <div class="code"><span class="label">shell</span><button class="copy" type="button" data-copy aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><pre>pip install burp2model
 burp2model --version</pre></div>
-  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (288 tests).</p>
+  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (289 tests).</p>
 </div>
 
 <div class="doc-section" id="quickstart">
@@ -114,7 +114,7 @@ burp2model cross-role shop --low user --high admin</pre></div>
       <tr><td><code>inputs/&lt;role&gt;.jsonl</code></td><td>Redacted per-role records. Role builds merge from these.</td></tr>
     </tbody>
   </table></div>
-  <p>By default a build also runs light recon on the primary public host and saves <code>osint.json</code>. It fails soft. Use <code>--no-osint</code> or <code>BURP2MODEL_OFFLINE=1</code> to stay offline.</p>
+  <p>A plain build is offline. Add <code>--osint</code> to also run light recon (DNS, TLS, headers) on the primary public host and save <code>osint.json</code>; it fails soft. <code>BURP2MODEL_OFFLINE=1</code> forces recon off.</p>
 </div>
 
 <div class="doc-section" id="layers">
@@ -185,7 +185,7 @@ burp2model cross-role shop --low user --high admin</pre></div>
 <div class="doc-section" id="faq">
   <h2>FAQ <a class="anchor" href="#faq" aria-label="Link to FAQ">#</a></h2>
   <h3>Is this a scanner?</h3>
-  <p>No. It reads a capture you already made and never replays it. Only <code>crawl</code>, <code>osint</code> and the light recon a default build runs (skip with <code>--no-osint</code>) send network requests.</p>
+  <p>No. It reads a capture you already made and never replays it. Only <code>crawl</code>, <code>osint</code> and <code>build --osint</code> send network requests.</p>
   <h3>Is it safe to share the outputs?</h3>
   <p>They hold no secret values or bodies. They do hold hostnames, paths and parameter names, so treat them as engagement material. Never share the fingerprint key.</p>
   <h3>My API subdomain shows as a third party.</h3>

@@ -49,7 +49,7 @@ unknown instead of guessed.
 - A self-contained interactive HTML report, `model.json`, `graph.json`, `graph.graphml`,
   Cypher export, and an animated build SVG.
 - `cross-role`, `gaps`, `changes` (drift between two models, grouped by feature area) and
-  `osint` (on by default, disable with `BURP2MODEL_OFFLINE=1`).
+  `osint` (opt-in: `build --osint`, or the `osint` command; `BURP2MODEL_OFFLINE=1` forces it off).
 
 ### Validated on
 OWASP Juice Shop, DVWA, Mutillidae II, WebGoat, a React SPA and three real Logger++ exports.

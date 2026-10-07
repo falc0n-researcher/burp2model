@@ -158,7 +158,7 @@ def test_rebuild_keeps_one_osint_run_and_grows_history(built):
 
 def test_offline_build_without_osint_still_makes_db(tmp_path):
     out = str(tmp_path)
-    assert main([SAMPLE, "-w", "x", "--out", out, "--no-osint"]) == 0
+    assert main([SAMPLE, "-w", "x", "--out", out]) == 0
     c = store.open_db(os.path.join(out, "x", "graph.db"))
     assert store.summary(c)["external_nodes"] == 0
     assert bql.run_query(bql.connect(os.path.join(out, "x", "graph.db")),
@@ -193,7 +193,7 @@ def test_osint_wildcard_san_and_error_page_headers(tmp_path):
              "http": {"status": 503, "security_headers_present": {}, "security_headers_missing": ["csp"]}}
     os.makedirs(tmp_path / "x")
     (tmp_path / "x" / "osint.json").write_text(json.dumps(osint))
-    assert main([SAMPLE, "-w", "x", "--out", str(tmp_path), "--no-osint"]) == 0
+    assert main([SAMPLE, "-w", "x", "--out", str(tmp_path)]) == 0
     c = bql.connect(str(tmp_path / "x" / "graph.db"))
     assert bql.run_query(c, "node.type:wildcard_san").total == 1
     assert bql.run_query(c, "node.type:subdomain AND node.label.cont:*").total == 0

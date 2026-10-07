@@ -202,13 +202,13 @@ def test_bad_input_is_a_clean_error_not_a_traceback(tmp_path, capsys):
     assert main(["crawl", "ftp://x/", "--yes", "--out", str(tmp_path)]) == 2
     assert main(["crawl", "http://127.0.0.1:9/", "--yes", "--header", "nonsense", "--out", str(tmp_path)]) == 2
     assert main(["crawl", "http://127.0.0.1:1/", "--yes", "--out", str(tmp_path), "--delay", "0",
-                 "--no-osint", "--browser", "off"]) == 2                    # nothing listening
+                 "--browser", "off"]) == 2                    # nothing listening
     assert "nothing was fetched" in capsys.readouterr().err
 
 
 def test_crawl_builds_the_same_outputs_as_a_burp_export_and_masks_everything(server, tmp_path):
     out = tmp_path / "o"
-    rc = main(["crawl", server + "/", "-w", "app", "--yes", "--delay", "0", "--out", str(out), "--no-osint", "--browser", "off",
+    rc = main(["crawl", server + "/", "-w", "app", "--yes", "--delay", "0", "--out", str(out), "--browser", "off",
                "--browser", "off", "--role", "user", "--auth-login", server + "/login",
                "--auth-body", '{"email":"a@b.co","password":"hunter2hunter2"}',
                "--auth-token", "authentication.token", "--save-xml", str(tmp_path / "crawl.xml")])
@@ -230,7 +230,7 @@ def test_crawl_builds_the_same_outputs_as_a_burp_export_and_masks_everything(ser
 
 def test_crawl_roles_merge_like_burp_role_builds(server, tmp_path):
     out = str(tmp_path / "o")
-    base = ["--yes", "--delay", "0", "--out", out, "--no-osint", "--browser", "off", "-w", "app"]
+    base = ["--yes", "--delay", "0", "--out", out, "--browser", "off", "-w", "app"]
     assert main(["crawl", server + "/", "--role", "anon"] + base) == 0
     assert main(["crawl", server + "/", "--browser", "off", "--role", "user", "--auth-login", server + "/login",
                  "--auth-body", "{}", "--auth-token", "authentication.token"] + base) == 0

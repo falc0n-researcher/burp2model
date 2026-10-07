@@ -277,7 +277,7 @@ def _probe_host(host: str | None) -> str | None:
 
 
 def _collect_osint(args, m, osint_path: str) -> dict | None:
-    """External recon is on by default and never fails a build.
+    """External recon runs only with --osint and never fails a build.
 
     Live results replace the stored osint.json; if the lookup is skipped or
     fails, the last saved run is reused so the graph keeps its recon layer.
@@ -289,7 +289,7 @@ def _collect_osint(args, m, osint_path: str) -> dict | None:
                 saved = json.load(f)
         except (OSError, ValueError):
             saved = None
-    if getattr(args, "no_osint", False) or os.environ.get("BURP2MODEL_OFFLINE") == "1":
+    if not getattr(args, "osint", False) or os.environ.get("BURP2MODEL_OFFLINE") == "1":
         return saved
     host = _probe_host(_primary_host(m))
     if host is None:
@@ -297,7 +297,7 @@ def _collect_osint(args, m, osint_path: str) -> dict | None:
         return saved
     from . import osint as osint_mod
     print(f"osint: probing {host} — DNS, TLS, headers, CT logs, RDAP "
-          f"(--no-osint or BURP2MODEL_OFFLINE=1 to skip)", file=sys.stderr)
+          f"(BURP2MODEL_OFFLINE=1 forces offline)", file=sys.stderr)
     try:
         result = osint_mod.run(host, timeout=args.osint_timeout, want_ports=False,
                                want_subdomains=True).to_dict()
@@ -933,8 +933,9 @@ def main(argv=None) -> int:
                    help="max items per section in context.json (default: 40)")
     b.add_argument("--out", default="burp2model-out",
                    help="output directory (default: burp2model-out)")
-    b.add_argument("--no-osint", action="store_true",
-                   help="skip external recon (on by default; also BURP2MODEL_OFFLINE=1)")
+    b.add_argument("--osint", action="store_true",
+                   help="also run light external recon on the primary host (off by default; "
+                        "sends DNS/TLS/HTTP requests; BURP2MODEL_OFFLINE=1 forces it off)")
     b.add_argument("--osint-timeout", type=float, default=5.0, metavar="SEC",
                    help="per-lookup timeout for the build's OSINT (default: 5)")
     b.add_argument("--skip-tools", metavar="TOOLS",
@@ -1021,8 +1022,8 @@ def main(argv=None) -> int:
     cw.add_argument("--out", default="burp2model-out", help="output directory (default: burp2model-out)")
     cw.add_argument("--animate", action="store_true", help="play the build animation in the terminal")
     cw.add_argument("--no-type", action="store_true", help="animation: skip the typing effect")
-    cw.add_argument("--no-osint", action="store_true",
-                    help="skip external recon (on by default; also BURP2MODEL_OFFLINE=1)")
+    cw.add_argument("--osint", action="store_true",
+                    help="also run light external recon on the primary host (off by default)")
     cw.add_argument("--osint-timeout", type=float, default=5.0, metavar="SEC")
     cw.set_defaults(func=cmd_crawl)
 

@@ -163,7 +163,7 @@ def test_login_token_reaches_the_app_through_local_storage(base):
 
 def test_browser_crawl_builds_the_model_and_masks_the_token(base, tmp_path):
     out = tmp_path / "o"
-    rc = main(["crawl", base + "/", "-w", "app", "--yes", "--out", str(out), "--no-osint", "--browser", "on",
+    rc = main(["crawl", base + "/", "-w", "app", "--yes", "--out", str(out), "--browser", "on",
                "--max-seconds", "90", "--local-storage", "token=tok-abc123"])
     assert rc == 0
     d = out / "app"
