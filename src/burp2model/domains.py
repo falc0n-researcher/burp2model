@@ -1,8 +1,8 @@
 """
 Registrable domains from the Public Suffix List.
 
-`api.sbi.bank.in` belongs to `sbi.bank.in`, `shop.aayush.co.in` to
-`aayush.co.in`, and `user.github.io` is its own site, not part of
+`api.shop.bank.in` belongs to `shop.bank.in`, `www.example.co.in` to
+`example.co.in`, and `user.github.io` is its own site, not part of
 `github.io`. A "last two labels" rule gets all three wrong; the Public Suffix
 List gets them right.
 
@@ -62,7 +62,7 @@ def _normalize(host: str) -> str:
 
 
 def public_suffix(host: str) -> str:
-    """The public suffix of `host` (`bank.in` for `www.sbi.bank.in`)."""
+    """The public suffix of `host` (`bank.in` for `www.shop.bank.in`)."""
     h = _normalize(host)
     labels = h.split(".")
     rules, wildcards, exceptions = _rules()

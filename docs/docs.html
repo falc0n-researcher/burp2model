@@ -185,7 +185,7 @@ burp2model cross-role shop --low user --high admin</pre></div>
 <div class="doc-section" id="faq">
   <h2>FAQ <a class="anchor" href="#faq" aria-label="Link to FAQ">#</a></h2>
   <h3>Is this a scanner?</h3>
-  <p>No. It reads a capture you already made. It never sends requests to build a model from a Burp export. Only <code>crawl</code>, <code>osint</code> and the default build recon touch the network.</p>
+  <p>No. It reads a capture you already made and never replays it. Only <code>crawl</code>, <code>osint</code> and the light recon a default build runs (skip with <code>--no-osint</code>) send network requests.</p>
   <h3>Is it safe to share the outputs?</h3>
   <p>They hold no secret values or bodies. They do hold hostnames, paths and parameter names, so treat them as engagement material. Never share the fingerprint key.</p>
   <h3>My API subdomain shows as a third party.</h3>

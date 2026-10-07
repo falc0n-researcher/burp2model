@@ -1,6 +1,6 @@
 # How burp2model works
 
-Traffic goes in, a model comes out. After the build, everything works from the redacted model offline. Only `crawl` and `osint` touch the network, and both are opt-in.
+Traffic goes in, a model comes out. Parsing, redaction, modelling and querying are offline. The network is used only by `crawl`, `osint`, and the light recon a default `build` runs (turn it off with `--no-osint` or `BURP2MODEL_OFFLINE=1`).
 
 ```
 Burp export (or crawl)  ->  parse  ->  redact  ->  model  ->  six-layer graph
@@ -95,7 +95,7 @@ Every claim cites an evidence id (`ev_N`). The `evidence` table in `model.json` 
 
 ## 9. OSINT
 
-`burp2model osint <host> --yes` is the only command that contacts the target and public services (DNS, TLS, HTTP headers, certificate transparency, RDAP). It never runs as part of `build`. Results are saved to `graph.db` as `EXTERNAL` nodes and are kept apart from captured traffic.
+`burp2model osint <host> --yes` contacts the target and public services (DNS, TLS, HTTP headers, certificate transparency, RDAP). A default `build` runs a light version of it on the primary public host and carries on if it fails; `--no-osint` skips it. Results are saved to `graph.db` as `EXTERNAL` nodes, kept apart from captured traffic.
 
 ## 10. Crawling
 

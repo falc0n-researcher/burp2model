@@ -18,10 +18,10 @@ from burp2model import parse_items, build
 
 @pytest.mark.parametrize("host,expected", [
     # the multi-label suffixes a "last two labels" rule gets wrong
-    ("api.sbi.bank.in", "sbi.bank.in"),
+    ("api.shop.bank.in", "shop.bank.in"),
     ("www.aauysh.co.in", "aauysh.co.in"),
-    ("shop.aayush.co.in", "aayush.co.in"),
-    ("portal.hdfc.bank.in", "hdfc.bank.in"),
+    ("shop.example.co.in", "example.co.in"),
+    ("portal.other.bank.in", "other.bank.in"),
     ("api.shop.co.uk", "shop.co.uk"),
     ("a.b.example.com.au", "example.com.au"),
     # plain gTLD
@@ -55,7 +55,7 @@ def test_idn_normalisation():
 
 def test_same_site():
     assert same_site("api.shop.co.in", "www.shop.co.in")
-    assert not same_site("api.sbi.bank.in", "api.hdfc.bank.in")
+    assert not same_site("api.shop.bank.in", "api.other.bank.in")
 
 
 def test_env_override_uses_supplied_list(tmp_path, monkeypatch):
