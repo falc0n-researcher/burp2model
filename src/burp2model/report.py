@@ -27,6 +27,10 @@ from .context import context_package
 from .methodology import METHODOLOGY_PROMPT, investigation_plan
 from .model import PRIV_RE, Model, to_dict
 from .bql_js import BQL_JS
+from .report_dash import DASH_CSS, DASH_JS
+from .report_inventory import INV_CSS, INV_JS
+from .report_query import QRY_CSS, QRY_JS
+from .report_map import MAP_CSS, MAP_JS
 
 # Version of the JSON embedded in report.html. Bump on any breaking change to
 # the payload shape so the page's code and the data can't silently drift.
@@ -284,6 +288,10 @@ def write_html_report(m: Model, path: str, osint: dict | None = None,
         finally:
             conn.close()
     html = (_TEMPLATE.replace("__BQLJS__", BQL_JS)
+            .replace("__DASHCSS__", DASH_CSS).replace("__DASHJS__", DASH_JS)
+            .replace("__INVCSS__", INV_CSS).replace("__INVJS__", INV_JS)
+            .replace("__QRYCSS__", QRY_CSS).replace("__QRYJS__", QRY_JS)
+            .replace("__MAPCSS__", MAP_CSS).replace("__MAPJS__", MAP_JS)
             .replace("__DATA__", _safe_json(payload)))
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)
@@ -432,32 +440,12 @@ background:var(--panel);margin-bottom:10px;cursor:pointer}
 
 
 /* query console */
-.qbar{display:flex;gap:8px;margin-bottom:10px}
-.qbar textarea{flex:1;min-height:52px;max-height:160px;resize:vertical;padding:13px 16px;border:1px solid var(--line2);border-radius:12px;background:var(--panel);color:var(--text);font:14px/1.45 var(--mono)}
-.qbar textarea:focus{border-color:var(--signal);outline:none}
-.qrun{align-self:flex-start;height:52px;padding:0 20px;border:1px solid var(--signal);border-radius:12px;background:var(--signal);color:#fff;font:600 13px var(--sans)}
-.qrun:hover{filter:brightness(1.06)}
-.qex{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
-.qex button,.qhist button{border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:4px 11px;font:500 12px var(--mono);color:var(--muted)}
-.qex button:hover,.qhist button:hover{border-color:var(--signal);color:var(--text)}
-.qerr{padding:12px 14px;border:1px solid var(--bad);border-radius:10px;color:var(--bad);font:13px var(--mono);background:var(--panel)}
-.qnote{display:flex;align-items:center;gap:10px;margin:0 0 10px;color:var(--muted);font:12.5px var(--mono)}
-.qnote .sp{flex:1}
-.qnote button{border:1px solid var(--line);background:var(--panel2);border-radius:7px;padding:3px 9px;font:500 12px var(--sans)}
-.qtbl td{vertical-align:top;font:12.5px var(--mono);max-width:520px;overflow-wrap:anywhere}
-.qtbl tr[data-ev],.qtbl tr[data-node]{cursor:pointer}
-.qtbl tr[data-ev]:hover,.qtbl tr[data-node]:hover{background:var(--panel2)}
-.qhist{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
-.qhelp{white-space:pre-wrap;color:var(--muted);font:12.5px/1.6 var(--mono);padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .tag-ext{font:600 10px var(--mono);letter-spacing:.05em;color:var(--inferred);border:1px solid var(--inferred);border-radius:5px;padding:0 5px}
 .icard{margin-bottom:14px}
 .icard .bd{padding:0}
 .icard td.k{width:190px;color:var(--muted);font:12px var(--mono)}
 .icard td.v{font:12.5px var(--mono);overflow-wrap:anywhere}
 .miss{color:var(--warn)}
-.evq{display:flex;gap:8px;align-items:center;margin:0 0 14px}
-.evq input{flex:1;height:38px;padding:0 12px;border:1px solid var(--line2);border-radius:9px;background:var(--panel);color:var(--text);font:13px var(--mono)}
-.evq input:focus{border-color:var(--signal);outline:none}
 
 /* unknowns list */
 .unk{padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:10px}
@@ -489,46 +477,6 @@ background:var(--panel);margin-bottom:10px;cursor:pointer}
 .answer .note{color:var(--muted);font-size:14px;margin:0 0 14px;max-width:70ch}
 .askfoot{display:inline-flex;align-items:center;gap:8px;margin-top:16px;padding:7px 12px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font:500 12.5px var(--sans)}
 .askfoot::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
-
-/* graph */
-.graphwrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;position:relative}
-#gsvg{width:100%;height:min(72vh,720px);display:block;cursor:grab}
-.glegend svg{width:12px;height:12px;flex:none}
-.glegend{display:flex;flex-wrap:wrap;gap:14px;padding:12px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
-.glegend .k{display:inline-flex;align-items:center;gap:6px}
-.glegend .sw{width:10px;height:10px;border-radius:3px}
-.glegend .ln2{width:18px;height:0;border-top:2px solid var(--line2)}
-.glegend .ln2.inf{border-top-style:dashed}
-.gnode circle{cursor:pointer;stroke:var(--panel);stroke-width:2;transition:opacity .12s}
-.gnode text{font:10px var(--mono);fill:var(--text);paint-order:stroke;stroke:var(--panel);stroke-width:3px;stroke-linejoin:round;pointer-events:none;transition:opacity .12s}
-.gedge{fill:none;stroke:var(--line2);stroke-width:1.2;transition:opacity .12s,stroke-width .12s}
-.gedge.inf{stroke-dasharray:4 4;stroke:var(--inferred);opacity:.55}
-/* hover focus: connected stays, the rest fades */
-svg.gfocus .gnode:not(.hi) circle,svg.gfocus .gnode:not(.hi) text{opacity:.16}
-svg.gfocus .gedge{opacity:.06}
-svg.gfocus .gedge.hi{opacity:1;stroke-width:1.8}
-svg.gfocus .gedge.hi.inf{opacity:.9}
-.gnode.hi text{font-weight:700}
-.gedge.ext{stroke-dasharray:1.5 3.5;stroke:var(--l6);opacity:.55}
-svg.gfocus .gedge.hi.ext{opacity:.95}
-/* search: matching nodes stay, the rest fades */
-svg.gsearch .gnode:not(.q) .shape,svg.gsearch .gnode:not(.q) text{opacity:.14}
-svg.gsearch .gedge{opacity:.08}
-.gnode .shape{cursor:pointer;stroke:var(--panel);stroke-width:2;transition:opacity .12s}
-.gnode.q .shape{stroke:var(--signal);stroke-width:2.5}
-.ghint{position:absolute;bottom:10px;right:12px;font-size:11px;color:var(--faint);background:var(--panel2);padding:4px 8px;border-radius:6px;border:1px solid var(--line);pointer-events:none}
-.gtools{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel2)}
-.gtools .chipwrap{flex:1;min-width:240px}
-.gtools .chip{padding:4px 10px;font-size:12px}
-.gtools .chip .sw{width:9px;height:9px;border-radius:2px;display:inline-block}
-.gtools .chip.off{opacity:.45;text-decoration:line-through}
-.gseg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
-.gseg button,.gbtn{font:600 12px var(--sans);padding:5px 10px;border:0;background:var(--panel);color:var(--muted)}
-.gseg button.on{background:var(--text);color:var(--ink)}
-.gseg button+button{border-left:1px solid var(--line2)}
-.gbtn{border:1px solid var(--line2);border-radius:8px}
-.gbtn:hover,.gseg button:hover{color:var(--text)}
-.gbtns{display:inline-flex;gap:6px}
 
 /* drawer */
 .scrim{position:fixed;inset:0;background:rgba(20,25,36,.35);opacity:0;visibility:hidden;transition:.18s;z-index:50}
@@ -583,6 +531,10 @@ box-shadow:var(--shadow);transform:translateX(100%);transition:transform .22s cu
 .prio .sig::before{content:"›";color:var(--sev);font-weight:700;flex:none}
 .prio .sig b{color:var(--text);font-weight:600}
 
+__DASHCSS__
+__INVCSS__
+__QRYCSS__
+__MAPCSS__
 @media(max-width:820px){
  .shell{display:flex;flex-direction:column;height:auto}
  nav.views{display:flex;gap:2px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;white-space:nowrap}
@@ -740,7 +692,7 @@ const weakCookies=(D.cookies||[]).filter(k=>!k.httponly||!k.secure);
 /* ---------- views ---------- */
 const hasRoles=(D.roles||[]).length>=2;
 const VIEWS=[
-  {id:"overview",name:"Overview",grp:"Summary",ct:()=>null},
+  {id:"overview",name:"Dashboard",grp:"Summary",ct:()=>null},
   {id:"ask",name:"Ask the model",grp:"Summary",hot:true,ct:()=>null},
   {id:"graph",name:"Map",grp:"Summary",ct:()=>(D.graph.nodes||[]).length},
   {id:"priorities",name:"Priorities",grp:"Summary",ct:()=>PRIO.length+weakCookies.length},
@@ -750,7 +702,7 @@ const VIEWS=[
   {id:"trust",name:"Trust",grp:"Model",dot:"var(--l5)",ct:()=>D.auth.length+D.cookies.length},
   {id:"crossrole",name:"Cross-role",grp:"Model",dot:"var(--l6)",ct:()=>hasRoles?EP.filter(e=>e.roles.length).length:null,cond:hasRoles},
   {id:"unknowns",name:"Open questions",grp:"Model",dot:"var(--l6)",ct:()=>D.unknowns.length},
-  {id:"evidence",name:"Evidence",grp:"Model",dot:"var(--l1)",ct:()=>Object.keys(D.evidence||{}).length},
+  {id:"inventory",name:"Inventory",grp:"Model",dot:"var(--l1)",ct:()=>Object.keys(D.evidence||{}).length},
   {id:"query",name:"Query (BQL)",grp:"Explore",hot:true,ct:()=>null,cond:!!BQLDB},
   {id:"infra",name:"Infrastructure",grp:"Explore",dot:"var(--inferred)",ct:()=>BQLDB&&BQLDB.osint?BQLDB.facts.length:null,cond:!!BQLDB},
 ];
@@ -772,74 +724,7 @@ function methodm(m){return `<span class="m ${m&&m!=='GET'&&m!=='*'?'w':''}">${es
 function statuses(ss){if(!ss||!ss.length)return '<span class="st">—</span>';return ss.map(s=>{const cls=s>=500?"r":s>=400?"y":s>=200&&s<300?"g":"";return `<span class="st ${cls}">${s}</span>`;}).join(" ");}
 function matchQ(e){if(!query)return true;const q=query.toLowerCase();return (e.label+" "+(e.host||"")+" "+(e.params||[]).join(" ")+" "+(e.referenced_by||[]).join(" ")).toLowerCase().includes(q);}
 
-/* ---------- OVERVIEW ---------- */
-function vOverview(){
-  const kpi=(n,k,cls)=>`<div class="kpi ${cls||''}"><div class="n">${n}</div><div class="k">${esc(k)}</div></div>`;
-  const cap=D.stats||{};
-  const cats=[["Hosts",c.hosts],["Routes",c.routes],["Scripts",c.scripts],["Endpoints",c.endpoints],
-    ["Parameters",c.parameters],["GraphQL operations",c.operations],["Third parties",c.third_parties],
-    ["Auth schemes",c.auth],["Cookies",c.cookies],["Roles",c.roles]].filter(x=>x[1]);
-  return `<h1 class="vt">Overview</h1><p class="vsub">A structural model of <b>${esc(D.app)}</b> built from traffic you captured. Every fact is cited to the request that produced it; nothing here is a vulnerability — the model maps what the app is and where to look.</p>
-  <div class="kpis">
-   ${kpi(c.hosts||0,"first-party hosts")}${kpi(c.routes||0,"routes / pages")}${kpi(c.endpoints||0,"API endpoints","sig")}
-   ${kpi(c.parameters||0,"parameters")}${kpi(c.third_parties||0,"third parties")}${kpi(c.unknowns||0,"open questions")}
-  </div>
-  ${provenanceBar()}
-  ${PRIO.length?`<div class="card"><div class="hd">Worth looking at first <span class="ct">top ${Math.min(3,PRIO.length)} of ${PRIO.length}</span></div><div class="bd" style="padding:14px 16px">
-   ${PRIO.slice(0,3).map((p,i)=>prioCard(p,i)).join("")}
-   <button class="chip" style="margin-top:4px" data-goto="priorities">See all priorities →</button></div></div>`:""}
-  <div class="card"><div class="hd">Model at a glance <span class="ct">click Map to explore</span></div><div class="bd" style="padding:6px 0">
-   <table><tbody>${cats.map(([k,v])=>`<tr data-goto="graph"><td>${esc(k)}</td><td class="mono">${v}</td></tr>`).join("")}</tbody></table></div></div>
-  ${hostsCard()}
-  <div class="card"><div class="hd">Capture coverage</div><div class="bd" style="padding:6px 0">
-   <table><tbody>
-    <tr><td>Requests parsed</td><td class="mono">${cap.parsed??cap.exchanges??"—"} of ${cap.items??"—"}${cap.skipped?` · <span style="color:var(--warn)">${cap.skipped} skipped</span>`:""}</td></tr>
-    <tr><td>Static assets (not mapped)</td><td class="mono">${cap.static_assets??0}</td></tr>
-    <tr><td>CORS preflights</td><td class="mono">${cap.preflight??0}</td></tr>
-    <tr><td>Roles</td><td class="mono">${(D.roles||[]).join(", ")||"none"}</td></tr>
-   </tbody></table></div></div>
-  ${osintCard()}
-  <div class="callout"><span class="i">i</span><p><b>Honesty.</b> An absence in this model is an absence in the <b>capture</b>, never a statement about the target. Edges are <b>observed</b> (seen in traffic) or <b>inferred</b> (a reference found in code) — never blurred.</p></div>`;
-}
-function provenanceBar(){
-  const st=(c.api_state||{}),both=st.BOTH||0,rt=st.RUNTIME_ONLY||0,so=st.STATIC_ONLY||0,total=both+rt+so;
-  if(!total)return "";
-  const seg=(n,col)=>n?`<span style="width:${(n/total*100).toFixed(1)}%;background:${col}"></span>`:"";
-  return `<div class="card"><div class="hd">Endpoint provenance <span class="ct">${total} endpoints</span></div><div class="bd" style="padding:12px 16px">
-   <div class="segbar">${seg(both,"var(--ok)")}${seg(rt,"var(--observed)")}${seg(so,"var(--signal)")}</div>
-   <div class="seglegend">
-    <span class="k"><span class="sw" style="background:var(--ok)"></span>seen in code <b>and</b> traffic <b>${both}</b></span>
-    <span class="k"><span class="sw" style="background:var(--observed)"></span>traffic only <b>${rt}</b></span>
-    <span class="k"><span class="sw" style="background:var(--signal)"></span>code only — never called <b>${so}</b></span>
-   </div></div></div>`;
-}
-function hostsCard(){
-  const hs=D.hosts||[];
-  if(!hs.length)return "";
-  return `<div class="card"><div class="hd">First-party hosts <span class="ct">${hs.length}</span></div><div class="bd" style="padding:0">
-   <table><thead><tr><th>Host</th><th>Scheme</th><th>Ports</th><th>Tech markers</th></tr></thead><tbody>
-   ${hs.map(h=>`<tr><td class="mono">${esc(h.label)}</td><td class="mono" style="color:var(--muted)">${esc((h.schemes||[]).join(", ")||"—")}</td>
-    <td class="mono" style="color:var(--muted)">${esc((h.ports||[]).join(", ")||"—")}</td>
-    <td class="mono" style="color:var(--muted);font-size:12px">${esc(Object.entries(h.tech||{}).map(([k,v])=>v?`${k}: ${v}`:k).join(" · ")||"—")}</td></tr>`).join("")}
-   </tbody></table></div></div>`;
-}
-function osintCard(){
-  const o=D.osint;
-  if(!o)return "";
-  const rows=[];
-  if(o.tls&&o.tls.issuer)rows.push(["TLS",`${o.tls.issuer}${o.tls.not_after?` · expires ${o.tls.not_after}`:""}`]);
-  if(o.hosting&&o.hosting.network)rows.push(["Hosting",`${o.hosting.network}${o.hosting.country?` · ${o.hosting.country}`:""}`]);
-  if((o.technology||[]).length)rows.push(["Technology",o.technology.join(", ")]);
-  if(o.headers_missing)rows.push(["Security headers",o.headers_missing.length?`${o.headers_missing.length} missing: ${o.headers_missing.join(", ")}`:"all common headers present"]);
-  if(o.registrar)rows.push(["Registrar",o.registrar]);
-  if((o.open_ports||[]).length)rows.push(["Open ports",o.open_ports.join(", ")]);
-  if(o.email_security)rows.push(["Email auth",`SPF: ${o.email_security.spf_note||"?"} · DMARC: ${o.email_security.dmarc_policy||o.email_security.dmarc_note||"?"}`]);
-  if(o.subdomains)rows.push(["Subdomains",`${o.subdomains} from certificate transparency`]);
-  if(!rows.length)return "";
-  return `<div class="card"><div class="hd">External recon <span class="ct">${esc(o.host||"")}</span></div><div class="bd" style="padding:6px 0">
-   <table><tbody>${rows.map(([k,v])=>`<tr data-goto="graph"><td>${esc(k)}</td><td class="mono" style="color:var(--muted)">${esc(v)}</td></tr>`).join("")}</tbody></table>
-   </div><div class="glegend" style="border-top:1px solid var(--line)">Collected live by <span class="mono">burp2model osint</span>, not from the capture. Shown on the Map as infrastructure.</div></div>`;
-}
+__DASHJS__
 function prioCard(p,i){
   const e=p.ep, lead=p.sig[0];
   const more=p.sig.slice(1).map(s=>`<div class="sig"><span><b>${esc(s.ttl)}.</b> ${esc(s.why)}</span></div>`).join("");
@@ -910,58 +795,12 @@ function initAsk(){
 }
 
 
-/* ---------- QUERY (BQL) ---------- */
-const Q_EXAMPLES=[
- ["POST, not an error",'req.method:POST AND resp.code.lt:400'],
- ["API errors",'req.path.cont:"/api/" AND resp.code.gte:400'],
- ["Only in code",'node.type:endpoint AND node.state:STATIC_ONLY'],
- ["Stack traces / tokens",'resp.body.regex:"stack ?trace|exception|token"'],
- ["Set-Cookie responses",'resp.header.cont:"set-cookie"'],
- ["Recon edges",'edge.state:EXTERNAL limit 40'],
- ["Hosts seen only via recon",'node.type:subdomain AND node.attr.seen_in_capture:0'],
- ["Open questions",'unknowns'],
- ["Recon: TLS",'osint tls'],
-];
-let qText="",qRes=null,qErr=null,qHist=[];
-try{qHist=JSON.parse(localStorage.getItem("b2m-qhist")||"[]");}catch(e){}
-function qRun(text){
-  qText=text;qErr=null;qRes=null;
-  if(!BQLDB){qErr="This report was built without graph.db — rebuild with burp2model to enable queries.";return;}
-  try{qRes=BQL.run(BQLDB,text);
-    qHist=[text].concat(qHist.filter(x=>x!==text)).slice(0,12);
-    try{localStorage.setItem("b2m-qhist",JSON.stringify(qHist));}catch(e){}
-  }catch(e){qErr=e instanceof BQL.BQLError?e.message:"error: "+e.message;}
-}
-function qCell(v){if(Array.isArray(v))return esc(v.join(", "));return v==null?"":esc(String(v));}
-function qTable(r){
-  if(r.kind==="text")return `<div class="qhelp">${esc(r.note)}</div>`;
-  const rowAttr=row=>row.ev&&/^ev_\d+$/.test(row.ev)?` data-ev="${row.ev.slice(3)}"`:(row.id&&r.kind==="nodes"?` data-node="${esc(row.id)}"`:"");
-  return `<div class="card"><div class="bd" style="padding:0;overflow:auto"><table class="qtbl"><thead><tr>${r.columns.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${
-    r.rows.length?r.rows.map(row=>`<tr${rowAttr(row)}>${r.columns.map(c=>`<td>${qCell(row[c])}</td>`).join("")}</tr>`).join("")
-    :`<tr><td colspan="${r.columns.length}"><div class="empty">No rows.</div></td></tr>`}</tbody></table></div></div>`;
-}
-function vQuery(){
-  return `<h1 class="vt">Query</h1><p class="vsub">Ask the graph with <b>BQL</b> — HTTPQL-style filters over requests, nodes and edges, plus graph verbs (<span class="mono">reach</span>, <span class="mono">blast</span>, <span class="mono">path</span>). Answered from the model, cited, no AI. The same language runs against <span class="mono">graph.db</span> with <span class="mono">burp2model q</span>.</p>
-  <div class="qbar"><textarea id="qin" spellcheck="false" placeholder='req.method:POST AND resp.code.gte:400    ·    reach "POST /api/checkout"    ·    help'>${esc(qText)}</textarea><button class="qrun" id="qgo">Run ⏎</button></div>
-  <div class="qex">${Q_EXAMPLES.map(([t,q])=>`<button data-q="${esc(q)}" title="${esc(q)}">${esc(t)}</button>`).join("")}</div>
-  <div id="qout">${qErr?`<div class="qerr">${esc(qErr)}</div>`:qRes?qOut():""}</div>
-  ${qHist.length?`<div class="qhist">${qHist.map(h=>`<button data-q="${esc(h)}">${esc(h.length>60?h.slice(0,59)+"…":h)}</button>`).join("")}</div>`:""}`;
-}
-function qOut(){const r=qRes;return `<div class="qnote"><span>${esc(r.kind==="text"?"help":r.note)}</span><span class="sp"></span>${r.kind!=="text"?`<button id="qcopy">Copy JSON</button>`:""}</div>${qTable(r)}`;}
-function initQuery(){
-  const inp=$("#qin"),go=()=>{qRun(inp.value);render();};
-  $("#qgo").onclick=go;
-  inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();go();}});
-  $$("[data-q]",$("#main")).forEach(b=>b.onclick=()=>{qRun(b.dataset.q);render();});
-  const cp=$("#qcopy");if(cp)cp.onclick=()=>fallbackCopy(JSON.stringify(qRes,null,2),()=>{cp.textContent="Copied";});
-  $$("tr[data-node]",$("#main")).forEach(r=>r.onclick=()=>{try{openNode(r.dataset.node);}catch(e){}});
-  inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);
-}
+__QRYJS__
 
 /* ---------- INFRASTRUCTURE (external recon, stored in graph.db) ---------- */
 function vInfra(){
   const B=D.bql;
-  if(!B||!B.osint)return `<h1 class="vt">Infrastructure</h1><p class="vsub">External recon — DNS, certificates, subdomains, mail policy, headers.</p><div class="empty">No recon stored. Builds run OSINT by default; it was skipped (offline / <span class="mono">--no-osint</span>) or failed. Run <span class="mono">burp2model osint HOST -w ${esc(D.app)} --yes</span>.</div>`;
+  if(!B||!B.osint)return `<h1 class="vt">Infrastructure</h1><p class="vsub">External recon — DNS, certificates, subdomains, mail policy, headers.</p><div class="empty">No recon stored. Recon is opt-in: rebuild with <span class="mono">--osint</span>, or run <span class="mono">burp2model osint HOST -w ${esc(D.app)} --yes</span>.</div>`;
   const by={};(B.facts||[]).forEach(f=>{(by[f.section]=by[f.section]||[]).push(f);});
   const order=["dns","tls","http","technology","email_security","registration","ip_geo","files","archive","ports","notes"];
   const titles={dns:"DNS",tls:"TLS certificate",http:"HTTP headers",technology:"Technology",email_security:"Mail authentication",registration:"Registration",ip_geo:"Hosting",files:"robots / security.txt / sitemap",archive:"Web archive",ports:"Open ports",notes:"Notes"};
@@ -1120,37 +959,7 @@ function vUnknowns(){
   return h;
 }
 
-/* ---------- EVIDENCE ---------- */
-let evQ="",evErr=null;
-function evFilter(all){
-  evErr=null;
-  if(!evQ||!BQLDB)return all;
-  try{const r=BQL.run(BQLDB,evQ+" limit 5000");
-    if(r.kind!=="requests"){evErr="Evidence filters requests — use req.* / resp.* fields.";return all;}
-    const ids=new Set(r.rows.map(x=>+x.ev.slice(3)));return all.filter(e=>ids.has(e.id));}
-  catch(e){evErr=e.message;return all;}
-}
-function vEvidence(){
-  const all=Object.values(D.evidence||{}).sort((a,b)=>a.id-b.id);
-  const base=evFilter(all);
-  const rows=base.filter(ev=>!query||`${ev.method} ${ev.host}${ev.path} ${ev.status} ${ev.role||""}`.toLowerCase().includes(query.toLowerCase()));
-  return `<h1 class="vt">Evidence</h1><p class="vsub">Every request the model was built from, in capture order. Each <span class="mono">ev_N</span> cited anywhere in this report resolves to one of these rows. Click a row for the redacted request &amp; response.</p>
-  ${BQLDB?`<div class="evq"><input id="evq" spellcheck="false" placeholder='filter with BQL — e.g. req.method:POST AND resp.code.gte:400' value="${esc(evQ)}"></div>${evErr?`<div class="qerr" style="margin-bottom:12px">${esc(evErr)}</div>`:""}`:""}
-  <div class="card"><div class="hd">Requests <span class="ct">${rows.length} of ${all.length}</span></div><div class="bd" style="padding:0">
-  <table><thead><tr><th>Id</th><th>Method</th><th>Request</th><th>Status</th><th>Role</th></tr></thead><tbody>
-  ${rows.length?rows.map(ev=>`<tr data-ev="${ev.id}">
-    <td class="mono" style="color:var(--signal);font-weight:600">ev_${ev.id}</td>
-    <td>${methodm(ev.method)}</td>
-    <td><span class="mono trunc" title="${esc(ev.host)}${esc(ev.path)}">${esc(ev.host)}<span style="color:var(--muted)">${esc(ev.path)}</span></span></td>
-    <td>${statuses(ev.status==null?[]:[ev.status])}</td>
-    <td class="mono" style="color:var(--muted)">${esc(ev.role||"—")}</td></tr>`).join("")
-   :`<tr><td colspan="5"><div class="empty">No evidence rows match this search.</div></td></tr>`}
-  </tbody></table></div></div>`;
-}
-function initEvq(){
-  const i=$("#evq");if(!i)return;
-  i.addEventListener("keydown",e=>{if(e.key==="Enter"){evQ=i.value.trim();render();const n=$("#evq");if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}}});
-}
+__INVJS__
 function openEv(i){
   const ev=D.evidence["ev_"+i];if(!ev)return;
   $("#dtitle").innerHTML=`<span class="mono">ev_${i}</span>`;
@@ -1164,230 +973,7 @@ function openEv(i){
   $("#drawer").classList.add("on");$("#scrim").classList.add("on");$("#drawer").setAttribute("aria-hidden","false");
 }
 
-/* ---------- MAP (stable, categorized) ---------- */
-const CAT=[
-  {id:"infra",label:"Infrastructure",short:"Infra",types:["infra"],color:"var(--l6)",shape:"square"},
-  {id:"host",label:"Hosts",short:"Hosts",types:["host"],color:"var(--l1)",shape:"rsquare"},
-  {id:"tech",label:"Technology",short:"Tech",types:["tech"],color:"var(--l5)",shape:"hex"},
-  {id:"route",label:"Pages / routes",short:"Pages",types:["route"],color:"var(--l2)",shape:"circle"},
-  {id:"script",label:"Scripts",short:"Scripts",types:["script"],color:"var(--l3)",shape:"diamond"},
-  {id:"endpoint",label:"API endpoints",short:"Endpoints",types:["endpoint"],color:"var(--l4)",shape:"circle"},
-  {id:"param",label:"Parameters & operations",short:"Params",types:["parameter","operation"],color:"var(--l4)",shape:"dot"},
-  {id:"trust",label:"Trust & third parties",short:"Trust",types:["third_party","auth","cookie","role"],color:"var(--l5)",shape:"tri"},
-];
-function catOf(t){for(let i=0;i<CAT.length;i++)if(CAT[i].types.includes(t))return i;return CAT.length-1;}
-/* map state: which layers are shown, which layout, per viewer */
-const GN=(D.graph.nodes||[]).length;
-let gHidden=new Set(GN>80?["param"]:[]), gLayout="layered";
-try{const s=JSON.parse(localStorage.getItem("b2m-map")||"null");if(s){gHidden=new Set(s.hidden||[]);gLayout=s.layout||gLayout;}}catch(e){}
-function gSave(){try{localStorage.setItem("b2m-map",JSON.stringify({hidden:[...gHidden],layout:gLayout}));}catch(e){}}
-/* node glyphs: one shape per kind, so the map reads without the legend */
-function shapePath(shape,r){
-  const s=r*1.15;
-  switch(shape){
-    case "square":return `M${-s} ${-s}H${s}V${s}H${-s}Z`;
-    case "rsquare":{const k=s*.45;return `M${-s+k} ${-s}H${s-k}Q${s} ${-s} ${s} ${-s+k}V${s-k}Q${s} ${s} ${s-k} ${s}H${-s+k}Q${-s} ${s} ${-s} ${s-k}V${-s+k}Q${-s} ${-s} ${-s+k} ${-s}Z`;}
-    case "diamond":return `M0 ${-s*1.2}L${s*1.2} 0L0 ${s*1.2}L${-s*1.2} 0Z`;
-    case "hex":return [0,1,2,3,4,5].map(i=>{const a=Math.PI/3*i;return (i?"L":"M")+(s*Math.cos(a)).toFixed(2)+" "+(s*Math.sin(a)).toFixed(2);}).join("")+"Z";
-    case "tri":return `M0 ${-s*1.15}L${s*1.1} ${s*.75}L${-s*1.1} ${s*.75}Z`;
-    case "dot":{const d=Math.max(3,r*.7);return `M${-d} 0a${d} ${d} 0 1 0 ${2*d} 0a${d} ${d} 0 1 0 ${-2*d} 0`;}
-    default:return `M${-r} 0a${r} ${r} 0 1 0 ${2*r} 0a${r} ${r} 0 1 0 ${-2*r} 0`;
-  }
-}
-function vGraph(){
-  const present=CAT.map((cat,i)=>({cat,i,n:(D.graph.nodes||[]).filter(x=>catOf(x.type)===i).length})).filter(x=>x.n);
-  const hasInfra=present.some(x=>x.cat.id==="infra");
-  return `<h1 class="vt">Map</h1><p class="vsub">The whole app as one graph: hosts and the technology they run, pages, scripts, endpoints and their parameters, the trust layer${hasInfra?", and the external footprint from recon":""}. <b>Solid</b> lines were seen in traffic, <b>dashed</b> lines were found in the client code${hasInfra?", <b>dotted</b> lines come from external recon":""}. Hover to trace, click to open, drag to rearrange.</p>
-  <div class="graphwrap">
-   <div class="gtools">
-    <div class="chipwrap" id="glayers">${present.map(x=>`<button class="chip${gHidden.has(x.cat.id)?" off":""}" data-glayer="${x.cat.id}" title="show / hide"><span class="sw" style="background:${x.cat.color}"></span>${esc(x.cat.label)} <span class="c">${x.n}</span></button>`).join("")}</div>
-    <div class="gseg" role="group" aria-label="Layout"><button data-glayout="layered" class="${gLayout==="layered"?"on":""}">Layered</button><button data-glayout="force" class="${gLayout==="force"?"on":""}">Force</button></div>
-    <div class="gbtns"><button class="gbtn" data-gz="in" aria-label="Zoom in">+</button><button class="gbtn" data-gz="out" aria-label="Zoom out">−</button><button class="gbtn" data-gz="fit">Fit</button><button class="gbtn" id="gexport" title="Download the map as an SVG file">Export SVG</button></div>
-   </div>
-   <div style="position:relative"><div class="ghint">${GN} nodes · hover to trace · drag node or canvas · scroll to zoom · double-click to reset</div><svg id="gsvg" role="img" aria-label="Web-app model graph"></svg></div>
-   <div class="glegend">
-    ${present.map(x=>`<span class="k"><svg width="12" height="12" viewBox="-7 -7 14 14"><path d="${shapePath(x.cat.shape,5)}" fill="${x.cat.color}"/></svg>${esc(x.cat.label)}</span>`).join("")}
-    <span class="k"><span class="ln2"></span>seen in traffic</span><span class="k"><span class="ln2 inf"></span>found in code</span>${hasInfra?`<span class="k"><span class="ln2" style="border-top-style:dotted;border-color:var(--l6)"></span>external recon</span>`:""}
-   </div></div>`;
-}
-function initGraph(){
-  const svg=$("#gsvg");if(!svg)return;
-  svg.innerHTML="";
-  const NS="http://www.w3.org/2000/svg";
-  const nodes=D.graph.nodes.map(n=>({...n,cat:catOf(n.type)})).filter(n=>!gHidden.has(CAT[n.cat].id));
-  const idx=Object.fromEntries(nodes.map((n,i)=>[n.id,i]));
-  const edges=D.graph.edges.filter(e=>idx[e.s]!=null&&idx[e.d]!=null);
-  const deg={};edges.forEach(e=>{deg[e.s]=(deg[e.s]||0)+1;deg[e.d]=(deg[e.d]||0)+1;});
-  const nbr={};edges.forEach(e=>{(nbr[e.s]=nbr[e.s]||[]).push(e.d);(nbr[e.d]=nbr[e.d]||[]).push(e.s);});
-  if(!nodes.length){svg.setAttribute("viewBox","0 0 600 200");svg.innerHTML='<text x="300" y="100" text-anchor="middle" font-size="13" fill="var(--faint)">Every layer is hidden — turn one back on above.</text>';}
-
-  /* deterministic column layout. Rows are ordered by repeated barycenter
-     sweeps (each node moves toward the average row of its neighbours), which
-     collapses most edge crossings while staying perfectly reproducible:
-     same model, same picture. */
-  const cols=CAT.map((_,i)=>i).filter(i=>nodes.some(n=>n.cat===i));
-  const ROWH=30, TOP=64, maxL=cols.length>6?22:26;
-  const byCol={};cols.forEach(ci=>byCol[ci]=nodes.filter(n=>n.cat===ci)
-    .sort((a,b)=>String(a.label).localeCompare(String(b.label))));
-  /* each column is as wide as its longest (truncated) label needs, so eight
-     sparse columns don't force the whole picture to shrink */
-  /* a column longer than SUB rows wraps into side-by-side sub-columns, so a
-     real app's 80 endpoints read as a block instead of a thin 2,500px strip */
-  const SUB=26, colX={};let left=70;
-  cols.forEach(ci=>{const longest=Math.max(...byCol[ci].map(n=>Math.min(maxL,String(n.label||"").length)));
-    const w=Math.min(250,Math.max(140,46+longest*6.4));
-    const nsub=Math.max(1,Math.ceil(byCol[ci].length/SUB));
-    colX[ci]=[];for(let k=0;k<nsub;k++){colX[ci].push(left+16);left+=w;}});
-  const COLW=cols.length?(left-70)/cols.length:248;
-  const rank={};cols.forEach(ci=>byCol[ci].forEach((n,r)=>rank[n.id]=r));
-  for(let sweep=0;sweep<6;sweep++){
-    const order=sweep%2?cols.slice().reverse():cols;
-    order.forEach(ci=>{
-      const col=byCol[ci];
-      const bary=n=>{const ns=(nbr[n.id]||[]).map(o=>rank[o]).filter(v=>v!=null);
-        return ns.length?ns.reduce((a,b)=>a+b,0)/ns.length:rank[n.id];};
-      col.sort((a,b)=>bary(a)-bary(b)||String(a.label).localeCompare(String(b.label)));
-      col.forEach((n,r)=>rank[n.id]=r);
-    });
-  }
-  const maxRows=Math.max(1,...cols.map(ci=>Math.min(SUB,byCol[ci].length)));
-  cols.forEach(ci=>{
-    const col=byCol[ci];
-    const off=(maxRows-Math.min(SUB,col.length))*ROWH/2;   // centre short columns vertically
-    col.forEach((n,r)=>{n.x=colX[ci][Math.floor(r/SUB)];n.y=TOP+off+(r%SUB)*ROWH;n.hx=n.x;n.hy=n.y;});
-  });
-  let W=left+40, H=Math.max(320,TOP+maxRows*ROWH+30);
-
-  /* force layout: a small deterministic simulation seeded from the layered
-     positions. Nodes repel, edges pull, each kind is loosely tethered to its
-     column so the picture stays readable. No randomness, so it is stable. */
-  if(gLayout==="force"&&nodes.length){
-    const cy=H/2;
-    nodes.forEach((n,i)=>{n.x=n.hx+((i*37)%11-5)*3;n.y=n.hy+((i*53)%13-6)*3;n.vx=0;n.vy=0;});
-    const K=Math.max(90,Math.sqrt(W*H/nodes.length)*0.55);
-    for(let it=0;it<260;it++){
-      const t=1-it/260, step=0.85*t+0.05;
-      for(let i=0;i<nodes.length;i++){const a=nodes[i];
-        for(let j=i+1;j<nodes.length;j++){const b=nodes[j];
-          let dx=b.x-a.x,dy=b.y-a.y;let d2=dx*dx+dy*dy;if(d2<1){dx=(i-j)*.01;dy=.01;d2=.0002;}
-          if(d2>K*K*9)continue;
-          const d=Math.sqrt(d2), f=(K*K)/d2*0.9, fx=dx/d*f, fy=dy/d*f;
-          a.vx-=fx;a.vy-=fy;b.vx+=fx;b.vy+=fy;}}
-      edges.forEach(e=>{const a=nodes[idx[e.s]],b=nodes[idx[e.d]];const dx=b.x-a.x,dy=b.y-a.y;const d=Math.max(1,Math.sqrt(dx*dx+dy*dy));
-        const f=(d-K*0.9)/d*0.06;a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f;});
-      nodes.forEach(n=>{n.vx+=(n.hx-n.x)*0.012;n.vy+=(cy-n.y)*0.004;   // column tether + light gravity
-        n.x+=n.vx*step;n.y+=n.vy*step;n.vx*=0.55;n.vy*=0.55;});
-    }
-    let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
-    nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x);maxY=Math.max(maxY,n.y);});
-    const pad=140;nodes.forEach(n=>{n.x=n.x-minX+pad;n.y=n.y-minY+60;n.hx=n.x;n.hy=n.y;});
-    W=maxX-minX+pad*2+120;H=Math.max(480,maxY-minY+120);
-  }
-
-  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-  /* let the box follow the graph's own aspect ratio instead of letterboxing a
-     wide graph inside a tall fixed frame */
-  {const bw=svg.getBoundingClientRect().width||1100;svg.style.height=Math.round(Math.max(360,Math.min(820,bw*H/W)))+"px";}
-  const gHead=document.createElementNS(NS,"g"),gE=document.createElementNS(NS,"g"),gN=document.createElementNS(NS,"g");
-  /* arrowheads: direction is part of the fact (a page CALLS an endpoint) */
-  const defs=document.createElementNS(NS,"defs");
-  defs.innerHTML='<marker id="mArr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0.6 8 4 0 7.4z" fill="var(--line2)"/></marker>'
-    +'<marker id="mArrInf" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0.6 8 4 0 7.4z" fill="var(--inferred)" opacity=".7"/></marker>'
-    +'<marker id="mArrExt" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0.6 8 4 0 7.4z" fill="var(--l6)" opacity=".6"/></marker>';
-  svg.append(defs,gE,gN,gHead);
-  if(gLayout==="layered")cols.forEach(ci=>{const t=document.createElementNS(NS,"text");t.setAttribute("x",colX[ci][0]);t.setAttribute("y",30);
-    t.setAttribute("text-anchor","middle");t.setAttribute("font-size","11");t.setAttribute("font-weight","700");
-    t.setAttribute("fill","var(--muted)");t.setAttribute("letter-spacing",".04em");t.textContent=(cols.length>6?CAT[ci].short:CAT[ci].label).toUpperCase();gHead.append(t);});
-  const rOf=n=>5+Math.min(7,(deg[n.id]||0)*1.1);
-  const edgeCls=s=>s==="INFERRED"?" inf":s==="EXTERNAL"?" ext":"";
-  const edgeNote=s=>s==="INFERRED"?" (found in code)":s==="EXTERNAL"?" (external recon)":" (seen in traffic)";
-  const eEls=edges.map(e=>{const l=document.createElementNS(NS,"path");l.setAttribute("class","gedge"+edgeCls(e.state));
-    l.setAttribute("marker-end",e.state==="INFERRED"?"url(#mArrInf)":e.state==="EXTERNAL"?"url(#mArrExt)":"url(#mArr)");
-    const ti=document.createElementNS(NS,"title");
-    ti.textContent=`${nodes[idx[e.s]].label} ${humanize(e.type).toLowerCase()} ${nodes[idx[e.d]].label}`+edgeNote(e.state);
-    l.append(ti);gE.append(l);return{e,l};});
-  const q=(query||"").toLowerCase();
-  const nEls=nodes.map(n=>{const g=document.createElementNS(NS,"g");g.setAttribute("class","gnode"+(q&&String(n.label).toLowerCase().includes(q)?" q":""));
-    const r=rOf(n);
-    const c=document.createElementNS(NS,"path");c.setAttribute("class","shape");
-    c.setAttribute("d",shapePath(CAT[n.cat].shape,r));c.setAttribute("fill",CAT[n.cat].color);
-    const t=document.createElementNS(NS,"text");let lbl=n.label||"";if(lbl.length>maxL)lbl=lbl.slice(0,maxL-1)+"…";
-    t.textContent=lbl;t.setAttribute("x",r*1.15+6);t.setAttribute("y",4);t.setAttribute("text-anchor","start");
-    const ti=document.createElementNS(NS,"title");ti.textContent=n.label+(n.detail?" — "+n.detail:"");g.append(c,t,ti);
-    g.style.cursor="pointer";g.onclick=()=>{if(!dragged)openNode(n.id);};
-    g.onpointerdown=ev=>{ev.preventDefault();ev.stopPropagation();drag=n;dragged=false;svg.setPointerCapture(ev.pointerId);};
-    g.onpointerenter=()=>focus(n.id);g.onpointerleave=unfocus;
-    gN.append(g);return{n,g};});
-  svg.classList.toggle("gsearch",!!q&&nEls.some(({g})=>g.classList.contains("q")));
-
-  /* hover: keep the node and everything it touches, fade the rest */
-  function focus(id){
-    svg.classList.add("gfocus");
-    const keep=new Set([id]);
-    eEls.forEach(({e,l})=>{const on=e.s===id||e.d===id;l.classList.toggle("hi",on);
-      if(on){keep.add(e.s);keep.add(e.d);}});
-    nEls.forEach(({n,g})=>g.classList.toggle("hi",keep.has(n.id)));
-  }
-  function unfocus(){svg.classList.remove("gfocus");
-    eEls.forEach(({l})=>l.classList.remove("hi"));nEls.forEach(({g})=>g.classList.remove("hi"));}
-
-  let drag=null,dragged=false,pan=null;
-  function pt(ev){const m=svg.getScreenCTM().inverse();const p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;const q=p.matrixTransform(m);return{x:q.x,y:q.y};}
-  let vb={x:0,y:0,w:W,h:H};
-  const setVB=()=>svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
-  const zoom=f=>{const cx=vb.x+vb.w/2,cy=vb.y+vb.h/2;vb={x:cx-vb.w*f/2,y:cy-vb.h*f/2,w:vb.w*f,h:vb.h*f};setVB();};
-  /* drag empty canvas to pan */
-  svg.addEventListener("pointerdown",ev=>{if(drag)return;pan={px:ev.clientX,py:ev.clientY,vx:vb.x,vy:vb.y};svg.setPointerCapture(ev.pointerId);});
-  svg.addEventListener("pointermove",ev=>{
-    if(drag){dragged=true;const p=pt(ev);drag.x=p.x;drag.y=p.y;draw();return;}
-    if(pan){const k=vb.w/svg.getBoundingClientRect().width;
-      vb.x=pan.vx-(ev.clientX-pan.px)*k;vb.y=pan.vy-(ev.clientY-pan.py)*k;setVB();}});
-  svg.addEventListener("pointerup",()=>{if(drag){drag=null;setTimeout(()=>dragged=false,0);}pan=null;});
-  svg.addEventListener("dblclick",()=>{nodes.forEach(n=>{n.x=n.hx;n.y=n.hy;});vb={x:0,y:0,w:W,h:H};setVB();draw();});
-  svg.addEventListener("wheel",ev=>{ev.preventDefault();const p=pt(ev);const f=ev.deltaY<0?.85:1.18;
-    vb={x:p.x-(p.x-vb.x)*f,y:p.y-(p.y-vb.y)*f,w:vb.w*f,h:vb.h*f};setVB();},{passive:false});
-
-  /* toolbar */
-  $$("[data-glayer]").forEach(b=>b.onclick=()=>{const k=b.dataset.glayer;gHidden.has(k)?gHidden.delete(k):gHidden.add(k);gSave();render();});
-  $$("[data-glayout]").forEach(b=>b.onclick=()=>{if(gLayout!==b.dataset.glayout){gLayout=b.dataset.glayout;gSave();render();}});
-  $$("[data-gz]").forEach(b=>b.onclick=()=>{const k=b.dataset.gz;if(k==="in")zoom(.8);else if(k==="out")zoom(1.25);else{vb={x:0,y:0,w:W,h:H};setVB();}});
-  const ex=$("#gexport");if(ex)ex.onclick=()=>exportSvg(svg);
-
-  function draw(){
-    eEls.forEach(({e,l})=>{const A=nodes[idx[e.s]],B=nodes[idx[e.d]];
-      const ra=rOf(A)*1.15, rb=rOf(B)*1.15;
-      if(gLayout==="force"){
-        /* straight, trimmed to the glyph edge on both ends */
-        const dx=B.x-A.x,dy=B.y-A.y,d=Math.max(1,Math.sqrt(dx*dx+dy*dy)),ux=dx/d,uy=dy/d;
-        l.setAttribute("d",`M${A.x+ux*ra} ${A.y+uy*ra} L${B.x-ux*(rb+2)} ${B.y-uy*(rb+2)}`);return;}
-      /* leave the source at the side facing the target, land the same way */
-      const sgn=B.x>=A.x?1:-1;
-      const ax=A.x+sgn*ra, bx=B.x-sgn*rb;
-      const dx=Math.max(30,Math.abs(bx-ax)*0.4);
-      l.setAttribute("d",`M${ax} ${A.y} C ${ax+sgn*dx} ${A.y}, ${bx-sgn*dx} ${B.y}, ${bx} ${B.y}`);});
-    nEls.forEach(({n,g})=>g.setAttribute("transform",`translate(${n.x} ${n.y})`));}
-  draw();
-}
-/* download the map as a standalone SVG: CSS variables are resolved to the
-   current theme's colours so the file renders anywhere */
-function exportSvg(svg){
-  const cs=getComputedStyle(document.documentElement);
-  const resolve=s=>String(s).replace(/var\((--[a-z0-9-]+)\)/gi,(m,v)=>cs.getPropertyValue(v).trim()||m);
-  const clone=svg.cloneNode(true);
-  clone.setAttribute("xmlns","http://www.w3.org/2000/svg");
-  clone.querySelectorAll("*").forEach(el=>{["fill","stroke"].forEach(a=>{const v=el.getAttribute(a);if(v&&v.includes("var("))el.setAttribute(a,resolve(v));});});
-  const style=document.createElementNS("http://www.w3.org/2000/svg","style");
-  style.textContent=resolve(`text{font:10px ui-monospace,Menlo,Consolas,monospace;fill:var(--text);paint-order:stroke;stroke:var(--panel);stroke-width:3px;stroke-linejoin:round}
-.gedge{fill:none;stroke:var(--line2);stroke-width:1.2}.gedge.inf{stroke-dasharray:4 4;stroke:var(--inferred);opacity:.55}.gedge.ext{stroke-dasharray:1.5 3.5;stroke:var(--l6);opacity:.55}
-.shape{stroke:var(--panel);stroke-width:2}`);
-  clone.insertBefore(style,clone.firstChild);
-  const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
-  const vb=(clone.getAttribute("viewBox")||"0 0 800 600").split(" ");
-  rect.setAttribute("x",vb[0]);rect.setAttribute("y",vb[1]);rect.setAttribute("width",vb[2]);rect.setAttribute("height",vb[3]);rect.setAttribute("fill",resolve("var(--panel)"));
-  clone.insertBefore(rect,style.nextSibling);
-  const blob=new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+clone.outerHTML],{type:"image/svg+xml"});
-  const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=(D.app||"model")+".map.svg";a.click();URL.revokeObjectURL(u);
-}
+__MAPJS__
 
 /* ---------- HTTP panes (Burp-style, fully redacted) ---------- */
 function httpHeaders(hs){return (hs||[]).map(([k,v])=>`<span class="hn">${esc(k)}</span>: <span class="${/\[REDACTED/i.test(v)?'rd':'hv'}">${esc(v)}</span>`).join("\n");}
@@ -1456,17 +1042,18 @@ addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();});
 $("#dbody").addEventListener("click",e=>{const t=e.target.closest(".tab");if(!t)return;const pane=document.getElementById(t.dataset.tab);if(!pane)return;const wrap=t.closest(".http");$$(".tab",wrap).forEach(x=>x.classList.remove("on"));t.classList.add("on");$$(".pane",wrap).forEach(p=>p.classList.add("hide"));pane.classList.remove("hide");});
 
 /* ---------- wire ---------- */
-const RENDER={overview:vOverview,ask:vAsk,priorities:vPriorities,surface:vSurface,code:vCode,supply:vSupply,trust:vTrust,crossrole:vCrossrole,unknowns:vUnknowns,evidence:vEvidence,graph:vGraph,query:vQuery,infra:vInfra};
+const RENDER={overview:vOverview,ask:vAsk,priorities:vPriorities,surface:vSurface,code:vCode,supply:vSupply,trust:vTrust,crossrole:vCrossrole,unknowns:vUnknowns,inventory:vEvidence,graph:vGraph,query:vQuery,infra:vInfra};
 function render(){
   renderNav();
   try{if(!(view==="query"&&(location.hash||"").startsWith("#query=")))history.replaceState(null,"","#"+view);}catch(e){}
   const main=$("#main");
-  main.innerHTML=`<section class="view on">${(RENDER[view]||vOverview)()}</section>
+  main.className="m-"+view;
+  main.innerHTML=`<section class="view view-${view} on">${(RENDER[view]||vOverview)()}</section>
    <div class="foot">Generated by <b>burp2model ${esc(D.version)}</b>${D.generated?` on ${esc(D.generated)}`:""} — an evidence-backed model of a capture you provided. Not a scanner; nothing here is a vulnerability. · <a href="https://falc0n-researcher.github.io/burp2model/">docs</a></div>`;
   if(view==="graph")initGraph();
   if(view==="ask")initAsk();
   if(view==="query")initQuery();
-  if(view==="evidence")initEvq();
+  if(view==="inventory")initEvq();
   // row / card clicks → drawer
   $$("[data-ep]",main).forEach(el=>el.onclick=()=>openEp(el.dataset.ep));
   $$("[data-ev]",main).forEach(el=>el.onclick=()=>openEv(el.dataset.ev));
@@ -1487,6 +1074,7 @@ addEventListener("keydown",e=>{
 function fromHash(){
   const h=(location.hash||"").slice(1);
   if(h.startsWith("query=")&&BQLDB){let q="";try{q=decodeURIComponent(h.slice(6));}catch(e){}view="query";if(q&&q!==qText)qRun(q);return true;}
+  if(h==="evidence"){view="inventory";return true;}
   if(RENDER[h]){view=h;return true;}
   return false;
 }

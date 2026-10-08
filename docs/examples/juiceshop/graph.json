@@ -1495,19 +1495,6 @@
       ]
     },
     {
-      "id": "endpoint:GET:localhost:/api/Products/abc",
-      "label": "GET /api/Products/abc",
-      "type": "endpoint",
-      "layer": 4,
-      "api_state": "RUNTIME_ONLY",
-      "roles": [
-        "anon"
-      ],
-      "evidence": [
-        293
-      ]
-    },
-    {
       "id": "endpoint:POST:localhost:/rest/products/search",
       "label": "POST /rest/products/search",
       "type": "endpoint",
@@ -1907,20 +1894,6 @@
       ],
       "evidence": [
         351
-      ]
-    },
-    {
-      "id": "endpoint:PUT:localhost:/rest/basket/{id}/coupon/{code}",
-      "label": "PUT /rest/basket/{id}/coupon/{code}",
-      "type": "endpoint",
-      "layer": 4,
-      "api_state": "BOTH",
-      "roles": [
-        "user"
-      ],
-      "evidence": [
-        88,
-        353
       ]
     },
     {
@@ -2931,6 +2904,17 @@
     {
       "id": "endpoint:*:localhost:/rest/admin",
       "label": "* /rest/admin",
+      "type": "endpoint",
+      "layer": 4,
+      "api_state": "STATIC_ONLY",
+      "roles": [],
+      "evidence": [
+        88
+      ]
+    },
+    {
+      "id": "endpoint:PUT:localhost:/rest/basket/{param}/coupon/{param}",
+      "label": "PUT /rest/basket/{param}/coupon/{param}",
       "type": "endpoint",
       "layer": 4,
       "api_state": "STATIC_ONLY",
@@ -5803,24 +5787,6 @@
     },
     {
       "source": "host:localhost",
-      "target": "endpoint:GET:localhost:/api/Products/abc",
-      "type": "EXPOSES",
-      "state": "OBSERVED",
-      "evidence": [
-        293
-      ]
-    },
-    {
-      "source": "role:anon",
-      "target": "endpoint:GET:localhost:/api/Products/abc",
-      "type": "REACHED",
-      "state": "OBSERVED",
-      "evidence": [
-        293
-      ]
-    },
-    {
-      "source": "host:localhost",
       "target": "endpoint:POST:localhost:/rest/products/search",
       "type": "EXPOSES",
       "state": "OBSERVED",
@@ -6615,42 +6581,6 @@
       "state": "OBSERVED",
       "evidence": [
         351
-      ]
-    },
-    {
-      "source": "host:localhost",
-      "target": "endpoint:PUT:localhost:/rest/basket/{id}/coupon/{code}",
-      "type": "EXPOSES",
-      "state": "OBSERVED",
-      "evidence": [
-        353
-      ]
-    },
-    {
-      "source": "endpoint:PUT:localhost:/rest/basket/{id}/coupon/{code}",
-      "target": "auth:bearer",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        353
-      ]
-    },
-    {
-      "source": "endpoint:PUT:localhost:/rest/basket/{id}/coupon/{code}",
-      "target": "auth:cookie:token",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        353
-      ]
-    },
-    {
-      "source": "role:user",
-      "target": "endpoint:PUT:localhost:/rest/basket/{id}/coupon/{code}",
-      "type": "REACHED",
-      "state": "OBSERVED",
-      "evidence": [
-        353
       ]
     },
     {
@@ -9052,15 +8982,6 @@
     },
     {
       "source": "route:localhost/",
-      "target": "endpoint:GET:localhost:/api/Products/abc",
-      "type": "CALLS",
-      "state": "OBSERVED",
-      "evidence": [
-        293
-      ]
-    },
-    {
-      "source": "route:localhost/",
       "target": "endpoint:POST:localhost:/rest/products/search",
       "type": "CALLS",
       "state": "OBSERVED",
@@ -9145,15 +9066,6 @@
       "state": "OBSERVED",
       "evidence": [
         351
-      ]
-    },
-    {
-      "source": "route:localhost/",
-      "target": "endpoint:PUT:localhost:/rest/basket/{id}/coupon/{code}",
-      "type": "CALLS",
-      "state": "OBSERVED",
-      "evidence": [
-        353
       ]
     },
     {
@@ -9703,7 +9615,7 @@
     },
     {
       "source": "script:localhost/main.js",
-      "target": "endpoint:PUT:localhost:/rest/basket/{id}/coupon/{code}",
+      "target": "endpoint:PUT:localhost:/rest/basket/{param}/coupon/{param}",
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **A new report.** The dashboard has charts and rankings instead of lists. The map is drawn on a
+  canvas as neighbourhoods by feature area, with a node inspector, path tracing, Flow and Focus
+  layouts, search and filters. The inventory is laid out like Burp: a site-map tree, a sortable
+  request table and the masked request and response side by side. The query console highlights
+  and completes BQL and offers queries built from your own model. A browser test drives every view.
+- Docs now say plainly that masked, truncated request and response bodies are stored in
+  `model.json`, `graph.db` and the report.
+
 - Large exports use about half the Python memory: parsed requests are freed once saved and
   once the model is built (a 20,000-request build peaked at 224 MB, down from 437 MB). Output
   is unchanged.

@@ -10,7 +10,7 @@ to your own AI instead of raw traffic.
 
 [![PyPI](https://img.shields.io/badge/pip-burp2model-e85002?style=for-the-badge)](https://pypi.org/project/burp2model/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a424e?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-289_passing-0fa79a?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/tests-294_passing-0fa79a?style=for-the-badge)](tests/)
 [![Secrets masked](https://img.shields.io/badge/secrets-masked_before_write-0e8fd6?style=for-the-badge)](#boundaries)
 [![Docs](https://img.shields.io/badge/docs-github_pages-7a5cff?style=for-the-badge)](https://falc0n-researcher.github.io/burp2model/)
 
@@ -56,7 +56,7 @@ Output goes to `burp2model-out/shop/`:
 
 | File | What it is |
 | --- | --- |
-| `report.html` | Self-contained interactive report: map, Ask box, Copy for AI, redacted request/response per request |
+| `report.html` | Self-contained interactive report: dashboard, map, Burp-style request inventory, query console, Copy for AI |
 | `model.json` | The six-layer graph with an evidence table mapping every `ev_N` to its request |
 | `context.json` | The evidence package to give an LLM instead of raw traffic |
 | `graph.db` | The model as one SQLite file, queryable with `burp2model q` |

@@ -1,6 +1,6 @@
 {
   "tool": "burp2model",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "schema": 1,
   "app": "shop",
   "scope": [
@@ -34,7 +34,9 @@
     "exchanges": 22,
     "static_assets": 1,
     "preflight": 1,
-    "third_party_requests": 2
+    "third_party_requests": 2,
+    "slug_templates_folded": 0,
+    "not_found_paths_dropped": 0
   },
   "nodes": [
     {
@@ -1953,7 +1955,7 @@
   "secrets": [
     {
       "kind": "authorization",
-      "hmac_12": "005543c434bd",
+      "hmac_12": "59397bc7b041",
       "length": 84,
       "entropy": 4.8,
       "count": 5,
@@ -1967,7 +1969,7 @@
     },
     {
       "kind": "cookie",
-      "hmac_12": "7385ae92d689",
+      "hmac_12": "18ff5f026406",
       "length": 44,
       "entropy": 4.88,
       "count": 5,
@@ -1981,7 +1983,7 @@
     },
     {
       "kind": "email",
-      "hmac_12": "db372f7a6361",
+      "hmac_12": "86657370f917",
       "length": 22,
       "entropy": 3.79,
       "count": 1,
@@ -1991,7 +1993,7 @@
     },
     {
       "kind": "email",
-      "hmac_12": "bc3c5688192d",
+      "hmac_12": "f6a8c53d5ae6",
       "length": 15,
       "entropy": 3.46,
       "count": 2,
@@ -2001,7 +2003,7 @@
     },
     {
       "kind": "authorization",
-      "hmac_12": "991582d44e46",
+      "hmac_12": "77e9425278e0",
       "length": 68,
       "entropy": 5.08,
       "count": 10,
@@ -2020,7 +2022,7 @@
     },
     {
       "kind": "cookie",
-      "hmac_12": "8871d5a38908",
+      "hmac_12": "2ee11a961940",
       "length": 43,
       "entropy": 4.65,
       "count": 10,
@@ -2039,7 +2041,7 @@
     },
     {
       "kind": "set-cookie",
-      "hmac_12": "c2ddd3e9697a",
+      "hmac_12": "88568ab46a93",
       "length": 72,
       "entropy": 4.82,
       "count": 1,
@@ -2049,7 +2051,7 @@
     },
     {
       "kind": "set-cookie",
-      "hmac_12": "58d4c0d76500",
+      "hmac_12": "7f53acf22206",
       "length": 17,
       "entropy": 3.57,
       "count": 1,
@@ -2059,7 +2061,7 @@
     },
     {
       "kind": "set-cookie",
-      "hmac_12": "6f18416e61bd",
+      "hmac_12": "f56efb3e3cc1",
       "length": 58,
       "entropy": 4.78,
       "count": 1,
@@ -2069,7 +2071,7 @@
     },
     {
       "kind": "password",
-      "hmac_12": "c6acf83c0950",
+      "hmac_12": "97a2ced194a6",
       "length": 12,
       "entropy": 3.08,
       "count": 1,
@@ -2079,7 +2081,7 @@
     },
     {
       "kind": "email",
-      "hmac_12": "c8fa58cd2d35",
+      "hmac_12": "9aded0cb1b57",
       "length": 21,
       "entropy": 3.69,
       "count": 1,
@@ -2089,7 +2091,7 @@
     },
     {
       "kind": "card",
-      "hmac_12": "269e0a6c4d15",
+      "hmac_12": "7176088ff238",
       "length": 19,
       "entropy": 0.91,
       "count": 2,
@@ -2099,7 +2101,7 @@
     },
     {
       "kind": "$.cvv",
-      "hmac_12": "e36df4e6ad12",
+      "hmac_12": "79797c64292f",
       "length": 3,
       "entropy": 1.58,
       "count": 1,
@@ -2109,7 +2111,7 @@
     },
     {
       "kind": "aws_key",
-      "hmac_12": "0cf6d59e2b46",
+      "hmac_12": "7041de2a7a74",
       "length": 20,
       "entropy": 3.68,
       "count": 1,
@@ -2119,7 +2121,7 @@
     },
     {
       "kind": "path:email",
-      "hmac_12": "7d35297de88b",
+      "hmac_12": "adb64c1eb45e",
       "length": 17,
       "entropy": 3.34,
       "count": 1,
@@ -2129,7 +2131,7 @@
     },
     {
       "kind": "path:token",
-      "hmac_12": "72d44278564f",
+      "hmac_12": "9acfd4ce4dec",
       "length": 12,
       "entropy": 3.58,
       "count": 1,
@@ -2572,7 +2574,7 @@
             "cloudflare"
           ]
         ],
-        "body": "\nconst API = \"https://api.example.com\";\nexport async function boot(id) {\n  await fetch(\"https://api.example.com/api/me\", {headers:{Authorization:token}});\n  await fetch(\"https://api.example.com/api/orders\");\n  await fetch(`https://api.example.com/api/orders/${id}`);\n  await axios.post(\"https://api.example.com/api/checkout\", body);\n  await fetch(\"https://api.example.com/graphql\", {method:\"POST\", body:q});\n  // referenced but never called in this capture \u2014 the interesting column\n  const AUDIT_URL = \"https://api.example.com/api/admin/audit\";\n  return AUDIT_URL;\n}\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle",
+        "body": "\nconst API = \"https://api.example.com\";\nexport async function boot(id) {\n  await fetch(\"https://api.example.com/api/me\", {headers:{Authorization:[REDACTED]\n  await fetch(\"https://api.example.com/api/orders\");\n  await fetch(`https://api.example.com/api/orders/${id}`);\n  await axios.post(\"https://api.example.com/api/checkout\", body);\n  await fetch(\"https://api.example.com/graphql\", {method:\"POST\", body:q});\n  // referenced but never called in this capture \u2014 the interesting column\n  const AUDIT_URL = \"https://api.example.com/api/admin/audit\";\n  return AUDIT_URL;\n}\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle\n// padding to look like a real bundle",
         "truncated": true
       }
     },
