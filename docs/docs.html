@@ -72,7 +72,7 @@
   <p>Python 3.9 or newer.</p>
   <div class="code"><span class="label">shell</span><button class="copy" type="button" data-copy aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><pre>pip install burp2model
 burp2model --version</pre></div>
-  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (294 tests).</p>
+  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (295 tests).</p>
 </div>
 
 <div class="doc-section" id="quickstart">
@@ -95,7 +95,7 @@ burp2model cross-role shop --low user --high admin</pre></div>
   BOTH         6
   STATIC_ONLY  1
   RUNTIME_ONLY 3
-    static-only  * /api/admin/audit  ev_3</pre></div>
+    static-only  * /api/admin/audit  ev_4</pre></div>
   <p><code>STATIC_ONLY</code> means the code names the path but the capture never requested it. The <code>*</code> means the code gave no HTTP method, so none is guessed.</p>
 </div>
 
@@ -116,10 +116,10 @@ burp2model cross-role shop --low user --high admin</pre></div>
   </table></div>
   <h3>The report</h3>
   <ul>
-    <li><b>Dashboard:</b> code vs runtime, traffic shape, what to look at first, roles, third parties and open questions.</li>
+    <li><b>Overview:</b> a short read: what was found, five leads to check first, and how much of the code ran.</li>
     <li><b>Map:</b> the app as neighbourhoods by feature area. Click a node to inspect it, shift-click a second to trace the shortest path, double-click to focus. Flow and Focus layouts, search, filters, PNG export.</li>
     <li><b>Inventory:</b> a site-map tree, a sortable request table and the masked request and response side by side, like Burp's HTTP history. Filter by text or BQL.</li>
-    <li><b>Query:</b> the BQL console with highlighting, completion, ready-made queries from your model, and paths shown as chains.</li>
+    <li><b>Ask:</b> one box for plain questions and BQL, with completion, ready-made queries from your model, and paths shown as chains.</li>
   </ul>
   <p>A plain build is offline. Add <code>--osint</code> to also run light recon (DNS, TLS, headers) on the primary public host and save <code>osint.json</code>; it fails soft. <code>BURP2MODEL_OFFLINE=1</code> forces recon off.</p>
 </div>

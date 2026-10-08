@@ -10,7 +10,7 @@ to your own AI instead of raw traffic.
 
 [![PyPI](https://img.shields.io/badge/pip-burp2model-e85002?style=for-the-badge)](https://pypi.org/project/burp2model/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a424e?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-294_passing-0fa79a?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/tests-295_passing-0fa79a?style=for-the-badge)](tests/)
 [![Secrets masked](https://img.shields.io/badge/secrets-masked_before_write-0e8fd6?style=for-the-badge)](#boundaries)
 [![Docs](https://img.shields.io/badge/docs-github_pages-7a5cff?style=for-the-badge)](https://falc0n-researcher.github.io/burp2model/)
 

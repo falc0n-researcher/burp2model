@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Evidence ids start at 1** and the report shows them as EVD 1, EVD 2 (the files and CLI still
+  use `ev_1`, `ev_2`). BQL accepts either form.
+- **Ask and Query are one view.** One box takes plain questions or BQL.
+- **The report reads in about a minute.** The overview is a short summary, five leads to check
+  first with a next step each, and two small charts; the rest sits under "More numbers". The
+  sidebar is "Start here" and "Reference". Every view uses the full width.
 - **A new report.** The dashboard has charts and rankings instead of lists. The map is drawn on a
   canvas as neighbourhoods by feature area, with a node inspector, path tracing, Flow and Focus
   layouts, search and filters. The inventory is laid out like Burp: a site-map tree, a sortable

@@ -6,8 +6,51 @@ spliced into the page; everything is computed from the payload `D` the report em
 
 DASH_CSS = r"""
 /* dashboard */
-.m-overview{padding:22px 28px 60px}
-.view-overview{max-width:1500px}
+.m-overview{padding:26px 32px 60px}
+.ovh{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:28px;align-items:end;margin-bottom:26px}
+@media(max-width:1000px){.ovh{grid-template-columns:minmax(0,1fr)}}
+.ovh h1{font:700 30px/1.1 var(--sans);letter-spacing:-.025em;margin:0 0 8px}
+.ovh .sum{font-size:16px;line-height:1.55;color:var(--muted);max-width:62ch;margin:0}
+.ovh .sum b{color:var(--text);font-weight:700}
+.ovh .meta{color:var(--faint);font:12px var(--mono);margin-top:10px}
+.big4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.big4 button{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px;text-align:left;cursor:pointer}
+.big4 button:hover{border-color:var(--line2);box-shadow:var(--shadow)}
+.big4 .n{font:700 32px/1 var(--sans);letter-spacing:-.03em}
+.big4 .k{font-size:12px;color:var(--muted);margin-top:6px}
+.big4 .hot .n{color:var(--signal)}
+.ovg{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;margin-bottom:22px}
+@media(max-width:1100px){.ovg{grid-template-columns:minmax(0,1fr)}}
+.sech{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}
+.sech h2{font:700 16px var(--sans);margin:0;letter-spacing:-.01em}
+.sech .s{color:var(--faint);font-size:12.5px}
+.sech .lnk{margin-left:auto;font:600 12.5px var(--sans);color:var(--signal);background:none;border:0}
+.lead{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:14px;align-items:start;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c,var(--signal));border-radius:12px;padding:14px 16px;margin-bottom:10px}
+.lead .num{font:700 14px var(--mono);color:var(--c,var(--signal));padding-top:2px}
+.lead .t{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font:700 14px var(--mono);word-break:break-all}
+.lead .w{font:600 13px var(--sans);margin-top:4px}
+.lead .y{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:80ch}
+.lead .nx{font-size:12.5px;margin-top:6px;color:var(--text)}
+.lead .nx b{font:700 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--c,var(--signal));margin-right:6px}
+.lead .acts{display:flex;flex-direction:column;gap:6px}
+.abtn{font:600 12px var(--sans);padding:6px 11px;border-radius:8px;border:1px solid var(--line2);background:var(--panel);color:var(--muted);white-space:nowrap}
+.abtn:hover{color:var(--text);border-color:var(--faint)}
+.abtn.pri{background:var(--text);color:var(--ink);border-color:var(--text)}
+@media(max-width:700px){.lead{grid-template-columns:24px minmax(0,1fr)}.lead .acts{grid-column:2;flex-direction:row}}
+.side{display:flex;flex-direction:column;gap:14px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
+@media(max-width:1000px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;text-align:left}
+.tile:hover{border-color:var(--signal);box-shadow:var(--shadow)}
+.tile b{display:block;font:700 14.5px var(--sans);margin-bottom:4px}
+.tile span{color:var(--muted);font-size:12.5px}
+details.more{border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-bottom:18px}
+details.more>summary{cursor:pointer;list-style:none;padding:14px 18px;font:700 14px var(--sans);display:flex;gap:10px;align-items:center}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::before{content:"▸";color:var(--faint);transition:transform .15s}
+details.more[open]>summary::before{transform:rotate(90deg)}
+details.more>summary span{font-weight:500;color:var(--faint);font-size:12.5px}
+details.more .inner{padding:0 18px 18px}
 .dh1{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:18px}
 .dh1 h1{font:700 28px/1.1 var(--sans);letter-spacing:-.025em;margin:0}
 .dh1 .sub{color:var(--muted);font:12.5px var(--mono);margin-top:6px}
@@ -147,7 +190,7 @@ function osintCard(){
   return `<div class="dc"><div class="h">External recon <span class="ct">${esc(o.host||"")}</span></div><div class="b"><table class="dtbl"><tbody>${rows.map(([k,v])=>`<tr data-goto="infra"><td>${esc(k)}</td><td style="max-width:60%">${esc(v)}</td></tr>`).join("")}</tbody></table>
    <div class="dnote">Collected live by <span class="mono">burp2model osint</span>, not from the capture.</div></div></div>`;
 }
-function vOverview(){
+function vMore(){
   const st=c.api_state||{},both=st.BOTH||0,rt=st.RUNTIME_ONLY||0,so=st.STATIC_ONLY||0,eptot=both+rt+so;
   const cap=D.stats||{},roles=D.roles||[];
   const reqTot=EVL.length;
@@ -177,19 +220,7 @@ function vOverview(){
     ["Trust","var(--l5)",(c.third_parties||0)+(c.auth||0)+(c.cookies||0),`${c.third_parties||0} third · ${c.auth||0} auth · ${c.cookies||0} cookies`,"trust"],
     ["Unknowns","var(--l6)",c.unknowns||0,"named gaps","unknowns"]];
 
-  return `<div class="dh1"><div><h1>${esc(D.app)}</h1><div class="sub">scope ${esc((D.scope||[]).join(", ")||"—")} · ${fmtN(reqTot)} requests · ${esc(D.generated||"")}</div></div><div class="sp"></div>
-   <div class="dtags">${roles.map(r=>`<span class="dtag">role <b>${esc(r)}</b></span>`).join("")}<span class="dtag">burp2model <b>${esc(D.version)}</b></span></div></div>
-
-  <div class="dkpis">
-   ${kpi(c.endpoints||0,"API endpoints",`${both} both · ${rt} traffic · ${so} code only`,"var(--l4)","surface")}
-   ${kpi(c.routes||0,"Routes",`${c.scripts||0} scripts · ${c.hosts||0} hosts`,"var(--l2)","surface")}
-   ${kpi(c.parameters||0,"Parameters",c.operations?`${c.operations} GraphQL ops · names only`:"names only, values masked","var(--l3)","surface")}
-   ${kpi(c.third_parties||0,"Third parties",tpReq?`${fmtN(tpReq)} requests off-scope`:"none seen","var(--l5)","supply")}
-   ${kpi(c.secrets||(D.secrets||[]).length,"Secrets masked",`${ckBad} weak cookie${ckBad===1?"":"s"}`,"var(--signal)","trust")}
-   ${kpi(c.unknowns||0,"Open questions",topUnk.length?openTitle(topUnk[0][0]).toLowerCase():"nothing left open","var(--l6)","unknowns")}
-  </div>
-
-  <div class="dgrid dg3">
+  return `  <div class="dgrid dg3">
    <div class="dc"><div class="h">Code vs runtime <span class="ct">${eptot} endpoints</span></div><div class="b">
     <div class="dwrap">${donut([{v:both,color:"var(--ok)",label:"seen in code and traffic"},{v:rt,color:"var(--observed)",label:"traffic only"},{v:so,color:"var(--signal)",label:"code only"}],150,20,String(eptot),"ENDPOINTS")}
      <div class="dleg">
@@ -248,6 +279,56 @@ function vOverview(){
     <div class="dnote">An absence here is an absence in the <b>capture</b>, never a statement about the target.</div></div></div>
   </div>
   ${D.osint?`<div class="dgrid" style="grid-template-columns:minmax(0,1fr)">${osintCard()}</div>`:""}`;
+}
+
+function leadCard(p,i){
+  const e=p.ep,l=p.sig[0],col=p.sev==="hot"?"var(--signal)":p.sev==="warn"?"var(--warn)":"var(--observed)";
+  return `<div class="lead" style="--c:${col}"><span class="num">${i+1}</span><div>
+    <div class="t">${methodm(e.method)}<span>${esc(e.path)}</span></div>
+    <div class="w">${esc(l.ttl)}${p.sig.length>1?` <span style="color:var(--faint);font-weight:500">+${p.sig.length-1} more</span>`:""}</div>
+    <div class="y">${esc(l.why)}</div><div class="nx"><b>Do next</b>${esc(l.next)}</div></div>
+    <div class="acts"><button class="abtn pri" data-ep="${esc(e.id)}">Open</button><button class="abtn" data-lead-map="${esc(e.id)}">On the map</button></div></div>`;
+}
+function vOverview(){
+  const st=c.api_state||{},both=st.BOTH||0,rt=st.RUNTIME_ONLY||0,so=st.STATIC_ONLY||0,eptot=both+rt+so;
+  const hot=PRIO.filter(p=>p.sev==="hot").length,roles=D.roles||[],reqTot=EVL.length;
+  const sum=[`<b>${c.endpoints||0}</b> API endpoints on <b>${c.routes||0}</b> pages, from <b>${fmtN(reqTot)}</b> captured requests${roles.length>1?` as <b>${roles.length}</b> roles`:""}.`];
+  if(so)sum.push(`<b>${so}</b> ${so===1?"endpoint is":"endpoints are"} named in the code but never called.`);
+  sum.push(PRIO.length?`Start with the ${Math.min(5,PRIO.length)} leads below.`:"Nothing stands out. The map is the next stop.");
+  const stc=tally(EVL,e=>statusClass(e.status));
+  const stOrder=["2xx","3xx","4xx","5xx"].map(k=>({label:k,v:(stc.find(x=>x[0]===k)||[0,0])[1],color:SC_COL[k]}));
+  const unk=c.unknowns||0;
+  return `<div class="ovh"><div><h1>${esc(D.app)}</h1><p class="sum">${sum.join(" ")}</p>
+    <div class="meta">scope ${esc((D.scope||[]).join(", ")||"none")} · ${esc(D.generated||"")}</div></div>
+   <div class="big4">
+    <button data-goto="surface"><div class="n">${c.endpoints||0}</div><div class="k">API endpoints</div></button>
+    <button data-goto="inventory"><div class="n">${fmtN(reqTot)}</div><div class="k">Requests</div></button>
+    <button class="${hot||weakCookies.length?"hot":""}" data-goto="priorities"><div class="n">${PRIO.length+weakCookies.length}</div><div class="k">To check</div></button>
+    <button data-goto="unknowns"><div class="n">${unk}</div><div class="k">Open questions</div></button></div></div>
+
+  <div class="ovg"><div>
+    <div class="sech"><h2>Check these first</h2><span class="s">ranked leads to verify, not findings</span>${PRIO.length+weakCookies.length>5?`<button class="lnk" data-goto="priorities">All ${PRIO.length+weakCookies.length} →</button>`:""}</div>
+    ${PRIO.slice(0,5).map(leadCard).join("")||'<div class="dc"><div class="b"><div class="empty">Nothing stands out in this capture.</div></div></div>'}
+   </div><div class="side">
+    <div class="dc"><div class="h">What the code names vs what ran</div><div class="b"><div class="dwrap">${donut([{v:both,color:"var(--ok)",label:"in code and traffic"},{v:rt,color:"var(--observed)",label:"traffic only"},{v:so,color:"var(--signal)",label:"code only"}],130,18,String(eptot),"ENDPOINTS")}
+      <div class="dleg"><div class="r" data-goto="surface"><span class="sw" style="background:var(--ok)"></span><span class="l">Both</span><b>${both}</b></div>
+       <div class="r" data-goto="surface"><span class="sw" style="background:var(--observed)"></span><span class="l">Traffic only</span><b>${rt}</b></div>
+       <div class="r" data-goto="surface"><span class="sw" style="background:var(--signal)"></span><span class="l">Code only</span><b>${so}</b></div></div></div></div></div>
+    <div class="dc"><div class="h">Responses</div><div class="b">${stacked(stOrder)}</div></div>
+    ${roles.length>1?`<div class="dc"><div class="h">Roles in this capture</div><div class="b"><div class="dtags">${roles.map(r=>`<span class="dtag"><b>${esc(r)}</b></span>`).join("")}</div><div class="dnote"><a href="#crossrole" data-goto="crossrole">See what each role reached →</a></div></div></div>`:""}
+   </div></div>
+
+  <div class="sech"><h2>Explore</h2></div>
+  <div class="tiles">
+   <button class="tile" data-goto="graph"><b>Map</b><span>How pages, scripts and endpoints connect.</span></button>
+   <button class="tile" data-goto="inventory"><b>Requests</b><span>Every request, like Burp's HTTP history.</span></button>
+   <button class="tile" data-goto="ask"><b>Ask</b><span>A plain question, or a BQL query.</span></button>
+   <button class="tile" data-goto="unknowns"><b>Open questions</b><span>What this capture could not show.</span></button></div>
+
+  <details class="more"><summary>More numbers <span>timeline, busiest endpoints, third parties, hosts</span></summary><div class="inner">${vMore()}</div></details>`;
+}
+function initOverview(){
+  $$("[data-lead-map]").forEach(b=>b.onclick=e=>{e.stopPropagation();MAPS.sel=b.dataset.leadMap;MAPS.path=null;if(MAPS.mode==="focus")MAPS.focusId=MAPS.sel;view="graph";render();});
 }
 /* one bar per request in capture order, coloured by status class; long captures are bucketed */
 function captureStrip(){

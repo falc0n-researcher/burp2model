@@ -246,7 +246,7 @@ def _term_sql(target: str, fname: str, op: str, value: str, params: list) -> str
         col, kind = _EDGE_FIELDS[fname]
     elif fname == "node.evidence":
         try:
-            ev = int(value.lower().removeprefix("ev_"))
+            ev = int(re.sub(r"^(?:ev_|evd[ _]?)", "", value.lower()))
         except ValueError:
             raise BQLError(f"node.evidence needs an evidence id, got {value!r}")
         if op not in ("eq", "ne"):

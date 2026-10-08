@@ -282,8 +282,8 @@ def test_report_embeds_copyable_context_without_secrets(tmp_path):
     write_html_report(m, str(out))
     html = out.read_text()
     assert "Copy for AI" in html and 'id="copyai"' in html
-    # the AI-off query view ships too, with its honesty line
-    assert "Ask the model" in html and "no AI was called" in html
+    # the AI-off question view ships too, with its honesty line
+    assert "function vAsk" in html and "No AI was called" in html
 
 
 def test_evidence_panes_are_redacted(tmp_path):
@@ -413,7 +413,7 @@ def test_secrets_deduplicated_with_evidence(tmp_path):
                             item(path="/b", req_headers=hdr)])
     assert len(m.secrets) == 1
     s = m.secrets[0]
-    assert s["count"] == 3 and s["evidence"] == [0, 1, 2]
+    assert s["count"] == 3 and s["evidence"] == [1, 2, 3]
     assert "sha256_12" not in s and "hmac_12" in s
 
 
@@ -476,7 +476,7 @@ def test_role_builds_merge_and_cross_role_works(tmp_path, capsys):
     data = json.load(open(os.path.join(out, "t", "model.json")))
     assert data["roles"] == ["admin", "user"]
     ids = [e["id"] for e in data["evidence"]]
-    assert ids == list(range(len(ids)))                # unique across merged inputs
+    assert ids == list(range(1, len(ids) + 1))              # unique across merged inputs
 
     m = from_dict(data)
     r = cross_role(m, "user", "admin")

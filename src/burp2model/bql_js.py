@@ -97,8 +97,8 @@ function termPred(target,f,op,value,ctx){
   if(target==="requests")[get,kind]=REQ[f];
   else if(target==="edges")[get,kind]=EDGE(ctx)[f];
   else if(f==="node.evidence"){
-    const ev=parseInt(value.toLowerCase().replace(/^ev_/,""),10);
-    if(!/^(ev_)?\d+$/i.test(value))fail("node.evidence needs an evidence id, got "+JSON.stringify(value));
+    const ev=parseInt(value.toLowerCase().replace(/^(?:ev_|evd[ _]?)/,""),10);
+    if(!/^(?:ev_|evd[ _]?)?\d+$/i.test(value))fail("node.evidence needs an evidence id, got "+JSON.stringify(value));
     if(op!=="eq"&&op!=="ne")fail("node.evidence supports eq and ne");
     return n=>(n.evidence.includes(ev))===(op==="eq");
   }else if(f==="node.role"){

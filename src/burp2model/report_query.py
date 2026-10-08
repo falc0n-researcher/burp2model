@@ -7,26 +7,18 @@ for graph paths.
 """
 
 QRY_CSS = r"""
-/* query console */
-.m-query{padding:0!important;overflow:hidden!important}
-.m-query .view{max-width:none;height:100%}
-.m-query .foot{display:none}
-.qx{display:grid;grid-template-columns:268px minmax(0,1fr);height:100%}
-@media(max-width:900px){.qx{grid-template-columns:minmax(0,1fr)}.qside{display:none}}
-.qside{border-right:1px solid var(--line);background:var(--panel);overflow:auto;padding:14px 10px 30px}
-.qside h4{font:600 10px var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:16px 8px 6px}
-.qside h4:first-child{margin-top:0}
-.qi{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 9px;border-radius:8px;color:var(--text);cursor:pointer}
-.qi:hover{background:var(--panel2)}
-.qi .t{font:600 12.5px var(--sans);display:block}
-.qi .d{font:11px var(--mono);color:var(--faint);display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.qi .x{float:right;color:var(--faint);font-size:11px;padding:0 4px}
-.qi .x:hover{color:var(--bad)}
-.qmain{display:flex;flex-direction:column;min-width:0;min-height:0;height:100%;overflow:auto;padding:20px 26px 40px}
-.qh{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
-.qh h1{font:700 22px var(--sans);letter-spacing:-.02em;margin:0}
-.qh .s{color:var(--muted);font-size:13px}
-.qed{position:relative;border:1px solid var(--line2);border-radius:12px;background:var(--panel);box-shadow:var(--shadow)}
+/* ask: one box for plain questions and BQL */
+.m-ask{padding:26px 32px 50px}
+.askx{max-width:none}
+.atabs{display:flex;gap:4px;margin:16px 0 10px;border-bottom:1px solid var(--line)}
+.atab{font:600 12.5px var(--sans);padding:8px 14px;border:0;background:none;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.atab.on{color:var(--text);border-bottom-color:var(--signal)}
+.achips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.achip{font:500 13px var(--sans);padding:7px 13px;border-radius:999px;border:1px solid var(--line2);background:var(--panel);color:var(--text);max-width:100%}
+.achip.mono{font:500 12px var(--mono)}
+.achip:hover{border-color:var(--signal)}
+.achip small{color:var(--faint);margin-left:6px;font-size:11px}
+.qed{margin-top:4px;position:relative;border:1px solid var(--line2);border-radius:12px;background:var(--panel);box-shadow:var(--shadow)}
 .qed:focus-within{border-color:var(--signal)}
 .qed .hl,.qed textarea{font:14px/1.6 var(--mono);padding:14px 16px;margin:0;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;min-height:76px;letter-spacing:0;tab-size:2}
 .qed .hl{position:absolute;inset:0;pointer-events:none;color:var(--text);overflow:hidden}
@@ -82,13 +74,12 @@ QRY_CSS = r"""
 
 QRY_JS = r"""
 /* ---------- QUERY (BQL console) ---------- */
-let qText="",qRes=null,qErr=null,qHist=[],qPins=[],qMs=0,qSort=null;
+let qText="",qRes=null,qErr=null,qHist=[],qMs=0,qSort=null;
 try{qHist=JSON.parse(localStorage.getItem("b2m-qhist")||"[]");}catch(e){}
-try{qPins=JSON.parse(localStorage.getItem("b2m-qpins")||"[]");}catch(e){}
-const qSave=()=>{try{localStorage.setItem("b2m-qhist",JSON.stringify(qHist));localStorage.setItem("b2m-qpins",JSON.stringify(qPins));}catch(e){}};
+const qSave=()=>{try{localStorage.setItem("b2m-qhist",JSON.stringify(qHist));}catch(e){}};
 function qRun(text){
   qText=text;qErr=null;qRes=null;qSort=null;
-  if(!BQLDB){qErr="This report was built without graph.db — rebuild with burp2model to enable queries.";return;}
+  if(!BQLDB){qErr="This report was built without graph.db. Rebuild with burp2model to enable queries.";return;}
   const t0=performance.now();
   try{qRes=BQL.run(BQLDB,text);qMs=performance.now()-t0;
     qHist=[text].concat(qHist.filter(x=>x!==text)).slice(0,15);qSave();
@@ -161,7 +152,7 @@ function qCell2(col,v,row){
   if(col==="status"||col==="code"){const n=+v,c=n>=500?"sr":n>=400?"sy":n>=300?"sb":n>=200?"sg":"";return `<span class="st2 ${c}">${esc(v)}</span>`;}
   if(col==="method")return methodm(String(v));
   if(col==="state")return `<span class="${v==="OBSERVED"?"ob":v==="INFERRED"?"in":v==="EXTERNAL"?"ex":""}">${esc(v)}</span>`;
-  if(col==="ev"||col==="evidence")return `<span class="evl">${esc(v)}</span>`;
+  if(col==="ev"||col==="evidence")return `<span class="evl">${esc(String(v).replace(/\bev_(\d+)/g,"EVD $1"))}</span>`;
   return esc(String(v));
 }
 function qCsv(r){const q=s=>'"'+String(s==null?"":Array.isArray(s)?s.join(";"):s).replace(/"/g,'""')+'"';return [r.columns.map(q).join(",")].concat(r.rows.map(x=>r.columns.map(c=>q(x[c])).join(","))).join("\n");}
@@ -172,7 +163,7 @@ function qResults(){
     return `<div class="qerr2">${esc(qErr)}${tip?`<span class="tip">${esc(tip)}</span>`:""}</div>`;
   }
   const r=qRes;
-  if(!r)return `<div class="qempty"><div class="big">Ask the graph anything</div>Pick a query on the left, or type one. Every answer is computed from this model, cites its evidence, and never calls an AI.</div>`;
+  if(!r)return `<div class="qempty"><div class="big">Ask a question</div>Type one above or pick one. Answers are worked out from this report and cite the requests behind them.</div>`;
   if(r.kind==="text")return `<div class="qref">${qReference()}</div>`;
   let facets="";
   if(r.kind==="requests"&&r.rows.length){
@@ -189,7 +180,7 @@ function qResults(){
   let rows=r.rows.slice();
   if(qSort){const{k,d}=qSort;rows.sort((a,b)=>{const x=a[k],y=b[k];return (typeof x==="number"&&typeof y==="number"?x-y:String(x==null?"":x).localeCompare(String(y==null?"":y)))*d;});}
   const rowAttr=row=>row.ev&&/^ev_\d+$/.test(row.ev)?` class="rowclick" data-ev="${row.ev.slice(3)}"`:(row.id&&r.kind==="nodes"?` class="rowclick" data-node="${esc(row.id)}"`:"");
-  return bar+facets+`<div class="qtab"><table><thead><tr>${r.columns.map(c=>`<th data-sk="${esc(c)}">${esc(c)}${qSort&&qSort.k===c?`<span class="ar">${qSort.d>0?" ▲":" ▼"}</span>`:""}</th>`).join("")}</tr></thead><tbody>${
+  return bar+facets+`<div class="qtab"><table><thead><tr>${r.columns.map(c=>`<th data-sk="${esc(c)}">${esc(c==="ev"?"evidence":c)}${qSort&&qSort.k===c?`<span class="ar">${qSort.d>0?" ▲":" ▼"}</span>`:""}</th>`).join("")}</tr></thead><tbody>${
     rows.length?rows.map(row=>`<tr${rowAttr(row)}>${r.columns.map(c=>`<td>${qCell2(c,row[c],row)}</td>`).join("")}</tr>`).join(""):`<tr><td colspan="${r.columns.length}"><div class="empty">No rows match.</div></td></tr>`}</tbody></table></div>`;
 }
 function qReference(){
@@ -201,45 +192,71 @@ function qReference(){
   <div class="row"><b>combine</b><span>AND OR NOT ( ) and end with <span style="color:var(--text)">limit N</span></span></div>
   <div class="row"><b>verbs</b><span>reach &lt;node&gt; · blast &lt;node&gt; [depth N] · upstream &lt;node&gt; · neighbors &lt;node&gt; · path &lt;a&gt; to &lt;b&gt; · osint [section] · unknowns · stats</span></div>`;
 }
-function vQuery(){
-  const lib=qLibrary();
-  const item=(t,q,d)=>`<button class="qi" data-q="${esc(q)}" title="${esc(q)}"><span class="t">${esc(t)}</span><span class="d">${esc(d||q)}</span></button>`;
-  return `<div class="qx"><aside class="qside">
-    ${qPins.length?`<h4>Pinned</h4>${qPins.map(q=>`<button class="qi" data-q="${esc(q)}" title="${esc(q)}"><span class="x" data-unpin="${esc(q)}" title="Unpin">✕</span><span class="d" style="color:var(--text)">${esc(q)}</span></button>`).join("")}`:""}
-    ${lib.map(([g,xs])=>`<h4>${esc(g)}</h4>${xs.map(x=>item(x[0],x[1],x[2])).join("")}`).join("")}
-    ${qHist.length?`<h4>Recent</h4>${qHist.slice(0,8).map(q=>`<button class="qi" data-q="${esc(q)}" title="${esc(q)}"><span class="d" style="color:var(--muted)">${esc(q)}</span></button>`).join("")}`:""}
-   </aside><section class="qmain">
-    <div class="qh"><h1>Query</h1><span class="s">Ask the graph with BQL. Answered from this model, cited, no AI.</span></div>
-    <div class="qed"><div class="hl" id="qhl"></div><textarea id="qin" spellcheck="false" autocomplete="off" placeholder='req.method:POST AND resp.code.gte:400    ·    reach "POST /api/checkout"    ·    help'>${esc(qText)}</textarea>
-     <div class="qbar2"><span class="hint"><kbd>Enter</kbd> run · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Tab</kbd> complete</span>
-      <button class="qbtn" id="qpin" title="Pin this query">${qPins.includes(qText.trim())?"★ Pinned":"☆ Pin"}</button><button class="qbtn" id="qhelp">Reference</button><button class="qrun2" id="qgo">Run</button></div>
-     <div class="qac" id="qac" hidden></div></div>
-    <div class="qres" id="qout">${qResults()}</div></section></div>`;
+/* a question is BQL when it has field:value terms, a graph verb or AND/OR/NOT; anything else is plain English */
+function looksBql(t){
+  t=(t||"").trim();if(!t)return false;
+  return /^(reach|blast|upstream|neighbors|path|osint|unknowns|stats|help|schema)\b/i.test(t)||/\b[a-z][\w.]*:\S/i.test(t)||/\b(req|resp|node|edge)\.[a-z]/i.test(t)||/\s(AND|OR|NOT)\s/.test(t);
 }
-function initQuery(){
+const ASK_PRESETS=[
+  ["List the endpoints","list the endpoints"],
+  ["What is in the code but never called?","what is referenced in code but never called"],
+  ["Which endpoints only returned errors?","which endpoints only returned errors"],
+  ["Which paths look privileged?","which endpoints look privileged"],
+  ["Who are the third parties?","third parties"],
+  ["What needs a login?","auth and cookies"],
+  ["Which endpoints take parameters?","parameters"],
+  ["What is still unknown?","what are the open questions"],
+];
+let aTab="questions",aNL=null;
+function aAnswerHtml(a){return `<div class="answer"><div class="ahd">${esc(a.title)}</div>${a.html}</div><div class="askfoot">Answered from this report. No AI was called.</div>`;}
+function aOut(){
+  if(aNL)return aAnswerHtml(aNL);
+  return qResults();
+}
+function aChips(){
+  if(aTab==="questions")return ASK_PRESETS.map(([t,q])=>`<button class="achip" data-nl="${esc(q)}">${esc(t)}</button>`).join("");
+  if(aTab==="bql")return qLibrary().flatMap(([g,xs])=>xs).map(x=>`<button class="achip" data-q="${esc(x[1])}" title="${esc(x[1])}">${esc(x[0])}</button>`).join("")+`<button class="achip" id="qhelp">BQL reference</button>`;
+  return qHist.length?qHist.slice(0,10).map(q=>`<button class="achip mono" data-q="${esc(q)}">${esc(q.length>70?q.slice(0,69)+"…":q)}</button>`).join(""):'<span style="color:var(--faint);font-size:13px">Nothing yet. Questions you run will show up here.</span>';
+}
+function vAsk(){
+  return `<div class="askx"><h1 class="vt">Ask</h1><p class="vsub">Ask in plain English, or type a BQL query for exact filters and graph paths. Answers come from this report.</p>
+   <div class="qed"><div class="hl" id="qhl"></div><textarea id="qin" spellcheck="false" autocomplete="off" placeholder='What is in the code but never called?    ·    req.method:POST AND resp.code.gte:400    ·    reach "POST /api/checkout"'>${esc(qText)}</textarea>
+    <div class="qbar2"><span class="hint"><kbd>Enter</kbd> to ask · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span><button class="qrun2" id="qgo">Ask</button></div>
+    <div class="qac" id="qac" hidden></div></div>
+   <div class="atabs"><button class="atab${aTab==="questions"?" on":""}" data-atab="questions">Questions</button>${BQLDB?`<button class="atab${aTab==="bql"?" on":""}" data-atab="bql">BQL examples</button>`:""}<button class="atab${aTab==="recent"?" on":""}" data-atab="recent">Recent</button></div>
+   <div class="achips" id="achips">${aChips()}</div>
+   <div class="qres" id="qout">${aOut()}</div></div>`;
+}
+function initAsk(){
   const inp=$("#qin"),hl=$("#qhl"),ac=$("#qac");
-  const paint=()=>{hl.innerHTML=qHighlight(inp.value);hl.scrollTop=inp.scrollTop;const h=Math.max(76,Math.min(240,inp.scrollHeight));if(inp.scrollHeight>inp.clientHeight)inp.style.height=h+"px";};
-  const out=()=>{$("#qout").innerHTML=qResults();wire();};
-  const go=()=>{ac.hidden=true;qRun(inp.value);render();};
-  /* completion: the word under the caret */
+  const paint=()=>{hl.innerHTML=looksBql(inp.value)?qHighlight(inp.value):esc(inp.value)+"\n";hl.scrollTop=inp.scrollTop;const h=Math.max(76,Math.min(240,inp.scrollHeight));if(inp.scrollHeight>inp.clientHeight)inp.style.height=h+"px";};
+  const out=()=>{$("#qout").innerHTML=aOut();wire();};
+  function ask(text){
+    qText=text;aNL=null;qRes=null;qErr=null;qSort=null;
+    if(!text.trim()){render();return;}
+    if(looksBql(text)&&BQLDB)qRun(text);
+    else{aNL=askEngine(text);qHist=[text].concat(qHist.filter(x=>x!==text)).slice(0,15);qSave();}
+    render();
+  }
+  const go=()=>{ac.hidden=true;ask(inp.value);};
+  /* completion only for BQL-looking words */
   let items=[],sel=0;
   function suggest(){
     const v=inp.value,pos=inp.selectionStart,left=v.slice(0,pos);
-    const m=/([A-Za-z_][\w.\-]*)(:)?([^\s():]*)?$/.exec(left);
     items=[];
-    if(m){
+    const m=/([A-Za-z_][\w.\-]*)(:)?([^\s():]*)?$/.exec(left);
+    if(m&&BQLDB){
       const word=m[1],hasColon=m[2]===":",val=m[3]||"";
+      const fieldish=/^(req|resp|node|edge|role|id)\b/i.test(word),first=left.trim()===word&&word.length>=2;
       if(hasColon){const f=word.replace(/\.(cont|ncont|eq|ne|like|regex|gt|gte|lt|lte)$/,"");
         items=qValues(f).filter(x=>x.toLowerCase().startsWith(val.toLowerCase())&&x!==val).slice(0,8).map(x=>({ins:/\s/.test(x)?'"'+x+'"':x,lab:x,d:"value",at:pos-val.length,end:pos}));}
-      else{
-        const parts=word.split(".");const last=parts[parts.length-1];
-        const base=parts.slice(0,-1).join(".");
+      else if(fieldish){
+        const parts=word.split("."),last=parts[parts.length-1],base=parts.slice(0,-1).join(".");
         if(parts.length>1&&Q_FIELDS.some(f=>f[0]===base)&&!Q_OPS.some(o=>o[0]===last)&&base!=="node.attr")
           items=Q_OPS.filter(o=>o[0].startsWith(last)&&o[0]!==last).map(o=>({ins:o[0]+":",lab:base+"."+o[0],d:o[1],at:pos-last.length,end:pos}));
-        if(!items.length&&word.length>=1)
-          items=Q_FIELDS.concat(Q_VERBS).filter(f=>f[0].toLowerCase().startsWith(word.toLowerCase())&&f[0].toLowerCase()!==word.toLowerCase())
-            .slice(0,8).map(f=>({ins:f[0]+(f[0].endsWith(".")||/^[A-Z]|^(reach|blast|upstream|neighbors|path|osint|limit)$/.test(f[0])?(f[0].endsWith(".")?"":" "):":"),lab:f[0],d:f[1],at:pos-word.length,end:pos}));
-      }
+        if(!items.length)items=Q_FIELDS.filter(f=>f[0].toLowerCase().startsWith(word.toLowerCase())&&f[0].toLowerCase()!==word.toLowerCase()).slice(0,8)
+          .map(f=>({ins:f[0]+(f[0].endsWith(".")?"":":"),lab:f[0],d:f[1],at:pos-word.length,end:pos}));
+      }else if(first)items=Q_VERBS.filter(f=>/^[a-z]/.test(f[0])&&f[0].startsWith(word.toLowerCase())&&f[0]!==word.toLowerCase()).slice(0,6).map(f=>({ins:f[0]+" ",lab:f[0],d:f[1],at:pos-word.length,end:pos}));
     }
     sel=0;
     if(!items.length){ac.hidden=true;return;}
@@ -257,25 +274,29 @@ function initQuery(){
     if(!ac.hidden){
       if(e.key==="ArrowDown"){e.preventDefault();sel=(sel+1)%items.length;mark();return;}
       if(e.key==="ArrowUp"){e.preventDefault();sel=(sel-1+items.length)%items.length;mark();return;}
-      if(e.key==="Tab"||(e.key==="Enter"&&items.length&&!e.shiftKey&&!e.metaKey&&!e.ctrlKey&&false)){e.preventDefault();accept(sel);return;}
+      if(e.key==="Tab"){e.preventDefault();accept(sel);return;}
       if(e.key==="Escape"){ac.hidden=true;return;}
-    }else if(e.key==="Tab"&&!e.shiftKey&&inp.value.trim()===""){/* leave focus handling alone */}
+    }
     if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();go();}
   });
   function wire(){
-    $$("[data-ev]",$("#qout")).forEach(r=>r.onclick=()=>openEv(r.dataset.ev));
-    $$("[data-node]",$("#qout")).forEach(r=>r.onclick=()=>{try{openNode(r.dataset.node);}catch(e){}});
-    $$("[data-sk]",$("#qout")).forEach(h=>h.onclick=()=>{const k=h.dataset.sk;qSort=qSort&&qSort.k===k?{k,d:-qSort.d}:{k,d:1};out();});
-    $$("[data-add]",$("#qout")).forEach(b=>b.onclick=()=>{inp.value=inp.value.replace(/\s+limit\s+\d+\s*$/i,"").trim()+" AND "+b.dataset.add;paint();go();});
+    const o=$("#qout");
+    $$("[data-ep]",o).forEach(el=>el.onclick=()=>openEp(el.dataset.ep));
+    $$("[data-ev]",o).forEach(r=>r.onclick=()=>openEv(r.dataset.ev));
+    $$("[data-node]",o).forEach(r=>r.onclick=()=>{try{openNode(r.dataset.node);}catch(e){}});
+    $$("[data-sk]",o).forEach(h=>h.onclick=()=>{const k=h.dataset.sk;qSort=qSort&&qSort.k===k?{k,d:-qSort.d}:{k,d:1};out();});
+    $$("[data-add]",o).forEach(b=>b.onclick=()=>{inp.value=inp.value.replace(/\s+limit\s+\d+\s*$/i,"").trim()+" AND "+b.dataset.add;paint();go();});
     const cj=$("#qcopyj");if(cj)cj.onclick=()=>fallbackCopy(JSON.stringify(qRes,null,2),()=>{cj.textContent="Copied";setTimeout(()=>cj.textContent="Copy JSON",1200);});
     const cv=$("#qcsv");if(cv)cv.onclick=()=>qDownload((D.app||"query")+".bql.csv",qCsv(qRes),"text/csv");
   }
   $("#qgo").onclick=go;
-  $("#qhelp").onclick=()=>{qRes={kind:"text",columns:[],rows:[],note:"",total:null};qErr=null;out();};
-  $("#qpin").onclick=()=>{const q=inp.value.trim();if(!q)return;qPins=qPins.includes(q)?qPins.filter(x=>x!==q):[q].concat(qPins).slice(0,12);qSave();qText=inp.value;render();};
-  $$("[data-q]",$("#main")).forEach(b=>b.onclick=e=>{if(e.target.closest("[data-unpin]")){qPins=qPins.filter(x=>x!==e.target.closest("[data-unpin]").dataset.unpin);qSave();render();return;}qRun(b.dataset.q);render();});
-  paint();wire();
-  if(!qRes&&!qErr&&!qText){}
+  $$("[data-atab]").forEach(b=>b.onclick=()=>{aTab=b.dataset.atab;$$(".atab").forEach(x=>x.classList.toggle("on",x===b));$("#achips").innerHTML=aChips();bindChips();});
+  function bindChips(){
+    $$("[data-nl]",$("#achips")).forEach(b=>b.onclick=()=>{inp.value=b.dataset.nl;ask(b.dataset.nl);});
+    $$("[data-q]",$("#achips")).forEach(b=>b.onclick=()=>{inp.value=b.dataset.q;ask(b.dataset.q);});
+    const h=$("#qhelp");if(h)h.onclick=()=>{aNL=null;qErr=null;qRes={kind:"text",columns:[],rows:[],note:"",total:null};out();};
+  }
+  bindChips();paint();wire();
   inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);
 }
 """

@@ -17,7 +17,7 @@ pytestmark = pytest.mark.skipif(find_chrome() is None, reason="no Chrome/Chromiu
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIEWS = ["overview", "ask", "graph", "priorities", "surface", "code", "supply", "trust",
-         "crossrole", "unknowns", "inventory", "query", "infra"]
+         "crossrole", "unknowns", "inventory", "infra"]
 
 
 class Page:
@@ -90,11 +90,21 @@ def test_every_view_renders_without_a_script_error(page):
     assert page.errors == []
 
 
-def test_dashboard_shows_the_model(page):
+def test_overview_leads_with_what_to_check(page):
     page.js("location.hash='#overview'")
-    assert page.js("document.querySelectorAll('.dk').length") == 6
+    assert page.js("document.querySelectorAll('.big4 button').length") == 4
+    assert page.js("document.querySelectorAll('.lead').length") >= 1
+    assert page.js("document.querySelectorAll('.lead').length") <= 5          # a short list, not a wall
     assert page.js("!!document.querySelector('.donut')")
-    assert page.js("document.querySelectorAll('.cstrip rect').length") > 0
+    assert page.js("document.querySelector('.view').getBoundingClientRect().width") > 1000   # uses the full width
+
+
+def test_evidence_is_labelled_evd_not_ev_underscore(page):
+    page.js("location.hash='#inventory'", wait=0.6)
+    page.js("document.querySelector('[data-id]').click()")
+    page.js("document.querySelector('[data-act=open]').click()", wait=0.5)
+    assert "EVD " in page.js("document.querySelector('#dtitle').textContent")
+    assert "ev_" not in page.js("document.querySelector('#drawer').textContent")
 
 
 def test_inventory_lists_every_request_and_filters(page):
@@ -110,8 +120,11 @@ def test_inventory_lists_every_request_and_filters(page):
     assert page.errors == []
 
 
-def test_query_console_runs_and_reports_errors(page):
-    page.js("location.hash='#query'", wait=0.5)
+def test_one_ask_box_takes_plain_questions_and_bql(page):
+    page.js("location.hash='#ask'", wait=0.5)
+    page.js("(()=>{const i=document.querySelector('#qin');i.value='which endpoints only returned errors';document.querySelector('#qgo').click();})()")
+    assert page.js("!!document.querySelector('#qout .answer')")
+    assert "No AI" in page.js("document.querySelector('#qout').textContent")
     page.js("(()=>{const i=document.querySelector('#qin');i.value='req.method:POST';document.querySelector('#qgo').click();})()")
     assert page.js("document.querySelectorAll('.qtab tbody tr').length") > 0
     page.js("(()=>{const i=document.querySelector('#qin');i.value='req.method:POST AND';document.querySelector('#qgo').click();})()")

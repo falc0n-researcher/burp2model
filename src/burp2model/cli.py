@@ -119,7 +119,7 @@ def _load_inputs(outdir: str) -> tuple[list[Exchange], dict, list[str]]:
             continue
         names.append(fn[:-6])
         for ex in loaded:
-            ex.index = len(exchanges)
+            ex.index = len(exchanges) + 1
             exchanges.append(ex)
     return exchanges, stats, names
 

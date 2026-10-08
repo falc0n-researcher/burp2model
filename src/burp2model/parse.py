@@ -419,7 +419,7 @@ def parse_items(path: str, role: str | None = None, stats: dict | None = None,
         return
     _check_no_entities(path)
     source = os.path.basename(path)
-    idx = 0
+    idx = 1                  # evidence ids start at 1
     item_no = 0
     root = None
     for event, elem in iterparse(path, events=("start", "end")):
@@ -509,7 +509,7 @@ def _parse_logger_csv(path, role, stats, skip_tools, only_tools):
     only = {t.strip().lower() for t in only_tools if t.strip()}
     tools: dict[str, int] = stats.setdefault("tools", {})
     from xml.etree.ElementTree import Element, SubElement
-    idx = 0
+    idx = 1                  # evidence ids start at 1
     for item_no, row in enumerate(_csv_rows(path)):
         tool = (row.get("Tool") or "").strip() or "?"
         tools[tool] = tools.get(tool, 0) + 1
@@ -559,7 +559,7 @@ def parse_elements(items, source: str, role: str | None = None, stats: dict | No
         stats = {}
     for k in ("items", "parsed", "skipped"):
         stats.setdefault(k, 0)
-    idx = 0
+    idx = 1                  # evidence ids start at 1
     for item_no, elem in enumerate(items):
         stats["items"] += 1
         try:

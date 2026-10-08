@@ -321,7 +321,7 @@ def build(exchanges: list[Exchange], name: str, seed_host: str | None = None,
     # must be unique, or every citation is ambiguous
     if len({ex.index for ex in exchanges}) != len(exchanges):
         for n, ex in enumerate(exchanges):
-            ex.index = n
+            ex.index = n + 1
     m.stats["slug_templates_folded"] = collapse_siblings(exchanges)
     if seed_host is None and exchanges:
         hosts: dict[str, int] = defaultdict(int)

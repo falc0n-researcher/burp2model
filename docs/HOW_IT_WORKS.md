@@ -84,7 +84,7 @@ The model names its gaps. Absence in the model means absence in the capture, not
 
 Each `--role` build saves redacted records to `inputs/<role>.jsonl`, then rebuilds one model from all saved roles. Rebuilding a role replaces only that role. A build without `--role`, or with `--fresh`, starts over.
 
-Every claim cites an evidence id (`ev_N`). The `evidence` table in `model.json` maps each id to its source file and item. Ids are renumbered when roles merge, so treat the outputs of one build as one set and re-copy after a rebuild.
+Every claim cites an evidence id (`ev_1`, `ev_2`, ... numbered from 1). The report shows the same ids as EVD 1, EVD 2. The `evidence` table in `model.json` maps each id to its source file and item. Ids are renumbered when roles merge, so treat the outputs of one build as one set and re-copy after a rebuild.
 
 ## 8. Outputs
 

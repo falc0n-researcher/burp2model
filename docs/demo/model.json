@@ -46,11 +46,11 @@
       "label": "role: admin",
       "attrs": {},
       "evidence": [
-        0,
         1,
         2,
         3,
-        4
+        4,
+        5
       ],
       "roles": []
     },
@@ -73,10 +73,10 @@
         }
       },
       "evidence": [
-        0,
-        5,
+        1,
         6,
-        7
+        7,
+        8
       ],
       "roles": []
     },
@@ -89,10 +89,10 @@
         "header": "server"
       },
       "evidence": [
-        0,
-        5,
+        1,
         6,
-        7
+        7,
+        8
       ],
       "roles": []
     },
@@ -109,7 +109,7 @@
         ]
       },
       "evidence": [
-        0
+        1
       ],
       "roles": [
         "admin"
@@ -133,11 +133,10 @@
         }
       },
       "evidence": [
-        1,
         2,
         3,
         4,
-        10,
+        5,
         11,
         12,
         13,
@@ -146,7 +145,8 @@
         16,
         17,
         18,
-        19
+        19,
+        20
       ],
       "roles": []
     },
@@ -159,19 +159,19 @@
         "header": "server"
       },
       "evidence": [
-        1,
         2,
         3,
         4,
-        10,
+        5,
         11,
         12,
         13,
         14,
-        16,
+        15,
         17,
         18,
-        19
+        19,
+        20
       ],
       "roles": []
     },
@@ -205,9 +205,9 @@
         "api_state": "BOTH"
       },
       "evidence": [
-        1,
-        8,
-        11
+        2,
+        9,
+        12
       ],
       "roles": [
         "admin",
@@ -221,17 +221,17 @@
       "label": "Authorization: bearer",
       "attrs": {},
       "evidence": [
-        1,
         2,
         3,
         4,
-        11,
+        5,
         12,
         13,
         14,
-        16,
+        15,
         17,
-        18
+        18,
+        19
       ],
       "roles": []
     },
@@ -242,17 +242,17 @@
       "label": "session cookie session",
       "attrs": {},
       "evidence": [
-        1,
         2,
         3,
         4,
-        11,
+        5,
         12,
         13,
         14,
-        16,
+        15,
         17,
-        18
+        18,
+        19
       ],
       "roles": []
     },
@@ -287,8 +287,8 @@
         "api_state": "RUNTIME_ONLY"
       },
       "evidence": [
-        2,
-        18
+        3,
+        19
       ],
       "roles": [
         "admin",
@@ -322,7 +322,7 @@
         "api_state": "RUNTIME_ONLY"
       },
       "evidence": [
-        3
+        4
       ],
       "roles": [
         "admin"
@@ -337,7 +337,7 @@
         "location": "body"
       },
       "evidence": [
-        3
+        4
       ],
       "roles": []
     },
@@ -350,7 +350,7 @@
         "location": "body"
       },
       "evidence": [
-        3
+        4
       ],
       "roles": []
     },
@@ -381,8 +381,8 @@
         "api_state": "BOTH"
       },
       "evidence": [
-        4,
-        8
+        5,
+        9
       ],
       "roles": [
         "admin"
@@ -395,7 +395,6 @@
       "label": "role: user",
       "attrs": {},
       "evidence": [
-        5,
         6,
         7,
         8,
@@ -411,7 +410,8 @@
         18,
         19,
         20,
-        21
+        21,
+        22
       ],
       "roles": []
     },
@@ -424,7 +424,7 @@
         "header": "x-powered-by"
       },
       "evidence": [
-        5
+        6
       ],
       "roles": []
     },
@@ -439,8 +439,8 @@
         "samesite": null
       },
       "evidence": [
-        5,
-        10
+        6,
+        11
       ],
       "roles": []
     },
@@ -455,7 +455,7 @@
         "samesite": null
       },
       "evidence": [
-        5
+        6
       ],
       "roles": []
     },
@@ -472,7 +472,7 @@
         ]
       },
       "evidence": [
-        5
+        6
       ],
       "roles": [
         "user"
@@ -491,7 +491,7 @@
         ]
       },
       "evidence": [
-        6
+        7
       ],
       "roles": [
         "user"
@@ -510,7 +510,7 @@
         ]
       },
       "evidence": [
-        7
+        8
       ],
       "roles": [
         "user"
@@ -534,8 +534,8 @@
         }
       },
       "evidence": [
-        8,
-        9
+        9,
+        10
       ],
       "roles": []
     },
@@ -548,8 +548,8 @@
         "header": "server"
       },
       "evidence": [
-        8,
-        9
+        9,
+        10
       ],
       "roles": []
     },
@@ -563,7 +563,7 @@
         "scope": "first-party"
       },
       "evidence": [
-        8
+        9
       ],
       "roles": [
         "user"
@@ -593,8 +593,8 @@
         "api_state": "BOTH"
       },
       "evidence": [
-        6,
-        10
+        7,
+        11
       ],
       "roles": [
         "user"
@@ -609,7 +609,7 @@
         "location": "body"
       },
       "evidence": [
-        10
+        11
       ],
       "roles": []
     },
@@ -622,7 +622,7 @@
         "location": "body"
       },
       "evidence": [
-        10
+        11
       ],
       "roles": []
     },
@@ -635,7 +635,7 @@
         "location": "body"
       },
       "evidence": [
-        10
+        11
       ],
       "roles": []
     },
@@ -666,8 +666,8 @@
         "api_state": "BOTH"
       },
       "evidence": [
-        8,
-        12
+        9,
+        13
       ],
       "roles": [
         "user"
@@ -700,8 +700,8 @@
         "api_state": "BOTH"
       },
       "evidence": [
-        8,
-        13
+        9,
+        14
       ],
       "roles": [
         "user"
@@ -734,8 +734,8 @@
         "api_state": "BOTH"
       },
       "evidence": [
-        8,
-        14
+        9,
+        15
       ],
       "roles": [
         "user"
@@ -750,7 +750,7 @@
         "location": "body"
       },
       "evidence": [
-        14
+        15
       ],
       "roles": []
     },
@@ -763,7 +763,7 @@
         "location": "body"
       },
       "evidence": [
-        14
+        15
       ],
       "roles": []
     },
@@ -776,7 +776,7 @@
         "location": "body"
       },
       "evidence": [
-        14
+        15
       ],
       "roles": []
     },
@@ -807,7 +807,7 @@
         "api_state": "RUNTIME_ONLY"
       },
       "evidence": [
-        16
+        17
       ],
       "roles": [
         "user"
@@ -822,7 +822,7 @@
         "location": "body"
       },
       "evidence": [
-        16
+        17
       ],
       "roles": []
     },
@@ -853,8 +853,8 @@
         "api_state": "BOTH"
       },
       "evidence": [
-        8,
-        17
+        9,
+        18
       ],
       "roles": [
         "user"
@@ -867,7 +867,7 @@
       "label": "GetProfile",
       "attrs": {},
       "evidence": [
-        17
+        18
       ],
       "roles": [
         "user"
@@ -882,7 +882,7 @@
         "location": "body"
       },
       "evidence": [
-        17
+        18
       ],
       "roles": []
     },
@@ -895,7 +895,7 @@
         "location": "body"
       },
       "evidence": [
-        17
+        18
       ],
       "roles": []
     },
@@ -923,7 +923,7 @@
         "api_state": "RUNTIME_ONLY"
       },
       "evidence": [
-        19
+        20
       ],
       "roles": [
         "user"
@@ -939,7 +939,7 @@
         "requests": 1
       },
       "evidence": [
-        20
+        21
       ],
       "roles": []
     },
@@ -953,7 +953,7 @@
         "scope": "external"
       },
       "evidence": [
-        20
+        21
       ],
       "roles": []
     },
@@ -967,7 +967,7 @@
         "requests": 1
       },
       "evidence": [
-        21
+        22
       ],
       "roles": []
     },
@@ -981,7 +981,7 @@
         "scope": "external"
       },
       "evidence": [
-        21
+        22
       ],
       "roles": []
     }
@@ -993,10 +993,10 @@
       "type": "RUNS",
       "state": "OBSERVED",
       "evidence": [
-        0,
-        5,
+        1,
         6,
-        7
+        7,
+        8
       ]
     },
     {
@@ -1005,7 +1005,7 @@
       "type": "SERVES",
       "state": "OBSERVED",
       "evidence": [
-        0
+        1
       ]
     },
     {
@@ -1014,7 +1014,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        0
+        1
       ]
     },
     {
@@ -1023,19 +1023,19 @@
       "type": "RUNS",
       "state": "OBSERVED",
       "evidence": [
-        1,
         2,
         3,
         4,
-        10,
+        5,
         11,
         12,
         13,
         14,
-        16,
+        15,
         17,
         18,
-        19
+        19,
+        20
       ]
     },
     {
@@ -1044,8 +1044,8 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        1,
-        11
+        2,
+        12
       ]
     },
     {
@@ -1054,8 +1054,8 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        1,
-        11
+        2,
+        12
       ]
     },
     {
@@ -1064,52 +1064,13 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        1,
-        11
+        2,
+        12
       ]
     },
     {
       "src": "role:admin",
       "dst": "endpoint:GET:api.example.com:/api/me",
-      "type": "REACHED",
-      "state": "OBSERVED",
-      "evidence": [
-        1
-      ]
-    },
-    {
-      "src": "host:api.example.com",
-      "dst": "endpoint:GET:api.example.com:/api/admin/users",
-      "type": "EXPOSES",
-      "state": "OBSERVED",
-      "evidence": [
-        2,
-        18
-      ]
-    },
-    {
-      "src": "endpoint:GET:api.example.com:/api/admin/users",
-      "dst": "auth:bearer",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        2,
-        18
-      ]
-    },
-    {
-      "src": "endpoint:GET:api.example.com:/api/admin/users",
-      "dst": "auth:cookie:session",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        2,
-        18
-      ]
-    },
-    {
-      "src": "role:admin",
-      "dst": "endpoint:GET:api.example.com:/api/admin/users",
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
@@ -1118,11 +1079,50 @@
     },
     {
       "src": "host:api.example.com",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        3,
+        19
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/admin/users",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        3,
+        19
+      ]
+    },
+    {
+      "src": "endpoint:GET:api.example.com:/api/admin/users",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        3,
+        19
+      ]
+    },
+    {
+      "src": "role:admin",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "src": "host:api.example.com",
       "dst": "endpoint:POST:api.example.com:/api/admin/users",
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -1131,7 +1131,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -1140,7 +1140,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -1149,7 +1149,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -1158,7 +1158,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -1167,7 +1167,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -1176,7 +1176,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        4
+        5
       ]
     },
     {
@@ -1185,7 +1185,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        4
+        5
       ]
     },
     {
@@ -1194,7 +1194,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        4
+        5
       ]
     },
     {
@@ -1203,7 +1203,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        4
+        5
       ]
     },
     {
@@ -1212,7 +1212,7 @@
       "type": "RUNS",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -1221,7 +1221,7 @@
       "type": "SETS_COOKIE",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -1230,7 +1230,7 @@
       "type": "SETS_COOKIE",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -1239,7 +1239,7 @@
       "type": "SERVES",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -1248,7 +1248,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -1257,7 +1257,7 @@
       "type": "SERVES",
       "state": "OBSERVED",
       "evidence": [
-        6
+        7
       ]
     },
     {
@@ -1266,7 +1266,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        6
+        7
       ]
     },
     {
@@ -1275,7 +1275,7 @@
       "type": "SERVES",
       "state": "OBSERVED",
       "evidence": [
-        7
+        8
       ]
     },
     {
@@ -1284,7 +1284,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        7
+        8
       ]
     },
     {
@@ -1293,8 +1293,8 @@
       "type": "RUNS",
       "state": "OBSERVED",
       "evidence": [
-        8,
-        9
+        9,
+        10
       ]
     },
     {
@@ -1303,7 +1303,7 @@
       "type": "LOADS",
       "state": "OBSERVED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1312,7 +1312,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1321,7 +1321,7 @@
       "type": "SETS_COOKIE",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -1330,7 +1330,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -1339,7 +1339,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -1348,7 +1348,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -1357,7 +1357,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -1366,7 +1366,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -1375,7 +1375,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        11
+        12
       ]
     },
     {
@@ -1384,7 +1384,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        12
+        13
       ]
     },
     {
@@ -1393,7 +1393,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        12
+        13
       ]
     },
     {
@@ -1402,7 +1402,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        12
+        13
       ]
     },
     {
@@ -1411,7 +1411,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        12
+        13
       ]
     },
     {
@@ -1420,7 +1420,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        13
+        14
       ]
     },
     {
@@ -1429,47 +1429,11 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        13
+        14
       ]
     },
     {
       "src": "endpoint:GET:api.example.com:/api/orders/{id}",
-      "dst": "auth:cookie:session",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        13
-      ]
-    },
-    {
-      "src": "role:user",
-      "dst": "endpoint:GET:api.example.com:/api/orders/{id}",
-      "type": "REACHED",
-      "state": "OBSERVED",
-      "evidence": [
-        13
-      ]
-    },
-    {
-      "src": "host:api.example.com",
-      "dst": "endpoint:POST:api.example.com:/api/checkout",
-      "type": "EXPOSES",
-      "state": "OBSERVED",
-      "evidence": [
-        14
-      ]
-    },
-    {
-      "src": "endpoint:POST:api.example.com:/api/checkout",
-      "dst": "auth:bearer",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        14
-      ]
-    },
-    {
-      "src": "endpoint:POST:api.example.com:/api/checkout",
       "dst": "auth:cookie:session",
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
@@ -1479,11 +1443,47 @@
     },
     {
       "src": "role:user",
-      "dst": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "endpoint:GET:api.example.com:/api/orders/{id}",
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
         14
+      ]
+    },
+    {
+      "src": "host:api.example.com",
+      "dst": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        15
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        15
+      ]
+    },
+    {
+      "src": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        15
+      ]
+    },
+    {
+      "src": "role:user",
+      "dst": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        15
       ]
     },
     {
@@ -1492,7 +1492,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -1501,7 +1501,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -1510,7 +1510,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -1519,7 +1519,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1528,7 +1528,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1537,7 +1537,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1546,7 +1546,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1555,7 +1555,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1564,7 +1564,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1573,7 +1573,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1582,7 +1582,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1591,7 +1591,7 @@
       "type": "USES_OPERATION",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1600,7 +1600,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1609,7 +1609,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1618,7 +1618,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1627,7 +1627,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        18
+        19
       ]
     },
     {
@@ -1636,7 +1636,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        19
+        20
       ]
     },
     {
@@ -1645,7 +1645,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        19
+        20
       ]
     },
     {
@@ -1654,7 +1654,7 @@
       "type": "LOADS",
       "state": "OBSERVED",
       "evidence": [
-        20
+        21
       ]
     },
     {
@@ -1663,21 +1663,12 @@
       "type": "LOADS",
       "state": "OBSERVED",
       "evidence": [
-        21
+        22
       ]
     },
     {
       "src": "route:shop.example.com/admin",
       "dst": "endpoint:GET:api.example.com:/api/me",
-      "type": "CALLS",
-      "state": "OBSERVED",
-      "evidence": [
-        1
-      ]
-    },
-    {
-      "src": "route:shop.example.com/admin",
-      "dst": "endpoint:GET:api.example.com:/api/admin/users",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1686,7 +1677,7 @@
     },
     {
       "src": "route:shop.example.com/admin",
-      "dst": "endpoint:POST:api.example.com:/api/admin/users",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1695,7 +1686,7 @@
     },
     {
       "src": "route:shop.example.com/admin",
-      "dst": "endpoint:GET:api.example.com:/api/admin/audit",
+      "dst": "endpoint:POST:api.example.com:/api/admin/users",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1703,17 +1694,17 @@
       ]
     },
     {
-      "src": "route:shop.example.com/login",
-      "dst": "endpoint:POST:api.example.com:/auth/login",
+      "src": "route:shop.example.com/admin",
+      "dst": "endpoint:GET:api.example.com:/api/admin/audit",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
-        10
+        5
       ]
     },
     {
-      "src": "route:shop.example.com/dashboard",
-      "dst": "endpoint:GET:api.example.com:/api/me",
+      "src": "route:shop.example.com/login",
+      "dst": "endpoint:POST:api.example.com:/auth/login",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1722,7 +1713,7 @@
     },
     {
       "src": "route:shop.example.com/dashboard",
-      "dst": "endpoint:GET:api.example.com:/api/orders",
+      "dst": "endpoint:GET:api.example.com:/api/me",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1731,7 +1722,7 @@
     },
     {
       "src": "route:shop.example.com/dashboard",
-      "dst": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "dst": "endpoint:GET:api.example.com:/api/orders",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1740,7 +1731,7 @@
     },
     {
       "src": "route:shop.example.com/dashboard",
-      "dst": "endpoint:POST:api.example.com:/api/checkout",
+      "dst": "endpoint:GET:api.example.com:/api/orders/{id}",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1749,16 +1740,16 @@
     },
     {
       "src": "route:shop.example.com/dashboard",
-      "dst": "endpoint:POST:api.example.com:/api/export",
+      "dst": "endpoint:POST:api.example.com:/api/checkout",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
-        16
+        15
       ]
     },
     {
       "src": "route:shop.example.com/dashboard",
-      "dst": "endpoint:POST:api.example.com:/graphql",
+      "dst": "endpoint:POST:api.example.com:/api/export",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1767,7 +1758,7 @@
     },
     {
       "src": "route:shop.example.com/dashboard",
-      "dst": "endpoint:GET:api.example.com:/api/admin/users",
+      "dst": "endpoint:POST:api.example.com:/graphql",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1775,8 +1766,8 @@
       ]
     },
     {
-      "src": "route:shop.example.com/login",
-      "dst": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "src": "route:shop.example.com/dashboard",
+      "dst": "endpoint:GET:api.example.com:/api/admin/users",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1785,11 +1776,20 @@
     },
     {
       "src": "route:shop.example.com/login",
+      "dst": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        20
+      ]
+    },
+    {
+      "src": "route:shop.example.com/login",
       "dst": "endpoint:POST:api.example.com:/auth/login",
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        6
+        7
       ]
     },
     {
@@ -1798,7 +1798,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1807,7 +1807,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1816,7 +1816,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1825,7 +1825,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1834,7 +1834,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1843,7 +1843,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     }
   ],
@@ -1960,11 +1960,11 @@
       "entropy": 4.8,
       "count": 5,
       "evidence": [
-        0,
         1,
         2,
         3,
-        4
+        4,
+        5
       ]
     },
     {
@@ -1974,11 +1974,11 @@
       "entropy": 4.88,
       "count": 5,
       "evidence": [
-        0,
         1,
         2,
         3,
-        4
+        4,
+        5
       ]
     },
     {
@@ -1988,7 +1988,7 @@
       "entropy": 3.79,
       "count": 1,
       "evidence": [
-        1
+        2
       ]
     },
     {
@@ -1998,7 +1998,7 @@
       "entropy": 3.46,
       "count": 2,
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -2008,16 +2008,16 @@
       "entropy": 5.08,
       "count": 10,
       "evidence": [
-        5,
         6,
         7,
-        11,
+        8,
         12,
         13,
         14,
-        16,
+        15,
         17,
-        18
+        18,
+        19
       ]
     },
     {
@@ -2027,16 +2027,16 @@
       "entropy": 4.65,
       "count": 10,
       "evidence": [
-        5,
         6,
         7,
-        11,
+        8,
         12,
         13,
         14,
-        16,
+        15,
         17,
-        18
+        18,
+        19
       ]
     },
     {
@@ -2046,7 +2046,7 @@
       "entropy": 4.82,
       "count": 1,
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -2056,7 +2056,7 @@
       "entropy": 3.57,
       "count": 1,
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -2066,7 +2066,7 @@
       "entropy": 4.78,
       "count": 1,
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -2076,7 +2076,7 @@
       "entropy": 3.08,
       "count": 1,
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -2086,7 +2086,7 @@
       "entropy": 3.69,
       "count": 1,
       "evidence": [
-        11
+        12
       ]
     },
     {
@@ -2096,7 +2096,7 @@
       "entropy": 0.91,
       "count": 2,
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -2106,7 +2106,7 @@
       "entropy": 1.58,
       "count": 1,
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -2116,7 +2116,7 @@
       "entropy": 3.68,
       "count": 1,
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -2126,7 +2126,7 @@
       "entropy": 3.34,
       "count": 1,
       "evidence": [
-        19
+        20
       ]
     },
     {
@@ -2136,13 +2136,13 @@
       "entropy": 3.58,
       "count": 1,
       "evidence": [
-        19
+        20
       ]
     }
   ],
   "evidence": [
     {
-      "id": 0,
+      "id": 1,
       "source": "burp-history-admin-sample.xml",
       "item": 0,
       "method": "GET",
@@ -2187,7 +2187,7 @@
       }
     },
     {
-      "id": 1,
+      "id": 2,
       "source": "burp-history-admin-sample.xml",
       "item": 1,
       "method": "GET",
@@ -2236,7 +2236,7 @@
       }
     },
     {
-      "id": 2,
+      "id": 3,
       "source": "burp-history-admin-sample.xml",
       "item": 2,
       "method": "GET",
@@ -2285,7 +2285,7 @@
       }
     },
     {
-      "id": 3,
+      "id": 4,
       "source": "burp-history-admin-sample.xml",
       "item": 3,
       "method": "POST",
@@ -2338,7 +2338,7 @@
       }
     },
     {
-      "id": 4,
+      "id": 5,
       "source": "burp-history-admin-sample.xml",
       "item": 4,
       "method": "GET",
@@ -2387,7 +2387,7 @@
       }
     },
     {
-      "id": 5,
+      "id": 6,
       "source": "burp-history-sample.xml",
       "item": 0,
       "method": "GET",
@@ -2452,7 +2452,7 @@
       }
     },
     {
-      "id": 6,
+      "id": 7,
       "source": "burp-history-sample.xml",
       "item": 1,
       "method": "GET",
@@ -2497,7 +2497,7 @@
       }
     },
     {
-      "id": 7,
+      "id": 8,
       "source": "burp-history-sample.xml",
       "item": 2,
       "method": "GET",
@@ -2542,7 +2542,7 @@
       }
     },
     {
-      "id": 8,
+      "id": 9,
       "source": "burp-history-sample.xml",
       "item": 3,
       "method": "GET",
@@ -2579,7 +2579,7 @@
       }
     },
     {
-      "id": 9,
+      "id": 10,
       "source": "burp-history-sample.xml",
       "item": 4,
       "method": "GET",
@@ -2616,7 +2616,7 @@
       }
     },
     {
-      "id": 10,
+      "id": 11,
       "source": "burp-history-sample.xml",
       "item": 5,
       "method": "POST",
@@ -2665,7 +2665,7 @@
       }
     },
     {
-      "id": 11,
+      "id": 12,
       "source": "burp-history-sample.xml",
       "item": 6,
       "method": "GET",
@@ -2714,7 +2714,7 @@
       }
     },
     {
-      "id": 12,
+      "id": 13,
       "source": "burp-history-sample.xml",
       "item": 7,
       "method": "GET",
@@ -2763,7 +2763,7 @@
       }
     },
     {
-      "id": 13,
+      "id": 14,
       "source": "burp-history-sample.xml",
       "item": 8,
       "method": "GET",
@@ -2812,7 +2812,7 @@
       }
     },
     {
-      "id": 14,
+      "id": 15,
       "source": "burp-history-sample.xml",
       "item": 9,
       "method": "POST",
@@ -2865,7 +2865,7 @@
       }
     },
     {
-      "id": 15,
+      "id": 16,
       "source": "burp-history-sample.xml",
       "item": 10,
       "method": "OPTIONS",
@@ -2906,7 +2906,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 17,
       "source": "burp-history-sample.xml",
       "item": 11,
       "method": "POST",
@@ -2959,7 +2959,7 @@
       }
     },
     {
-      "id": 17,
+      "id": 18,
       "source": "burp-history-sample.xml",
       "item": 12,
       "method": "POST",
@@ -3012,7 +3012,7 @@
       }
     },
     {
-      "id": 18,
+      "id": 19,
       "source": "burp-history-sample.xml",
       "item": 13,
       "method": "GET",
@@ -3061,7 +3061,7 @@
       }
     },
     {
-      "id": 19,
+      "id": 20,
       "source": "burp-history-sample.xml",
       "item": 14,
       "method": "GET",
@@ -3102,7 +3102,7 @@
       }
     },
     {
-      "id": 20,
+      "id": 21,
       "source": "burp-history-sample.xml",
       "item": 15,
       "method": "GET",
@@ -3135,7 +3135,7 @@
       }
     },
     {
-      "id": 21,
+      "id": 22,
       "source": "burp-history-sample.xml",
       "item": 16,
       "method": "GET",

@@ -442,7 +442,7 @@ function initGraph(){
     const rows=[];
     if(ep){rows.push(["State",ep.state==="BOTH"?"seen in code and traffic":ep.state==="STATIC_ONLY"?"in code, never called":"traffic only"]);if(ep.statuses.length)rows.push(["Statuses",ep.statuses.join(", ")]);rows.push(["Requests",ep.requests]);if(ep.params.length)rows.push(["Parameters",ep.params.length]);if(ep.roles.length)rows.push(["Roles",ep.roles.join(", ")]);if(ep.credentials.length)rows.push(["Credentials",ep.credentials.join(", ")]);if(ep.privileged)rows.push(["Note","privileged-looking path"]);}
     else if(n.state)rows.push(["State",n.state]);
-    if((n.evidence||[]).length)rows.push(["Evidence",n.evidence.slice(0,4).map(i=>"ev_"+i).join(", ")+(n.evidence.length>4?" …":"")]);
+    if((n.evidence||[]).length)rows.push(["Evidence",n.evidence.slice(0,4).map(EVD).join(", ")+(n.evidence.length>4?" …":"")]);
     if(n.detail)rows.push(["Detail",n.detail]);
     const path=MAPS.path;
     el.innerHTML=`<div class="nh"><span class="ic" style="color:${cat._c}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[n.type]||ICON.endpoint}"/></svg></span><span class="kind">${esc(KIND_LABEL[n.type]||humanize(n.type))}</span></div>

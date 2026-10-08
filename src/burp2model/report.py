@@ -376,12 +376,12 @@ color:var(--muted);font:500 13.5px var(--sans);text-align:left;margin-bottom:1px
 html[data-theme="dark"] .vbtn.on .ct{background:var(--panel3)}
 .vbtn .dot{width:8px;height:8px;border-radius:2px;flex:none}
 
-main{overflow:auto;padding:22px 26px 60px;min-width:0}
-.view{display:none;max-width:1120px}
+main{overflow:auto;padding:26px 32px 60px;min-width:0}
+.view{display:none}
 .view.on{display:block;animation:fade .2s ease}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
 h1.vt{font:700 24px/1.2 var(--sans);letter-spacing:-.02em;margin:0 0 4px}
-.vsub{color:var(--muted);margin:0 0 20px;max-width:70ch}
+.vsub{color:var(--muted);margin:0 0 20px;max-width:80ch}
 
 /* kpis */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px}
@@ -580,6 +580,7 @@ const PRIV=/\/(admin|administrator|internal|manage|management|config|privileged|
 const ACR=new Set(["API","URL","URI","TLS","SSL","DNS","JWT","OTP","HTTP","HTTPS","CORS","SPF","DKIM","DMARC","ID","JS","HTML","CSS","IP","RDAP","SAN","CDN","XSS","CSRF","SSO","MFA","2FA","PII","GET","POST","PUT","PATCH","DELETE","HEAD"]);
 function humanize(t){if(t==null)return"";return String(t).split(/[_\s]+/).map((w,i)=>{const u=w.toUpperCase();if(ACR.has(u))return u;const l=w.toLowerCase();return i===0?l.charAt(0).toUpperCase()+l.slice(1):l;}).join(" ");}
 const c=D.counts, EP=D.endpoints;
+const EVD=i=>"EVD "+i;
 document.title=(D.app?D.app+" · ":"")+"burp2model report";
 
 /* theme (persist per-viewer, fail-safe) */
@@ -638,7 +639,7 @@ $("#copytok").textContent="~"+Math.max(1,Math.round((CTX.token_estimate||0)/1000
 $("#copyai").onclick=()=>doCopy("whole");
 const OPTS=[["methodology","Hunting methodology","have the AI reason a recon & hunting plan for THIS app, not a checklist",null],
   ["whole","Whole model","everything an AI needs, with the rules",CTX.token_estimate],
-  ["graph","Reasoning graph","adjacency + communities, flows, trust zones — for the AI to traverse",null],
+  ["graph","Reasoning graph","adjacency + communities, flows, trust zones, for the AI to traverse",null],
   ["endpoints","Endpoints only","the API surface with parameters and evidence",null],
   ["open","Open questions only","what to test next, for a focused prompt",null]];
 $("#copyopts").innerHTML=OPTS.map(([k,t,d,tok])=>`<button role="menuitem" data-scope="${k}"><b>${esc(t)}</b><span>${esc(d)}${tok?` · ~${Math.round(tok/1000)}k tok`:""}</span></button>`).join("");
@@ -653,7 +654,7 @@ const SEV_RANK={hot:0,warn:1,info:2};
 function signalsFor(e){
   const sig=[];
   if(e.state==="STATIC_ONLY") sig.push({sev:"hot",ttl:"Referenced in code, never called",
-    why:"The client code names this endpoint but no request to it was captured — an unwalked path.",
+    why:"The client code names this endpoint but no request to it was captured, so nobody has walked this path.",
     next:"Request it directly in an authorised session and observe the response."});
   if(e.privileged&&e.requests>0) sig.push({sev:"hot",ttl:"Privileged-looking path was reached",
     why:"The path matches an admin/internal pattern and appears in the capture"+(e.roles.length?` (roles: ${e.roles.join(", ")})`:"")+".",
@@ -663,10 +664,10 @@ function signalsFor(e){
     next:"Request it in an authorised session and observe who is allowed in."});
   const ss=e.statuses||[];
   if(ss.length&&ss.every(s=>s>=400)) sig.push({sev:"warn",ttl:"Only ever returned errors",
-    why:`Every observed status was ${ss.join(", ")} — behaviour with valid input/auth is unseen.`,
+    why:`Every observed status was ${ss.join(", ")} so behaviour with valid input or auth has not been seen.`,
     next:"Exercise the feature normally in an authorised session."});
   if(e.anon) sig.push({sev:"warn",ttl:"Seen with and without credentials",
-    why:"Some requests carried a credential and some did not — the auth requirement is ambiguous.",
+    why:"Some requests carried a credential and some did not, so it is unclear whether auth is required.",
     next:"Replay it unauthenticated and compare the response."});
   if(e.requests>0&&e.method!=="*"&&e.method!=="GET"&&e.method!=="HEAD"&&!e.credentials.length)
     sig.push({sev:"info",ttl:"State-changing call without an observed credential",
@@ -692,19 +693,18 @@ const weakCookies=(D.cookies||[]).filter(k=>!k.httponly||!k.secure);
 /* ---------- views ---------- */
 const hasRoles=(D.roles||[]).length>=2;
 const VIEWS=[
-  {id:"overview",name:"Dashboard",grp:"Summary",ct:()=>null},
-  {id:"ask",name:"Ask the model",grp:"Summary",hot:true,ct:()=>null},
-  {id:"graph",name:"Map",grp:"Summary",ct:()=>(D.graph.nodes||[]).length},
-  {id:"priorities",name:"Priorities",grp:"Summary",ct:()=>PRIO.length+weakCookies.length},
-  {id:"surface",name:"Endpoints",grp:"Model",dot:"var(--l4)",ct:()=>EP.length},
-  {id:"code",name:"Client code",grp:"Model",dot:"var(--l3)",ct:()=>D.scripts.length},
-  {id:"supply",name:"Third parties",grp:"Model",dot:"var(--l5)",ct:()=>D.third_parties.length},
-  {id:"trust",name:"Trust",grp:"Model",dot:"var(--l5)",ct:()=>D.auth.length+D.cookies.length},
-  {id:"crossrole",name:"Cross-role",grp:"Model",dot:"var(--l6)",ct:()=>hasRoles?EP.filter(e=>e.roles.length).length:null,cond:hasRoles},
-  {id:"unknowns",name:"Open questions",grp:"Model",dot:"var(--l6)",ct:()=>D.unknowns.length},
-  {id:"inventory",name:"Inventory",grp:"Model",dot:"var(--l1)",ct:()=>Object.keys(D.evidence||{}).length},
-  {id:"query",name:"Query (BQL)",grp:"Explore",hot:true,ct:()=>null,cond:!!BQLDB},
-  {id:"infra",name:"Infrastructure",grp:"Explore",dot:"var(--inferred)",ct:()=>BQLDB&&BQLDB.osint?BQLDB.facts.length:null,cond:!!BQLDB},
+  {id:"overview",name:"Overview",grp:"Start here",ct:()=>null},
+  {id:"priorities",name:"To check",grp:"Start here",hot:true,ct:()=>PRIO.length+weakCookies.length},
+  {id:"graph",name:"Map",grp:"Start here",ct:()=>null},
+  {id:"inventory",name:"Requests",grp:"Start here",ct:()=>EVL.length},
+  {id:"ask",name:"Ask",grp:"Start here",ct:()=>null},
+  {id:"surface",name:"Endpoints",grp:"Reference",dot:"var(--l4)",ct:()=>EP.length},
+  {id:"code",name:"Client code",grp:"Reference",dot:"var(--l3)",ct:()=>D.scripts.length},
+  {id:"supply",name:"Third parties",grp:"Reference",dot:"var(--l5)",ct:()=>D.third_parties.length},
+  {id:"trust",name:"Trust",grp:"Reference",dot:"var(--l5)",ct:()=>D.auth.length+D.cookies.length},
+  {id:"crossrole",name:"Cross-role",grp:"Reference",dot:"var(--l6)",ct:()=>hasRoles?EP.filter(e=>e.roles.length).length:null,cond:hasRoles},
+  {id:"unknowns",name:"Open questions",grp:"Reference",dot:"var(--l6)",ct:()=>D.unknowns.length},
+  {id:"infra",name:"Infrastructure",grp:"Reference",dot:"var(--inferred)",ct:()=>BQLDB&&BQLDB.osint?BQLDB.facts.length:null,cond:!!BQLDB},
 ];
 let view="overview", filters={method:new Set(),host:new Set(),role:new Set(),cred:new Set()}, sortKey="label", sortDir=1, query="";
 
@@ -735,26 +735,26 @@ function prioCard(p,i){
 
 /* ---------- ASK (answers from the model, no AI) ---------- */
 const ARROW='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--faint)"><path d="M9 6l6 6-6 6"/></svg>';
-function arow(e){return `<div class="arow" data-ep="${esc(e.id)}">${methodm(e.method)}<span class="p mono">${esc(e.path)}</span><span class="ev">${(e.evidence||[]).slice(0,2).map(i=>"ev_"+i).join(", ")}</span>${ARROW}</div>`;}
+function arow(e){return `<div class="arow" data-ep="${esc(e.id)}">${methodm(e.method)}<span class="p mono">${esc(e.path)}</span><span class="ev">${(e.evidence||[]).slice(0,2).map(EVD).join(", ")}</span>${ARROW}</div>`;}
 function alist(title,note,rows){return {title,html:`<div class="answer">${note?`<p class="note">${note}</p>`:""}${rows.length?rows.join(""):'<div class="empty">Nothing in this model matches.</div>'}</div>`};}
 function ans_endpoints(){const r=[...EP].sort((a,b)=>a.path.localeCompare(b.path));return alist("Endpoints",`The model holds <b>${r.length}</b> API endpoint${r.length===1?"":"s"}. Click any to see its parameters and the request that produced it.`,r.map(arow));}
-function ans_incode(){const r=EP.filter(e=>e.state==="STATIC_ONLY").sort((a,b)=>a.path.localeCompare(b.path));return alist("Referenced in code, never called",r.length?`These URLs appear in the client code but no request to them was captured — unwalked paths worth trying.`:`Every endpoint referenced in the code was also seen in traffic.`,r.map(arow));}
-function ans_errors(){const r=EP.filter(e=>e.statuses.length&&e.statuses.every(s=>s>=400)).sort((a,b)=>a.path.localeCompare(b.path));return alist("Only ever returned errors",r.length?`Every response captured for these was 4xx/5xx — their behaviour with valid input and auth is unseen.`:`No endpoint returned only errors.`,r.map(arow));}
+function ans_incode(){const r=EP.filter(e=>e.state==="STATIC_ONLY").sort((a,b)=>a.path.localeCompare(b.path));return alist("Referenced in code, never called",r.length?`These URLs appear in the client code but no request to them was captured, unwalked paths worth trying.`:`Every endpoint referenced in the code was also seen in traffic.`,r.map(arow));}
+function ans_errors(){const r=EP.filter(e=>e.statuses.length&&e.statuses.every(s=>s>=400)).sort((a,b)=>a.path.localeCompare(b.path));return alist("Only ever returned errors",r.length?`Every response captured for these was 4xx/5xx, their behaviour with valid input and auth is unseen.`:`No endpoint returned only errors.`,r.map(arow));}
 function ans_priv(){const r=EP.filter(e=>e.privileged).sort((a,b)=>a.path.localeCompare(b.path));return alist("Privileged-looking paths",r.length?`Paths that match an admin/internal pattern.`:`No privileged-looking paths in this capture.`,r.map(arow));}
-function ans_thirdparty(){const r=(D.third_parties||[]);return {title:"Third parties",html:`<div class="answer"><p class="note">${r.length} host${r.length===1?"":"s"} outside the app's own domain — code you don't control running in your users' context.</p>${r.map(t=>`<div class="arow"><span class="p mono">${esc(t.label)}</span><span class="ev">${t.requests} req</span></div>`).join("")||'<div class="empty">None.</div>'}</div>`};}
+function ans_thirdparty(){const r=(D.third_parties||[]);return {title:"Third parties",html:`<div class="answer"><p class="note">${r.length} host${r.length===1?"":"s"} outside the app's own domain, code you don't control running in your users' context.</p>${r.map(t=>`<div class="arow"><span class="p mono">${esc(t.label)}</span><span class="ev">${t.requests} req</span></div>`).join("")||'<div class="empty">None.</div>'}</div>`};}
 function ans_auth(){const a=D.auth||[],k=D.cookies||[];return {title:"Authentication & cookies",html:`<div class="answer"><p class="note">How the app carries identity.</p>
   ${a.map(x=>`<div class="arow"><span class="p mono">${esc(x.label)}</span><span class="ev">${x.endpoints.length} endpoint${x.endpoints.length===1?"":"s"}</span></div>`).join("")}
   ${k.map(x=>{const miss=[!x.httponly&&"HttpOnly",!x.secure&&"Secure"].filter(Boolean);return `<div class="arow"><span class="p mono">cookie ${esc(x.name)}</span><span class="ev">${miss.length?"missing "+miss.join("+"):"HttpOnly+Secure"}</span></div>`;}).join("")}
   ${!a.length&&!k.length?'<div class="empty">No credentials or cookies observed.</div>':""}</div>`};}
-function ans_unknowns(){return {title:"Open questions",html:`<div class="answer"><p class="note">What the capture could not answer.</p>${(D.unknowns||[]).map(u=>`<div class="arow"><span class="p">${esc(openTitle(u.type))} — <span class="mono" style="color:var(--muted)">${esc(u.entity)}</span></span></div>`).join("")||'<div class="empty">Nothing left open.</div>'}</div>`};}
+function ans_unknowns(){return {title:"Open questions",html:`<div class="answer"><p class="note">What the capture could not answer.</p>${(D.unknowns||[]).map(u=>`<div class="arow"><span class="p">${esc(openTitle(u.type))}, <span class="mono" style="color:var(--muted)">${esc(u.entity)}</span></span></div>`).join("")||'<div class="empty">Nothing left open.</div>'}</div>`};}
 function ans_endpoint(path){
   const q=path.toLowerCase();const hits=EP.filter(e=>e.path.toLowerCase().includes(q)).sort((a,b)=>a.path.length-b.path.length);
-  if(!hits.length)return {title:"No such endpoint",html:`<div class="answer"><p class="note">Nothing in the model matches <span class="mono">${esc(path)}</span>. The model can only answer for endpoints it actually holds — that's the point.</p></div>`};
+  if(!hits.length)return {title:"No such endpoint",html:`<div class="answer"><p class="note">Nothing in the model matches <span class="mono">${esc(path)}</span>. The model can only answer for endpoints it actually holds, that's the point.</p></div>`};
   return {title:"Endpoint",html:`<div class="answer">${hits.slice(0,6).map(e=>{
     const bits=[];if(e.statuses.length)bits.push("status "+e.statuses.join("/"));if(e.params.length)bits.push(e.params.length+" params");if(e.referenced_by.length)bits.push("referenced by "+e.referenced_by.join(", "));if(e.called_from.length)bits.push("called from "+e.called_from.join(", "));
     return `<div class="arow" data-ep="${esc(e.id)}">${methodm(e.method)}<span class="p mono">${esc(e.path)}</span>${ARROW}</div><p class="note" style="margin:-2px 0 12px 6px">${esc(bits.join(" · ")||"seen in traffic")}</p>`;}).join("")}</div>`};
 }
-function ans_shape(){const c2=D.counts;return {title:D.app,html:`<div class="answer"><p class="note"><b>${esc(D.app)}</b> — ${c2.hosts} host${c2.hosts===1?"":"s"}, ${c2.routes} route${c2.routes===1?"":"s"}, <b>${c2.endpoints} endpoints</b>, ${c2.parameters} parameters, ${c2.third_parties} third part${c2.third_parties===1?"y":"ies"}, ${c2.unknowns} open question${c2.unknowns===1?"":"s"}. Ask about any of them, or open the Map.</p></div>`};}
+function ans_shape(){const c2=D.counts;return {title:D.app,html:`<div class="answer"><p class="note"><b>${esc(D.app)}</b>, ${c2.hosts} host${c2.hosts===1?"":"s"}, ${c2.routes} route${c2.routes===1?"":"s"}, <b>${c2.endpoints} endpoints</b>, ${c2.parameters} parameters, ${c2.third_parties} third part${c2.third_parties===1?"y":"ies"}, ${c2.unknowns} open question${c2.unknowns===1?"":"s"}. Ask about any of them, or open the Map.</p></div>`};}
 function askEngine(q){
   q=(q||"").toLowerCase().trim();
   if(!q)return ans_shape();
@@ -765,42 +765,16 @@ function askEngine(q){
   if(/third|vendor|external|supply|dependen/.test(q))return ans_thirdparty();
   if(/auth|login|cookie|session|credential|token|sign ?in/.test(q))return ans_auth();
   if(/unknown|open question|couldn'?t|can'?t see|don'?t know|what.*miss|gap/.test(q))return ans_unknowns();
-  if(/param|field|input|argument/.test(q)){const r=EP.filter(e=>e.params.length).sort((a,b)=>b.params.length-a.params.length);return alist("Endpoints with parameters",`Parameter <b>names</b> only — values were masked at capture.`,r.map(e=>`<div class="arow" data-ep="${esc(e.id)}">${methodm(e.method)}<span class="p mono">${esc(e.path)}</span><span class="ev">${e.params.length}</span>${ARROW}</div>`));}
+  if(/param|field|input|argument/.test(q)){const r=EP.filter(e=>e.params.length).sort((a,b)=>b.params.length-a.params.length);return alist("Endpoints with parameters",`Parameter <b>names</b> only, values were masked at capture.`,r.map(e=>`<div class="arow" data-ep="${esc(e.id)}">${methodm(e.method)}<span class="p mono">${esc(e.path)}</span><span class="ev">${e.params.length}</span>${ARROW}</div>`));}
   if(/endpoint|api|route|url|path|list|what.*(exist|there)|surface/.test(q))return ans_endpoints();
   return ans_shape();
 }
-const ASK_PRESETS=[
-  ["List the endpoints","list the endpoints"],
-  ["Referenced in code but never called","what is referenced in code but never called"],
-  ["Third parties","third parties"],
-  ["Auth & cookies","auth and cookies"],
-  ["Open questions","what are the open questions"],
-  ["Endpoints that only errored","which endpoints only returned errors"],
-];
-function vAsk(){
-  return `<h1 class="vt">Ask the model</h1><p class="vsub">Type a question about the app and get an answer straight from the model — instant, cited, and with no AI involved. For judgement calls, use <b>Copy for AI</b> instead.</p>
-  <div class="askbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-   <input id="askq" type="search" placeholder="e.g. what is referenced in code but never called?" autocomplete="off"></div>
-  <div class="presets">${ASK_PRESETS.map(([t,q])=>`<button class="preset" data-q="${esc(q)}">${esc(t)}</button>`).join("")}</div>
-  <div id="askout"></div>
-  <div class="askfoot">Answered from the model — no AI was called.</div>`;
-}
-function initAsk(){
-  const out=$("#askout"),inp=$("#askq");if(!out)return;
-  const run=q=>{const a=askEngine(q);out.innerHTML=`<div class="answer"><div class="ahd">${esc(a.title)}</div>${a.html}</div>`;
-    $$("[data-ep]",out).forEach(el=>el.onclick=()=>openEp(el.dataset.ep));};
-  run("");
-  inp.addEventListener("input",e=>run(e.target.value));
-  $$(".preset").forEach(b=>b.onclick=()=>{inp.value=b.dataset.q;run(b.dataset.q);inp.focus();});
-}
-
-
 __QRYJS__
 
 /* ---------- INFRASTRUCTURE (external recon, stored in graph.db) ---------- */
 function vInfra(){
   const B=D.bql;
-  if(!B||!B.osint)return `<h1 class="vt">Infrastructure</h1><p class="vsub">External recon — DNS, certificates, subdomains, mail policy, headers.</p><div class="empty">No recon stored. Recon is opt-in: rebuild with <span class="mono">--osint</span>, or run <span class="mono">burp2model osint HOST -w ${esc(D.app)} --yes</span>.</div>`;
+  if(!B||!B.osint)return `<h1 class="vt">Infrastructure</h1><p class="vsub">External recon: DNS, certificates, subdomains, mail policy, headers.</p><div class="empty">No recon stored. Recon is opt-in: rebuild with <span class="mono">--osint</span>, or run <span class="mono">burp2model osint HOST -w ${esc(D.app)} --yes</span>.</div>`;
   const by={};(B.facts||[]).forEach(f=>{(by[f.section]=by[f.section]||[]).push(f);});
   const order=["dns","tls","http","technology","email_security","registration","ip_geo","files","archive","ports","notes"];
   const titles={dns:"DNS",tls:"TLS certificate",http:"HTTP headers",technology:"Technology",email_security:"Mail authentication",registration:"Registration",ip_geo:"Hosting",files:"robots / security.txt / sitemap",archive:"Web archive",ports:"Open ports",notes:"Notes"};
@@ -814,12 +788,12 @@ function vInfra(){
   const unseen=subs.filter(n=>!n.inCapture);
   const subCard=subs.length?`<div class="card icard"><div class="hd">Subdomains <span class="ct">${subs.length}</span></div><div class="bd"><table><thead><tr><th>Name</th><th>In your capture?</th><th>Found via</th></tr></thead><tbody>${
     subs.map(n=>`<tr><td class="mono">${esc(n.label)}</td><td class="${n.inCapture?"":"miss"}">${n.inCapture?"yes":"never visited"}</td><td class="mono" style="color:var(--muted)">${esc(n.via)}</td></tr>`).join("")}</tbody></table></div></div>`:"";
-  return `<h1 class="vt">Infrastructure <span class="tag-ext">EXTERNAL</span></h1><p class="vsub">Public recon on <b class="mono">${esc(B.osint.host)}</b> (run #${B.osint.id}, ${esc(B.osint.generated_at)}). It lives in the graph as <span class="mono">EXTERNAL</span> edges — a separate provenance from traffic you captured or code that referenced a path. ${unseen.length?`<b>${unseen.length}</b> of ${subs.length} subdomain(s) never appeared in your capture.`:""}</p>${subCard}${cards}`;
+  return `<h1 class="vt">Infrastructure <span class="tag-ext">EXTERNAL</span></h1><p class="vsub">Public recon on <b class="mono">${esc(B.osint.host)}</b> (run #${B.osint.id}, ${esc(B.osint.generated_at)}). It lives in the graph as <span class="mono">EXTERNAL</span> edges, a separate provenance from traffic you captured or code that referenced a path. ${unseen.length?`<b>${unseen.length}</b> of ${subs.length} subdomain(s) never appeared in your capture.`:""}</p>${subCard}${cards}`;
 }
 
 /* ---------- PRIORITIES ---------- */
 function vPriorities(){
-  let h=`<h1 class="vt">Priorities</h1><p class="vsub">The endpoints and trust gaps worth a look first, ranked. Each is a <b>hypothesis</b> with the evidence to test it — never a finding. Click any item for its evidence.</p>`;
+  let h=`<h1 class="vt">To check</h1><p class="vsub">Endpoints and gaps worth a look first, ranked. Each one is a lead to verify, not a finding. Click one to see the requests behind it.</p>`;
   if(!PRIO.length && !weakCookies.length) return h+`<div class="empty">Nothing stood out in this capture. That is a statement about the capture, not the target.</div>`;
   h+=PRIO.map((p,i)=>prioCard(p,i)).join("");
   if(weakCookies.length){
@@ -856,7 +830,7 @@ function epPass(e){
 function vSurface(){
   const rows=EP.filter(epPass).sort(sortEP);
   const th=(k,l)=>`<th data-sort="${k}">${l} <span class="ar">${sortKey===k?(sortDir>0?"▲":"▼"):""}</span></th>`;
-  return `<h1 class="vt">Endpoints</h1><p class="vsub">Every API endpoint the model knows — from the requests in your capture and from URLs found in the client code. Click any row for its parameters and the full request &amp; response.</p>
+  return `<h1 class="vt">Endpoints</h1><p class="vsub">Every API endpoint the model knows, from the requests in your capture and from URLs found in the client code. Click any row for its parameters and the full request &amp; response.</p>
   ${facets()}
   <div class="card"><div class="hd">Endpoints <span class="ct">${rows.length} of ${EP.length}</span></div><div class="bd" style="padding:0">
   <table><thead><tr>${th("method","M")}${th("label","Endpoint")}${th("host","Host")}${th("statuses","Status")}${th("params","Params")}<th>Evidence</th></tr></thead><tbody>
@@ -866,7 +840,7 @@ function vSurface(){
     <td class="mono" style="color:var(--muted)">${esc(e.host)}</td>
     <td>${statuses(e.statuses)}</td>
     <td class="mono" style="color:var(--muted)">${e.params.length||"—"}</td>
-    <td class="mono" style="color:var(--faint);font-size:11px">${(e.evidence||[]).slice(0,3).map(i=>"ev_"+i).join(", ")||"—"}</td></tr>`).join(""):`<tr><td colspan="6"><div class="empty">No endpoints match these filters.</div></td></tr>`}
+    <td class="mono" style="color:var(--faint);font-size:11px">${(e.evidence||[]).slice(0,3).map(EVD).join(", ")||"—"}</td></tr>`).join(""):`<tr><td colspan="6"><div class="empty">No endpoints match these filters.</div></td></tr>`}
   </tbody></table></div></div>`;
 }
 function sortEP(a,b){let x=a[sortKey],y=b[sortKey];if(sortKey==="params"){x=a.params.length;y=b.params.length;}if(sortKey==="statuses"){x=a.statuses[0]||0;y=b.statuses[0]||0;}
@@ -875,7 +849,7 @@ function sortEP(a,b){let x=a[sortKey],y=b[sortKey];if(sortKey==="params"){x=a.pa
 /* ---------- CLIENT CODE ---------- */
 function vCode(){
   if(!D.scripts.length) return `<h1 class="vt">Client code</h1><p class="vsub">No JavaScript was captured. Re-run the capture with the app's script bundles included, and the map can add the endpoints the code references.</p><div class="empty">0 scripts in this model.</div>`;
-  return `<h1 class="vt">Client code</h1><p class="vsub">Scripts served to the browser and the endpoints they reference. A reference is <b>inferred</b> — a URL in code is not proof of a call.</p>
+  return `<h1 class="vt">Client code</h1><p class="vsub">Scripts served to the browser and the endpoints they reference. A reference is <b>inferred</b>, a URL in code is not proof of a call.</p>
   ${D.scripts.filter(s=>matchQ({label:s.label,host:s.host,params:s.references})).map(s=>`<div class="card"><div class="hd">${methodm("JS")} <span class="mono">${esc(s.label)}</span> <span class="ct">${esc(s.host)} · ${s.references.length} ref${s.references.length===1?"":"s"}</span></div>
    <div class="bd" style="padding:12px 16px">${s.references.length?`<div class="taglist">${s.references.map(r=>`<span>${esc(r)}</span>`).join("")}</div>`:'<div style="color:var(--faint)">No endpoint references extracted.</div>'}</div></div>`).join("")}`;
 }
@@ -887,7 +861,7 @@ function vSupply(){
   <div class="card"><div class="bd" style="padding:0"><table><thead><tr><th>Third party</th><th>Requests</th><th>Referenced by</th><th>Evidence</th></tr></thead><tbody>
   ${D.third_parties.filter(t=>matchQ({label:t.label,params:t.referenced_by})).map(t=>`<tr><td class="mono">${esc(t.label)}</td><td class="mono">${t.requests}</td>
    <td class="mono" style="color:var(--muted)">${(t.referenced_by||[]).map(esc).join(", ")||"—"}</td>
-   <td class="mono" style="color:var(--faint);font-size:11px">${(t.evidence||[]).slice(0,3).map(i=>"ev_"+i).join(", ")}</td></tr>`).join("")}
+   <td class="mono" style="color:var(--faint);font-size:11px">${(t.evidence||[]).slice(0,3).map(EVD).join(", ")}</td></tr>`).join("")}
   </tbody></table></div></div>`;
 }
 
@@ -909,7 +883,7 @@ function vTrust(){
   h+=secrets.length?`<table><thead><tr><th>Kind</th><th>Length</th><th>Entropy</th><th>Seen</th><th>Evidence</th></tr></thead><tbody>${secrets.map(s=>
     `<tr><td class="mono">${esc(s.kind)}</td><td class="mono" style="color:var(--muted)">${s.length} chars</td>
      <td class="mono" style="color:var(--muted)">${(s.entropy??0).toFixed(2)} bits/char</td><td class="mono">×${s.count}</td>
-     <td class="mono" style="color:var(--faint);font-size:11px">${(s.evidence||[]).slice(0,3).map(i=>"ev_"+i).join(", ")}</td></tr>`).join("")}</tbody></table>
+     <td class="mono" style="color:var(--faint);font-size:11px">${(s.evidence||[]).slice(0,3).map(EVD).join(", ")}</td></tr>`).join("")}</tbody></table>
    <div class="glegend" style="border-top:1px solid var(--line)">Values were masked before anything reached disk; only kind, shape and a keyed fingerprint are kept.</div>`
    :`<div class="empty">No secret-shaped values were observed in the capture.</div>`;
   h+=`</div></div>`;
@@ -920,7 +894,7 @@ function vTrust(){
 function vCrossrole(){
   const roles=D.roles||[];
   const reached=EP.filter(e=>e.roles.length);
-  let h=`<h1 class="vt">Cross-role surface</h1><p class="vsub">Which role reached which endpoint, and the status each got back. Divergence is a broken-access-control <b>hypothesis</b> — replay across accounts to confirm.</p>`;
+  let h=`<h1 class="vt">Cross-role surface</h1><p class="vsub">Which role reached which endpoint, and the status each got back. Divergence is a broken-access-control <b>hypothesis</b>, replay across accounts to confirm.</p>`;
   // privileged / divergence highlights — one card per endpoint, notes merged
   const hiBy={};
   const note=(e,t)=>{(hiBy[e.id]=hiBy[e.id]||{e,notes:[]}).notes.push(t);};
@@ -962,7 +936,7 @@ function vUnknowns(){
 __INVJS__
 function openEv(i){
   const ev=D.evidence["ev_"+i];if(!ev)return;
-  $("#dtitle").innerHTML=`<span class="mono">ev_${i}</span>`;
+  $("#dtitle").innerHTML=`<span class="mono">${EVD(i)}</span>`;
   $("#dbody").innerHTML=`<h4>Attributes</h4><div class="kv">
     <div class="k">Request</div><div class="v mono">${esc(ev.method)} ${esc(ev.host)}${esc(ev.path)}</div>
     <div class="k">Status</div><div class="v mono">${ev.status==null?"?":ev.status}</div>
@@ -988,7 +962,7 @@ function evidenceBlock(i,open){
   const meta=ev?`${esc(ev.method)} ${esc(ev.host)}${esc(ev.path)} → ${ev.status==null?"?":ev.status}`:"";
   const uid="e"+i+"x"+Math.random().toString(36).slice(2,7);
   const hasHttp=ev&&(ev.request||ev.response);
-  return `<details class="evrow"${open?" open":""}><summary><span class="id">ev_${i}</span><span class="meta">${meta}</span></summary>${
+  return `<details class="evrow"${open?" open":""}><summary><span class="id">${EVD(i)}</span><span class="meta">${meta}</span></summary>${
    hasHttp?`<div class="http"><div class="tabs"><button class="tab on" data-tab="${uid}r">Request</button><button class="tab" data-tab="${uid}s">Response</button></div>
     <div id="${uid}r" class="pane">${httpMsg(ev.request)}</div><div id="${uid}s" class="pane hide">${httpMsg(ev.response)}</div>
     <div style="padding:7px 12px;color:var(--faint);font-size:11px;border-top:1px solid var(--line)">Every value masked at capture time.</div></div>`
@@ -1004,7 +978,7 @@ function openEp(id){
   const kv=(k,v)=>v!=null&&v!==""&&!(Array.isArray(v)&&!v.length)?`<div class="k">${k}</div><div class="v">${v}</div>`:"";
   $("#dtitle").innerHTML=`${methodm(e.method)} <span class="mono">${esc(e.path)}</span>`;
   $("#dbody").innerHTML=`
-   ${staticOnly?`<div class="callout" style="margin-bottom:16px"><span class="i">i</span><p>This endpoint was <b>referenced in the client code but never requested</b> in the capture, so there is no request or response for it. The evidence below is the page or script that names it — a good thing to try next.</p></div>`:""}
+   ${staticOnly?`<div class="callout" style="margin-bottom:16px"><span class="i">i</span><p>This endpoint was <b>referenced in the client code but never requested</b> in the capture, so there is no request or response for it. The evidence below is the page or script that names it, a good thing to try next.</p></div>`:""}
    <h4>Attributes</h4><div class="kv">
     ${kv("Host",`<span class="mono">${esc(e.host)}</span>`)}
     ${kv("Statuses",statuses(e.statuses))}${kv("Requests",e.requests)}
@@ -1016,7 +990,7 @@ function openEp(id){
    ${e.params.length?`<h4>Parameters (${e.params.length})</h4><div class="taglist">${e.params.map(p=>`<span>${esc(p)}</span>`).join("")}</div>`:""}
    ${e.referenced_by.length?`<h4>Referenced by (inferred)</h4><div class="taglist">${e.referenced_by.map(p=>`<span>${esc(p)}</span>`).join("")}</div>`:""}
    ${e.called_from.length?`<h4>Called from (observed)</h4><div class="taglist">${e.called_from.map(p=>`<span>${esc(p)}</span>`).join("")}</div>`:""}
-   <h4>Evidence — request &amp; response</h4>${evrows||'<div style="color:var(--faint)">—</div>'}`;
+   <h4>Evidence: request and response</h4>${evrows||'<div style="color:var(--faint)">—</div>'}`;
   $("#drawer").classList.add("on");$("#scrim").classList.add("on");$("#drawer").setAttribute("aria-hidden","false");
 }
 const NBYID=Object.fromEntries((D.graph.nodes||[]).map(n=>[n.id,n]));
@@ -1032,7 +1006,7 @@ function openNode(id){
    </div>
    ${n.type==="infra"?`<div class="callout" style="margin-top:14px"><span class="i">i</span><p>Collected by external recon (<span class="mono">burp2model osint</span>), not from the capture. It describes the app's public footprint.</p></div>`:""}
    ${conns.length?`<h4>Connections (${conns.length})</h4><div class="taglist">${conns.map(e=>{const o=e.s===id?e.d:e.s;const nn=NBYID[o];const dir=e.s===id?"→":"←";return `<span>${dir} ${esc(humanize(e.type))}: ${esc(nn?nn.label:o)}</span>`;}).join("")}</div>`:""}
-   ${(n.evidence||[]).length?`<h4>Evidence — request &amp; response</h4>${n.evidence.map((i,k)=>evidenceBlock(i,k===0)).join("")}`:""}`;
+   ${(n.evidence||[]).length?`<h4>Evidence: request and response</h4>${n.evidence.map((i,k)=>evidenceBlock(i,k===0)).join("")}`:""}`;
   $("#drawer").classList.add("on");$("#scrim").classList.add("on");$("#drawer").setAttribute("aria-hidden","false");
 }
 function closeDrawer(){$("#drawer").classList.remove("on");$("#scrim").classList.remove("on");$("#drawer").setAttribute("aria-hidden","true");}
@@ -1042,17 +1016,17 @@ addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();});
 $("#dbody").addEventListener("click",e=>{const t=e.target.closest(".tab");if(!t)return;const pane=document.getElementById(t.dataset.tab);if(!pane)return;const wrap=t.closest(".http");$$(".tab",wrap).forEach(x=>x.classList.remove("on"));t.classList.add("on");$$(".pane",wrap).forEach(p=>p.classList.add("hide"));pane.classList.remove("hide");});
 
 /* ---------- wire ---------- */
-const RENDER={overview:vOverview,ask:vAsk,priorities:vPriorities,surface:vSurface,code:vCode,supply:vSupply,trust:vTrust,crossrole:vCrossrole,unknowns:vUnknowns,inventory:vEvidence,graph:vGraph,query:vQuery,infra:vInfra};
+const RENDER={overview:vOverview,ask:vAsk,priorities:vPriorities,surface:vSurface,code:vCode,supply:vSupply,trust:vTrust,crossrole:vCrossrole,unknowns:vUnknowns,inventory:vEvidence,graph:vGraph,infra:vInfra};
 function render(){
   renderNav();
-  try{if(!(view==="query"&&(location.hash||"").startsWith("#query=")))history.replaceState(null,"","#"+view);}catch(e){}
+  try{if(!(view==="ask"&&(location.hash||"").startsWith("#query=")))history.replaceState(null,"","#"+view);}catch(e){}
   const main=$("#main");
   main.className="m-"+view;
   main.innerHTML=`<section class="view view-${view} on">${(RENDER[view]||vOverview)()}</section>
-   <div class="foot">Generated by <b>burp2model ${esc(D.version)}</b>${D.generated?` on ${esc(D.generated)}`:""} — an evidence-backed model of a capture you provided. Not a scanner; nothing here is a vulnerability. · <a href="https://falc0n-researcher.github.io/burp2model/">docs</a></div>`;
+   <div class="foot">Generated by <b>burp2model ${esc(D.version)}</b>${D.generated?` on ${esc(D.generated)}`:""}. An evidence-backed model of a capture you provided. Not a scanner; nothing here is a vulnerability. · <a href="https://falc0n-researcher.github.io/burp2model/">docs</a></div>`;
   if(view==="graph")initGraph();
   if(view==="ask")initAsk();
-  if(view==="query")initQuery();
+  if(view==="overview")initOverview();
   if(view==="inventory")initEvq();
   // row / card clicks → drawer
   $$("[data-ep]",main).forEach(el=>el.onclick=()=>openEp(el.dataset.ep));
@@ -1073,13 +1047,14 @@ addEventListener("keydown",e=>{
 /* report.html#query=<urlencoded BQL> opens the console with that query already run */
 function fromHash(){
   const h=(location.hash||"").slice(1);
-  if(h.startsWith("query=")&&BQLDB){let q="";try{q=decodeURIComponent(h.slice(6));}catch(e){}view="query";if(q&&q!==qText)qRun(q);return true;}
+  if(h.startsWith("query=")){let q="";try{q=decodeURIComponent(h.slice(6));}catch(e){}view="ask";if(q&&q!==qText){qText=q;aNL=null;qErr=null;qRes=null;if(looksBql(q)&&BQLDB)qRun(q);else aNL=askEngine(q);}return true;}
   if(h==="evidence"){view="inventory";return true;}
+  if(h==="query"){view="ask";return true;}
   if(RENDER[h]){view=h;return true;}
   return false;
 }
 fromHash();
-addEventListener("hashchange",()=>{const was=view;if(fromHash()&&(view!==was||view==="query"))render();});
+addEventListener("hashchange",()=>{const was=view;if(fromHash()&&(view!==was||view==="ask"))render();});
 render();
 </script>
 </body>

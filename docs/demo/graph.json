@@ -10,11 +10,11 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        0,
         1,
         2,
         3,
-        4
+        4,
+        5
       ]
     },
     {
@@ -25,10 +25,10 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        0,
-        5,
+        1,
         6,
-        7
+        7,
+        8
       ]
     },
     {
@@ -39,10 +39,10 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        0,
-        5,
+        1,
         6,
-        7
+        7,
+        8
       ]
     },
     {
@@ -55,7 +55,7 @@
         "admin"
       ],
       "evidence": [
-        0
+        1
       ]
     },
     {
@@ -66,11 +66,11 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        1,
         2,
         3,
         4,
-        10
+        5,
+        11
       ]
     },
     {
@@ -81,11 +81,11 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        1,
         2,
         3,
         4,
-        10
+        5,
+        11
       ]
     },
     {
@@ -99,9 +99,9 @@
         "user"
       ],
       "evidence": [
-        1,
-        8,
-        11
+        2,
+        9,
+        12
       ]
     },
     {
@@ -112,11 +112,11 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        1,
         2,
         3,
         4,
-        11
+        5,
+        12
       ]
     },
     {
@@ -127,11 +127,11 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        1,
         2,
         3,
         4,
-        11
+        5,
+        12
       ]
     },
     {
@@ -145,8 +145,8 @@
         "user"
       ],
       "evidence": [
-        2,
-        18
+        3,
+        19
       ]
     },
     {
@@ -159,7 +159,7 @@
         "admin"
       ],
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -170,7 +170,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -181,7 +181,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -194,8 +194,8 @@
         "admin"
       ],
       "evidence": [
-        4,
-        8
+        5,
+        9
       ]
     },
     {
@@ -206,11 +206,11 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        5,
         6,
         7,
         8,
-        9
+        9,
+        10
       ]
     },
     {
@@ -221,7 +221,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -232,8 +232,8 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        5,
-        10
+        6,
+        11
       ]
     },
     {
@@ -244,7 +244,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -257,7 +257,7 @@
         "user"
       ],
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -270,7 +270,7 @@
         "user"
       ],
       "evidence": [
-        6
+        7
       ]
     },
     {
@@ -283,7 +283,7 @@
         "user"
       ],
       "evidence": [
-        7
+        8
       ]
     },
     {
@@ -294,8 +294,8 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        8,
-        9
+        9,
+        10
       ]
     },
     {
@@ -306,8 +306,8 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        8,
-        9
+        9,
+        10
       ]
     },
     {
@@ -320,7 +320,7 @@
         "user"
       ],
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -333,8 +333,8 @@
         "user"
       ],
       "evidence": [
-        6,
-        10
+        7,
+        11
       ]
     },
     {
@@ -345,7 +345,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -356,7 +356,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -367,7 +367,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -380,8 +380,8 @@
         "user"
       ],
       "evidence": [
-        8,
-        12
+        9,
+        13
       ]
     },
     {
@@ -394,8 +394,8 @@
         "user"
       ],
       "evidence": [
-        8,
-        13
+        9,
+        14
       ]
     },
     {
@@ -408,8 +408,8 @@
         "user"
       ],
       "evidence": [
-        8,
-        14
+        9,
+        15
       ]
     },
     {
@@ -420,7 +420,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -431,7 +431,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -442,7 +442,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -455,7 +455,7 @@
         "user"
       ],
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -466,7 +466,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -479,8 +479,8 @@
         "user"
       ],
       "evidence": [
-        8,
-        17
+        9,
+        18
       ]
     },
     {
@@ -493,7 +493,7 @@
         "user"
       ],
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -504,7 +504,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -515,7 +515,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -528,7 +528,7 @@
         "user"
       ],
       "evidence": [
-        19
+        20
       ]
     },
     {
@@ -539,7 +539,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        20
+        21
       ]
     },
     {
@@ -550,7 +550,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        20
+        21
       ]
     },
     {
@@ -561,7 +561,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        21
+        22
       ]
     },
     {
@@ -572,7 +572,7 @@
       "api_state": null,
       "roles": [],
       "evidence": [
-        21
+        22
       ]
     }
   ],
@@ -583,9 +583,9 @@
       "type": "RUNS",
       "state": "OBSERVED",
       "evidence": [
-        0,
-        5,
-        6
+        1,
+        6,
+        7
       ]
     },
     {
@@ -594,7 +594,7 @@
       "type": "SERVES",
       "state": "OBSERVED",
       "evidence": [
-        0
+        1
       ]
     },
     {
@@ -603,7 +603,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        0
+        1
       ]
     },
     {
@@ -612,9 +612,9 @@
       "type": "RUNS",
       "state": "OBSERVED",
       "evidence": [
-        1,
         2,
-        3
+        3,
+        4
       ]
     },
     {
@@ -623,8 +623,8 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        1,
-        11
+        2,
+        12
       ]
     },
     {
@@ -633,8 +633,8 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        1,
-        11
+        2,
+        12
       ]
     },
     {
@@ -643,52 +643,13 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        1,
-        11
+        2,
+        12
       ]
     },
     {
       "source": "role:admin",
       "target": "endpoint:GET:api.example.com:/api/me",
-      "type": "REACHED",
-      "state": "OBSERVED",
-      "evidence": [
-        1
-      ]
-    },
-    {
-      "source": "host:api.example.com",
-      "target": "endpoint:GET:api.example.com:/api/admin/users",
-      "type": "EXPOSES",
-      "state": "OBSERVED",
-      "evidence": [
-        2,
-        18
-      ]
-    },
-    {
-      "source": "endpoint:GET:api.example.com:/api/admin/users",
-      "target": "auth:bearer",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        2,
-        18
-      ]
-    },
-    {
-      "source": "endpoint:GET:api.example.com:/api/admin/users",
-      "target": "auth:cookie:session",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        2,
-        18
-      ]
-    },
-    {
-      "source": "role:admin",
-      "target": "endpoint:GET:api.example.com:/api/admin/users",
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
@@ -697,11 +658,50 @@
     },
     {
       "source": "host:api.example.com",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        3,
+        19
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/admin/users",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        3,
+        19
+      ]
+    },
+    {
+      "source": "endpoint:GET:api.example.com:/api/admin/users",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        3,
+        19
+      ]
+    },
+    {
+      "source": "role:admin",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        3
+      ]
+    },
+    {
+      "source": "host:api.example.com",
       "target": "endpoint:POST:api.example.com:/api/admin/users",
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -710,7 +710,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -719,7 +719,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -728,7 +728,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -737,7 +737,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -746,7 +746,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        3
+        4
       ]
     },
     {
@@ -755,7 +755,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        4
+        5
       ]
     },
     {
@@ -764,7 +764,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        4
+        5
       ]
     },
     {
@@ -773,7 +773,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        4
+        5
       ]
     },
     {
@@ -782,7 +782,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        4
+        5
       ]
     },
     {
@@ -791,7 +791,7 @@
       "type": "RUNS",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -800,7 +800,7 @@
       "type": "SETS_COOKIE",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -809,7 +809,7 @@
       "type": "SETS_COOKIE",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -818,7 +818,7 @@
       "type": "SERVES",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -827,7 +827,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        5
+        6
       ]
     },
     {
@@ -836,7 +836,7 @@
       "type": "SERVES",
       "state": "OBSERVED",
       "evidence": [
-        6
+        7
       ]
     },
     {
@@ -845,7 +845,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        6
+        7
       ]
     },
     {
@@ -854,7 +854,7 @@
       "type": "SERVES",
       "state": "OBSERVED",
       "evidence": [
-        7
+        8
       ]
     },
     {
@@ -863,7 +863,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        7
+        8
       ]
     },
     {
@@ -872,8 +872,8 @@
       "type": "RUNS",
       "state": "OBSERVED",
       "evidence": [
-        8,
-        9
+        9,
+        10
       ]
     },
     {
@@ -882,7 +882,7 @@
       "type": "LOADS",
       "state": "OBSERVED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -891,7 +891,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -900,7 +900,7 @@
       "type": "SETS_COOKIE",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -909,7 +909,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -918,7 +918,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -927,7 +927,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -936,7 +936,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -945,7 +945,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        10
+        11
       ]
     },
     {
@@ -954,7 +954,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        11
+        12
       ]
     },
     {
@@ -963,7 +963,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        12
+        13
       ]
     },
     {
@@ -972,7 +972,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        12
+        13
       ]
     },
     {
@@ -981,7 +981,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        12
+        13
       ]
     },
     {
@@ -990,7 +990,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        12
+        13
       ]
     },
     {
@@ -999,7 +999,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        13
+        14
       ]
     },
     {
@@ -1008,47 +1008,11 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        13
+        14
       ]
     },
     {
       "source": "endpoint:GET:api.example.com:/api/orders/{id}",
-      "target": "auth:cookie:session",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        13
-      ]
-    },
-    {
-      "source": "role:user",
-      "target": "endpoint:GET:api.example.com:/api/orders/{id}",
-      "type": "REACHED",
-      "state": "OBSERVED",
-      "evidence": [
-        13
-      ]
-    },
-    {
-      "source": "host:api.example.com",
-      "target": "endpoint:POST:api.example.com:/api/checkout",
-      "type": "EXPOSES",
-      "state": "OBSERVED",
-      "evidence": [
-        14
-      ]
-    },
-    {
-      "source": "endpoint:POST:api.example.com:/api/checkout",
-      "target": "auth:bearer",
-      "type": "SENT_CREDENTIAL",
-      "state": "OBSERVED",
-      "evidence": [
-        14
-      ]
-    },
-    {
-      "source": "endpoint:POST:api.example.com:/api/checkout",
       "target": "auth:cookie:session",
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
@@ -1058,11 +1022,47 @@
     },
     {
       "source": "role:user",
-      "target": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "endpoint:GET:api.example.com:/api/orders/{id}",
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
         14
+      ]
+    },
+    {
+      "source": "host:api.example.com",
+      "target": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "EXPOSES",
+      "state": "OBSERVED",
+      "evidence": [
+        15
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "auth:bearer",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        15
+      ]
+    },
+    {
+      "source": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "auth:cookie:session",
+      "type": "SENT_CREDENTIAL",
+      "state": "OBSERVED",
+      "evidence": [
+        15
+      ]
+    },
+    {
+      "source": "role:user",
+      "target": "endpoint:POST:api.example.com:/api/checkout",
+      "type": "REACHED",
+      "state": "OBSERVED",
+      "evidence": [
+        15
       ]
     },
     {
@@ -1071,7 +1071,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -1080,7 +1080,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -1089,7 +1089,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        14
+        15
       ]
     },
     {
@@ -1098,7 +1098,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1107,7 +1107,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1116,7 +1116,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1125,7 +1125,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1134,7 +1134,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        16
+        17
       ]
     },
     {
@@ -1143,7 +1143,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1152,7 +1152,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1161,7 +1161,7 @@
       "type": "SENT_CREDENTIAL",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1170,7 +1170,7 @@
       "type": "USES_OPERATION",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1179,7 +1179,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1188,7 +1188,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1197,7 +1197,7 @@
       "type": "USES_PARAMETER",
       "state": "OBSERVED",
       "evidence": [
-        17
+        18
       ]
     },
     {
@@ -1206,7 +1206,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        18
+        19
       ]
     },
     {
@@ -1215,7 +1215,7 @@
       "type": "EXPOSES",
       "state": "OBSERVED",
       "evidence": [
-        19
+        20
       ]
     },
     {
@@ -1224,7 +1224,7 @@
       "type": "REACHED",
       "state": "OBSERVED",
       "evidence": [
-        19
+        20
       ]
     },
     {
@@ -1233,7 +1233,7 @@
       "type": "LOADS",
       "state": "OBSERVED",
       "evidence": [
-        20
+        21
       ]
     },
     {
@@ -1242,21 +1242,12 @@
       "type": "LOADS",
       "state": "OBSERVED",
       "evidence": [
-        21
+        22
       ]
     },
     {
       "source": "route:shop.example.com/admin",
       "target": "endpoint:GET:api.example.com:/api/me",
-      "type": "CALLS",
-      "state": "OBSERVED",
-      "evidence": [
-        1
-      ]
-    },
-    {
-      "source": "route:shop.example.com/admin",
-      "target": "endpoint:GET:api.example.com:/api/admin/users",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1265,7 +1256,7 @@
     },
     {
       "source": "route:shop.example.com/admin",
-      "target": "endpoint:POST:api.example.com:/api/admin/users",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1274,7 +1265,7 @@
     },
     {
       "source": "route:shop.example.com/admin",
-      "target": "endpoint:GET:api.example.com:/api/admin/audit",
+      "target": "endpoint:POST:api.example.com:/api/admin/users",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1282,17 +1273,17 @@
       ]
     },
     {
-      "source": "route:shop.example.com/login",
-      "target": "endpoint:POST:api.example.com:/auth/login",
+      "source": "route:shop.example.com/admin",
+      "target": "endpoint:GET:api.example.com:/api/admin/audit",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
-        10
+        5
       ]
     },
     {
-      "source": "route:shop.example.com/dashboard",
-      "target": "endpoint:GET:api.example.com:/api/me",
+      "source": "route:shop.example.com/login",
+      "target": "endpoint:POST:api.example.com:/auth/login",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1301,7 +1292,7 @@
     },
     {
       "source": "route:shop.example.com/dashboard",
-      "target": "endpoint:GET:api.example.com:/api/orders",
+      "target": "endpoint:GET:api.example.com:/api/me",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1310,7 +1301,7 @@
     },
     {
       "source": "route:shop.example.com/dashboard",
-      "target": "endpoint:GET:api.example.com:/api/orders/{id}",
+      "target": "endpoint:GET:api.example.com:/api/orders",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1319,7 +1310,7 @@
     },
     {
       "source": "route:shop.example.com/dashboard",
-      "target": "endpoint:POST:api.example.com:/api/checkout",
+      "target": "endpoint:GET:api.example.com:/api/orders/{id}",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1328,16 +1319,16 @@
     },
     {
       "source": "route:shop.example.com/dashboard",
-      "target": "endpoint:POST:api.example.com:/api/export",
+      "target": "endpoint:POST:api.example.com:/api/checkout",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
-        16
+        15
       ]
     },
     {
       "source": "route:shop.example.com/dashboard",
-      "target": "endpoint:POST:api.example.com:/graphql",
+      "target": "endpoint:POST:api.example.com:/api/export",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1346,7 +1337,7 @@
     },
     {
       "source": "route:shop.example.com/dashboard",
-      "target": "endpoint:GET:api.example.com:/api/admin/users",
+      "target": "endpoint:POST:api.example.com:/graphql",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1354,8 +1345,8 @@
       ]
     },
     {
-      "source": "route:shop.example.com/login",
-      "target": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "source": "route:shop.example.com/dashboard",
+      "target": "endpoint:GET:api.example.com:/api/admin/users",
       "type": "CALLS",
       "state": "OBSERVED",
       "evidence": [
@@ -1364,11 +1355,20 @@
     },
     {
       "source": "route:shop.example.com/login",
+      "target": "endpoint:GET:api.example.com:/api/reset/{email}/{token}",
+      "type": "CALLS",
+      "state": "OBSERVED",
+      "evidence": [
+        20
+      ]
+    },
+    {
+      "source": "route:shop.example.com/login",
       "target": "endpoint:POST:api.example.com:/auth/login",
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        6
+        7
       ]
     },
     {
@@ -1377,7 +1377,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1386,7 +1386,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1395,7 +1395,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1404,7 +1404,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1413,7 +1413,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     },
     {
@@ -1422,7 +1422,7 @@
       "type": "REFERENCES",
       "state": "INFERRED",
       "evidence": [
-        8
+        9
       ]
     }
   ]

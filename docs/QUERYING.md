@@ -6,7 +6,7 @@
 $ burp2model query shop "code vs runtime"
 APIs: 10 endpoints
   BOTH 6 · STATIC_ONLY 1 · RUNTIME_ONLY 3
-    static-only  * /api/admin/audit  ev_3
+    static-only  * /api/admin/audit  ev_4
 Source: model graph · Model call: none
 ```
 
@@ -44,8 +44,8 @@ Fields are `req.*`, `resp.*`, `node.*`, `edge.*`. Operators: `eq ne cont ncont l
 
 ```
 $ burp2model graph shop --reach /api/checkout
-  api.example.com --EXPOSES--> POST /api/checkout              ev_14
-  cdn.example.com/app.js --REFERENCES(inferred)--> POST /api/checkout  ev_8
+  api.example.com --EXPOSES--> POST /api/checkout              ev_15
+  cdn.example.com/app.js --REFERENCES(inferred)--> POST /api/checkout  ev_9
 ```
 
 - `--reach NODE`: how a node is reached from an entry point.
