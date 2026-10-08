@@ -31,6 +31,7 @@ from .report_dash import DASH_CSS, DASH_JS
 from .report_inventory import INV_CSS, INV_JS
 from .report_query import QRY_CSS, QRY_JS
 from .report_map import MAP_CSS, MAP_JS
+from .report_fonts import TYPE_CSS, font_css
 
 # Version of the JSON embedded in report.html. Bump on any breaking change to
 # the payload shape so the page's code and the data can't silently drift.
@@ -87,11 +88,16 @@ def _osint_graph(osint: dict, primary_host: str | None, node_ids: set[str] | Non
     dns = osint.get("dns") or {}
     for ip in (dns.get("A") or [])[:3]:
         add(f"infra:ip:{ip}", f"IP · {ip}", f"DNS A record: {ip}", "dns")
+    if dns.get("A"):
+        summary["ips"] = dns["A"][:3]
+    if dns.get("CNAME"):
+        summary["cname"] = dns["CNAME"][0]
     if dns.get("CNAME"):
         add("infra:cname", f"CNAME · {dns['CNAME'][0]}",
             "Canonical name: " + ", ".join(dns["CNAME"][:3]), "dns")
     if dns.get("NS"):
         add("infra:ns", f"Nameservers · {len(dns['NS'])}", "NS: " + ", ".join(dns["NS"][:4]), "dns")
+        summary["nameservers"] = dns["NS"][:4]
     if dns.get("MX"):
         add("infra:mx", "Mail (MX)", "MX: " + ", ".join(dns["MX"][:3]), "dns")
     geo = osint.get("ip_geo") or {}
@@ -113,6 +119,7 @@ def _osint_graph(osint: dict, primary_host: str | None, node_ids: set[str] | Non
             f"{present} present, {len(missing)} missing"
             + (": " + ", ".join(missing[:6]) if missing else ""), "http")
         summary["headers_missing"] = missing
+        summary["headers_present"] = sorted((http.get("security_headers_present") or {}).keys())
     em = osint.get("email_security") or {}
     if em.get("dmarc_policy") or em.get("spf_note"):
         add("infra:email", "Email auth",
@@ -269,6 +276,7 @@ def build_payload(m: Model, osint: dict | None = None, lens: str = "attention") 
         "operations": operations, "third_parties": third_parties, "auth": auth,
         "cookies": cookies, "secrets": data["secrets"], "unknowns": unknowns,
         "graph": graph,
+        "stack": m.stack,
         "context": context_package(m, lens=lens, osint=osint),
         "methodology": {"prompt": METHODOLOGY_PROMPT, "scaffold": investigation_plan(m)},
         "osint": o_summary,
@@ -277,8 +285,12 @@ def build_payload(m: Model, osint: dict | None = None, lens: str = "attention") 
 
 
 def write_html_report(m: Model, path: str, osint: dict | None = None,
-                      lens: str = "attention", db_path: str | None = None) -> None:
+                      lens: str = "attention", db_path: str | None = None,
+                      screenshot: tuple[str, bytes] | None = None) -> None:
     payload = build_payload(m, osint=osint, lens=lens)
+    if screenshot:
+        from . import shot
+        payload["screenshot"] = shot.data_uri(*screenshot)
     if db_path:
         # the in-page query console reads the same graph.db the CLI queries
         from . import store
@@ -291,7 +303,7 @@ def write_html_report(m: Model, path: str, osint: dict | None = None,
             .replace("__DASHCSS__", DASH_CSS).replace("__DASHJS__", DASH_JS)
             .replace("__INVCSS__", INV_CSS).replace("__INVJS__", INV_JS)
             .replace("__QRYCSS__", QRY_CSS).replace("__QRYJS__", QRY_JS)
-            .replace("__MAPCSS__", MAP_CSS).replace("__MAPJS__", MAP_JS)
+            .replace("__MAPCSS__", MAP_CSS).replace("__TYPECSS__", TYPE_CSS).replace("__FONTCSS__", font_css()).replace("__MAPJS__", MAP_JS)
             .replace("__DATA__", _safe_json(payload)))
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)
@@ -302,11 +314,12 @@ _TEMPLATE = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 21.5 16 26l10-4.5' fill='none' stroke='%230e8fd6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M6 16.5 16 21l10-4.5' fill='none' stroke='%237a5cff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 6 6 10.5 16 15l10-4.5z' fill='%23e85002'/%3E%3C/svg%3E">
 <title>burp2model report</title>
 <style>
+__FONTCSS__
 :root{
 --ink:#fff;--panel:#fff;--panel2:#f7f8fa;--panel3:#fafbfc;--line:#e7eaef;--line2:#cfd5dd;
 --text:#141924;--muted:#6b7580;--faint:#98a1ac;--signal:#e85002;--signal-soft:#fdece3;
@@ -535,6 +548,7 @@ __DASHCSS__
 __INVCSS__
 __QRYCSS__
 __MAPCSS__
+__TYPECSS__
 @media(max-width:820px){
  .shell{display:flex;flex-direction:column;height:auto}
  nav.views{display:flex;gap:2px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;white-space:nowrap}

@@ -39,4 +39,4 @@ version = { attr = "burp2model.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-burp2model = ["py.typed", "data/*.dat"]
+burp2model = ["py.typed", "data/*.dat", "data/fonts/*.woff2", "data/fonts/*.md"]

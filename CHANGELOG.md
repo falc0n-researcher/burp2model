@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Technology stack.** The model reads servers, CDNs, frameworks and third-party services from headers,
+  cookies, pages and hosts, each tied to its evidence. The overview draws it as a stack map and shows an
+  infrastructure summary (host, hosting, IP, TLS, DNS, mail auth, headers set) with only the fields found.
+  The stack is in `model.json` and `context.json`.
+- **Screenshot on the overview.** An anonymous browser crawl captures the start page. Attach your own with
+  `--screenshot FILE`, or skip it with `--no-screenshot`. Signed-in crawls never capture one on their own.
+- **Fonts.** The report embeds Inter, Space Grotesk and JetBrains Mono (about 150 KB, SIL OFL), so it looks
+  the same offline.
+
 - **Evidence ids start at 1** and the report shows them as EVD 1, EVD 2 (the files and CLI still
   use `ev_1`, `ev_2`). BQL accepts either form.
 - **Ask and Query are one view.** One box takes plain questions or BQL.

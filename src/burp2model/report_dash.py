@@ -6,6 +6,36 @@ spliced into the page; everything is computed from the payload `D` the report em
 
 DASH_CSS = r"""
 /* dashboard */
+/* at a glance: screenshot, infrastructure, stack */
+.band{display:grid;gap:18px;align-items:start;margin-bottom:24px;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)}
+.band.shot{grid-template-columns:minmax(0,.95fr) minmax(0,.9fr) minmax(0,1.3fr)}
+@media(max-width:1250px){.band.shot{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.band.shot .shotcard{grid-column:1/-1}}
+@media(max-width:900px){.band,.band.shot{grid-template-columns:minmax(0,1fr)}}
+.shotcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.shotcard .sbar{display:flex;align-items:center;gap:6px;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--line)}
+.shotcard .sbar i{width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.shotcard .sbar span{margin-left:8px;flex:1;font:11.5px var(--mono);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shotcard button.simg{border:0;padding:0;background:var(--ink);cursor:zoom-in;flex:1;min-height:200px;display:block}
+.shotcard img{width:100%;height:100%;min-height:200px;max-height:340px;object-fit:cover;object-position:top;display:block}
+.lightbox{position:fixed;inset:0;z-index:80;background:rgba(10,13,18,.82);display:grid;place-items:center;padding:30px;cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:var(--shadow)}
+.irows{display:grid;grid-template-columns:104px minmax(0,1fr);gap:0}
+.irows .k{color:var(--muted);font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
+.irows .v{font:12.5px var(--mono);padding:6px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.irows .k:nth-last-child(2),.irows .v:last-child{border-bottom:0}
+.irows .v small{color:var(--faint);margin-left:6px}
+.smap{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;row-gap:12px}
+.smap .sn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:96px;display:flex;flex-direction:column;gap:5px;align-self:stretch}
+.smap .sn.you{justify-content:center;align-items:center;font:600 12px var(--mono);color:var(--muted);min-width:70px}
+.smap .sl{font:600 9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.smap .sa{display:grid;place-items:center;width:24px;color:var(--faint);font-size:15px}
+.tp{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--sans);padding:3px 4px 3px 0;border:0;background:none;color:var(--text);text-align:left}
+.tp i{width:8px;height:8px;border-radius:2px;flex:none}
+.tp small{color:var(--faint);font:500 10.5px var(--mono)}
+.tp:hover{color:var(--signal)}
+.svc{margin-top:14px;display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px 12px;align-items:baseline}
+.svc .sk{font:600 10px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+.svc .sv{display:flex;flex-wrap:wrap;gap:4px 14px}
 .m-overview{padding:26px 32px 60px}
 .ovh{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:28px;align-items:end;margin-bottom:26px}
 @media(max-width:1000px){.ovh{grid-template-columns:minmax(0,1fr)}}
@@ -281,6 +311,63 @@ function vMore(){
   ${D.osint?`<div class="dgrid" style="grid-template-columns:minmax(0,1fr)">${osintCard()}</div>`:""}`;
 }
 
+
+/* ---------- at a glance: screenshot, infrastructure, stack ---------- */
+const STACK=D.stack||[];
+const STACK_COL={"Edge & CDN":"var(--l6)","Web server":"var(--l1)","Language & framework":"var(--l4)","Frontend":"var(--l3)","CMS & platform":"var(--l2)","API":"var(--inferred)","Services":"var(--l5)"};
+const STACK_SHORT={"Edge & CDN":"Edge","Web server":"Server","Language & framework":"App","Frontend":"Frontend","CMS & platform":"Platform","API":"API"};
+const HDR_LABEL={"strict-transport-security":"HSTS","content-security-policy":"CSP","x-frame-options":"X-Frame-Options","x-content-type-options":"nosniff","referrer-policy":"Referrer-Policy","permissions-policy":"Permissions-Policy","cross-origin-opener-policy":"COOP","cross-origin-resource-policy":"CORP"};
+/* the host the story is about: the one recon looked at, else the busiest */
+function primaryFirst(){
+  const rec=(D.osint||{}).host;
+  return [...(D.hosts||[])].sort((a,b)=>(b.label===rec)-(a.label===rec)||(b.evidence||[]).length-(a.evidence||[]).length);
+}
+function techPill(t){
+  const ev=(t.evidence||[])[0],how=t.how?`seen in ${t.how}`:"";
+  return `<button class="tp" ${ev?`data-ev="${ev}"`:""} title="${esc(how+(ev?" · "+EVD(ev):""))}"><i style="background:${STACK_COL[t.category]||"var(--l5)"}"></i>${esc(t.name)}${t.version?`<small>${esc(t.version)}</small>`:""}</button>`;
+}
+function stackCard(){
+  const order=["Edge & CDN","Web server","Language & framework","Frontend","CMS & platform","API"];
+  const layers=order.map(c=>[c,STACK.filter(t=>t.category===c)]).filter(x=>x[1].length);
+  const svc=STACK.filter(t=>t.category==="Services");
+  if(!layers.length&&!svc.length)return "";
+  const kinds=new Map();svc.forEach(t=>{const k=t.kind||"Other";(kinds.get(k)||kinds.set(k,[]).get(k)).push(t);});
+  return `<div class="dc"><div class="h">Technology stack <span class="ct">${STACK.length} detected</span></div><div class="b">
+   ${layers.length?`<div class="smap"><div class="sn you">Browser</div>${layers.map(([c,ts])=>`<div class="sa">→</div><div class="sn"><span class="sl">${esc(STACK_SHORT[c]||c)}</span>${ts.map(techPill).join("")}</div>`).join("")}</div>`:""}
+   ${svc.length?`<div class="svc">${[...kinds.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,ts])=>`<span class="sk">${esc(k)}</span><span class="sv">${ts.map(techPill).join("")}</span>`).join("")}</div>`:""}
+   <div class="dnote">Read from headers, cookies, pages and the hosts the app talks to. Hints, not a version scan.</div></div></div>`;
+}
+function infraRows(){
+  const rows=[],o=D.osint||{},hs=primaryFirst();
+  if(hs.length){const h=hs[0],sc=(h.schemes||[]).join("/"),pt=(h.ports||[]).join(", ");
+    rows.push(["Host",`${esc(h.label)}${hs.length>1?`<small>+${hs.length-1} more</small>`:""}<small>${esc([sc,pt].filter(Boolean).join(" "))}</small>`]);}
+  if(o.hosting&&o.hosting.network)rows.push(["Hosting",esc(o.hosting.network+(o.hosting.country?" · "+o.hosting.country:""))]);
+  if((o.ips||[]).length)rows.push(["IP",esc(o.ips.join(", "))]);
+  if(o.tls&&o.tls.issuer)rows.push(["TLS",esc(o.tls.issuer)+(o.tls.days_until_expiry!=null?`<small>${o.tls.days_until_expiry} days left</small>`:"")]);
+  if(o.registrar)rows.push(["Registrar",esc(o.registrar)]);
+  const dn=[];if((o.nameservers||[]).length)dn.push(o.nameservers.length+" nameservers");if(o.subdomains)dn.push(o.subdomains+" subdomains");
+  if(dn.length)rows.push(["DNS",esc(dn.join(" · "))]);
+  const em=o.email_security||{},mail=[];if(em.spf)mail.push("SPF");if(em.dmarc_policy)mail.push("DMARC p="+em.dmarc_policy);
+  if(mail.length)rows.push(["Mail auth",esc(mail.join(" · "))]);
+  const hp=(o.headers_present||[]).map(h=>HDR_LABEL[h]||h);
+  if(hp.length)rows.push(["Headers set",esc(hp.slice(0,4).join(", "))+(hp.length>4?`<small>+${hp.length-4}</small>`:"")]);
+  return rows.slice(0,8);
+}
+function infraCard(){
+  const rows=infraRows();if(rows.length<2)return "";
+  return `<div class="dc"><div class="h">Infrastructure</div><div class="b"><div class="irows">${rows.map(([k,v])=>`<div class="k">${esc(k)}</div><div class="v">${v}</div>`).join("")}</div>${D.osint?`<div class="dnote">Hosting, TLS and DNS come from external recon.</div>`:""}</div></div>`;
+}
+function shotCard(){
+  if(!D.screenshot)return "";
+  const hs=primaryFirst(),h=hs[0];
+  return `<div class="shotcard"><div class="sbar"><i></i><i></i><i></i><span>${esc(h?`${(h.schemes||["https"])[0]}://${h.label}/`:D.app)}</span></div><button class="simg" data-shot aria-label="Enlarge the screenshot"><img src="${esc(D.screenshot)}" alt="Screenshot of ${esc(h?h.label:D.app)}"></button></div>`;
+}
+function glance(){
+  const shot=shotCard(),a=infraCard(),b=stackCard();
+  if(!shot&&!a&&!b)return "";
+  return `<div class="band${shot?" shot":""}">${shot}${a}${b}</div>`;
+}
+
 function leadCard(p,i){
   const e=p.ep,l=p.sig[0],col=p.sev==="hot"?"var(--signal)":p.sev==="warn"?"var(--warn)":"var(--observed)";
   return `<div class="lead" style="--c:${col}"><span class="num">${i+1}</span><div>
@@ -306,6 +393,8 @@ function vOverview(){
     <button class="${hot||weakCookies.length?"hot":""}" data-goto="priorities"><div class="n">${PRIO.length+weakCookies.length}</div><div class="k">To check</div></button>
     <button data-goto="unknowns"><div class="n">${unk}</div><div class="k">Open questions</div></button></div></div>
 
+  ${glance()}
+
   <div class="ovg"><div>
     <div class="sech"><h2>Check these first</h2><span class="s">ranked leads to verify, not findings</span>${PRIO.length+weakCookies.length>5?`<button class="lnk" data-goto="priorities">All ${PRIO.length+weakCookies.length} →</button>`:""}</div>
     ${PRIO.slice(0,5).map(leadCard).join("")||'<div class="dc"><div class="b"><div class="empty">Nothing stands out in this capture.</div></div></div>'}
@@ -328,6 +417,10 @@ function vOverview(){
   <details class="more"><summary>More numbers <span>timeline, busiest endpoints, third parties, hosts</span></summary><div class="inner">${vMore()}</div></details>`;
 }
 function initOverview(){
+  $$("[data-ev]",$("#main")).forEach(b=>b.onclick=e=>{e.stopPropagation();openEv(b.dataset.ev);});
+  const sh=$("[data-shot]");
+  if(sh)sh.onclick=()=>{const d=document.createElement("div");d.className="lightbox";d.innerHTML=`<img src="${esc(D.screenshot)}" alt="Screenshot">`;d.onclick=()=>d.remove();document.body.append(d);};
+  addEventListener("keydown",function k(e){if(e.key==="Escape"){const l=$(".lightbox");if(l)l.remove();removeEventListener("keydown",k);}});
   $$("[data-lead-map]").forEach(b=>b.onclick=e=>{e.stopPropagation();MAPS.sel=b.dataset.leadMap;MAPS.path=null;if(MAPS.mode==="focus")MAPS.focusId=MAPS.sel;view="graph";render();});
 }
 /* one bar per request in capture order, coloured by status class; long captures are bucketed */

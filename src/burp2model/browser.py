@@ -381,6 +381,7 @@ class BrowserCrawler(Crawler):
                            "blocked_asset_cap": 0})
         self._deadline = time.monotonic() + (cfg.max_seconds if cfg.max_seconds else 10 ** 9)
         self._journey_active = False                     # a scripted step is deliberate: no "looks destructive" filter
+        self.screenshot: bytes | None = None
         self._scripts: list[tuple[str, str]] = []        # (url, text) of JS/HTML bodies, for the static pass
 
     # ------------------------------------------------------------ lifecycle --
@@ -392,6 +393,18 @@ class BrowserCrawler(Crawler):
         self.proc, url = launch_chrome(self.chrome, self.tmp, extra, headless=not self.cfg.headful)
         self.cdp = CDP(WebSocket(url))
         self.cdp.urgent = self._handle
+
+    def _capture(self) -> bytes | None:
+        """The page as it looks now: a JPEG of the viewport, small enough to embed."""
+        for quality in (72, 50):
+            try:
+                r = self._page("Page.captureScreenshot", {"format": "jpeg", "quality": quality}, 15)
+                data = base64.b64decode(r.get("data") or "")
+            except (RuntimeError, TimeoutError, ValueError):
+                return None
+            if data and len(data) <= 600_000:
+                return data
+        return None
 
     def _close(self) -> None:
         try:
@@ -788,7 +801,7 @@ class BrowserCrawler(Crawler):
                     self._settle(0.3, 3)
                     self._drain()
                     self._sync_cookies()
-                    return CrawlResult(self.items, self.stats, self.forms, self.scope)
+                    return CrawlResult(self.items, self.stats, self.forms, self.scope, self.screenshot)
             queue: deque = deque()
             start = cfg.start
             self.seen.add(("GET", self._key(start)))
@@ -810,6 +823,8 @@ class BrowserCrawler(Crawler):
                     if cfg.progress:
                         print(f"crawl: [{self.stats['requests']} req] {url}", file=sys.stderr)
                     self._harvest(depth, queue, url)
+                    if cfg.screenshot and self.screenshot is None:
+                        self.screenshot = self._capture()
                     todo.append((url, depth))
                     if not routes_done:
                         self._route_seeds(queue, depth + 1)
@@ -825,7 +840,7 @@ class BrowserCrawler(Crawler):
         finally:
             self._close()
         self._static_pass()
-        return CrawlResult(self.items, self.stats, self.forms, self.scope)
+        return CrawlResult(self.items, self.stats, self.forms, self.scope, self.screenshot)
 
     # ------------------------------------------------------------ journeys ---
     _KEYS = {"Enter": (13, "\r"), "Tab": (9, ""), "Escape": (27, ""), "ArrowDown": (40, ""),

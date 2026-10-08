@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from xml.etree.ElementTree import iterparse
 
 from .extract import MAX_SCAN_BYTES, extract_html_refs, extract_js_refs, extract_script_assets
+from .stack import detect as detect_stack
 from .redact import (
     SecretFingerprint,
     classify_segment,
@@ -80,6 +81,7 @@ class Exchange:
     tech: list[tuple[str, str]] = field(default_factory=list)
     js_refs: list[tuple] = field(default_factory=list)
     js_assets: list[tuple] = field(default_factory=list)      # source maps, workers a script names
+    stack: list[tuple] = field(default_factory=list)          # (name, category, how, version) the response shows
     scan_truncated: bool = False
     gql_ops: list[str] = field(default_factory=list)
     preflight: bool = False
@@ -111,6 +113,7 @@ class Exchange:
             "credentials": self.credentials, "tech": [list(t) for t in self.tech],
             "js_refs": [list(r) for r in self.js_refs],
             "js_assets": [list(r) for r in self.js_assets],
+            "stack": [list(r) for r in self.stack],
             "scan_truncated": self.scan_truncated, "gql_ops": self.gql_ops,
             "preflight": self.preflight, "ev": self.ev,
         }
@@ -132,6 +135,7 @@ class Exchange:
             tech=[tuple(t) for t in r.get("tech", [])],
             js_refs=[tuple(x) for x in r.get("js_refs", [])],
             js_assets=[tuple(x) for x in r.get("js_assets", [])],
+            stack=[tuple(x) for x in r.get("stack", [])],
             scan_truncated=r.get("scan_truncated", False),
             gql_ops=r.get("gql_ops", []), preflight=r.get("preflight", False),
             ev=r.get("ev", {}),
@@ -655,6 +659,7 @@ def _parse_item(elem, idx: int, role: str | None) -> Exchange | None:
     scan_truncated = (is_js or is_html) and (not resp_dec_ok or elem.find("truncated") is not None)
     js_refs: set = set()
     js_assets: set = set()
+    stack_text = ""
     if is_js or is_html:
         scan_b = resp_body_b
         if len(scan_b) > MAX_SCAN_BYTES:
@@ -665,9 +670,13 @@ def _parse_item(elem, idx: int, role: str | None) -> Exchange | None:
             hdr_map = next((v for k, v in resp_headers if k.lower() in ("sourcemap", "x-sourcemap")), None)
             js_assets = extract_script_assets(resp_full_r, host, ptemplate, hdr_map)
         resp_body_r = resp_full_r[:BODY_KEEP]
+        stack_text = resp_full_r
     else:
         resp_body_r, s6 = redact_body(resp_body_b[:BODY_KEEP * 5].decode("utf-8", "replace"))
         resp_body_r = resp_body_r[:BODY_KEEP]
+
+    stack = detect_stack({k.lower(): v for k, v in resp_headers},
+                         [c["name"] for c in set_cookies] + cookie_names, stack_text, red_path, is_js or is_html)
 
     for chunk in (s0, s1, s2, s3, s4, s5, s6):
         secrets.extend(chunk)
@@ -719,6 +728,7 @@ def _parse_item(elem, idx: int, role: str | None) -> Exchange | None:
         tech=tech_r,
         js_refs=sorted(js_refs, key=lambda r: (r[2], r[0] or "", r[1] or "", r[3])),
         js_assets=sorted(js_assets),
+        stack=stack,
         scan_truncated=scan_truncated,
         gql_ops=gql_ops,
         preflight=preflight,

@@ -45,6 +45,10 @@ By default, every host under the registrable domain of the busiest host is first
 
 Layer 3 also records workers (`new Worker`, `serviceWorker.register`, `importScripts`) as scripts linked by `SPAWNS` edges, and source maps (`sourceMappingURL`) as a `sourcemap` attribute on the script. If the `.map` file was not captured, the model raises `SOURCE_MAP_NOT_CAPTURED`.
 
+## Technology stack
+
+While parsing, burp2model reads what each response shows: `Server` and similar headers, cookie names, HTML and script markers, and the third-party hosts the app talks to. The result is a short list (edge or CDN, web server, language or framework, frontend, platform, services), each entry tied to the requests that showed it. These are hints from the capture, not a version scan. The report draws them as a stack map, and `context.json` carries them as `stack`.
+
 ## 4. OBSERVED vs INFERRED
 
 Every edge says how it is known.

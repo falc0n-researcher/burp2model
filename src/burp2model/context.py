@@ -486,6 +486,14 @@ def context_package(m: Model, lens: str = "attention", cap: int = 40,
                      "secure": n.attrs.get("secure"), "samesite": n.attrs.get("samesite")}
                     for n in nodes if n.type == "cookie"],
     }
+    stack = []
+    for t in m.stack[:cap]:
+        ids = t.get("evidence", [])[:2]
+        cited.update(ids)
+        stack.append({k: t[k] for k in ("name", "category") if t.get(k)}
+                     | ({"kind": t["kind"]} if t.get("kind") else {})
+                     | ({"version": t["version"]} if t.get("version") else {})
+                     | {"evidence": [f"ev_{i}" for i in ids]})
     top_secrets = sorted(m.secrets, key=lambda s: (-s["count"], s["kind"]))[:20]
     secrets = [{"kind": s["kind"], "length": s["length"], "entropy": s["entropy"],
                 "count": s["count"], "evidence": [f"ev_{i}" for i in s["evidence"][:3]]}
@@ -510,6 +518,7 @@ def context_package(m: Model, lens: str = "attention", cap: int = 40,
         "endpoints": [endpoint_view(n) for n in endpoints],
         "scripts": [{**simple_view(n), "references": refs_out.get(n.id, 0)} for n in scripts],
         "third_parties": [simple_view(n) for n in tps],
+        "stack": stack,
         "trust": trust,
         "secrets": secrets,
         "unknowns": [{"type": u.type,

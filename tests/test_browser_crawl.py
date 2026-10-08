@@ -118,6 +118,12 @@ def test_runs_the_app_and_records_its_real_xhr_traffic(full):
     assert res.stats["browser"] and res.stats["js_probes"] >= 1
 
 
+def test_the_start_page_is_captured_as_a_small_jpeg_when_asked(base):
+    res = crawl(base, browser="on", screenshot=True, no_interact=True, max_requests=30)
+    assert res.screenshot and res.screenshot[:3] == b"\xff\xd8\xff" and len(res.screenshot) < 600_000
+    assert crawl(base, browser="on", no_interact=True, max_requests=30).screenshot is None
+
+
 def test_clicks_reveal_menus_routes_and_buttons(full):
     _, log = full
     got = {(e["m"], e["p"].split("?")[0]) for e in log}

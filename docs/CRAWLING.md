@@ -24,6 +24,13 @@ Only crawl targets you are authorized to test.
 | never submits a form with a password field | types a password it was not given |
 | lets the app make its own in-scope requests | allows a non-GET under `--read-only` |
 
+## Screenshot
+
+An anonymous browser crawl also captures the start page and shows it on the report overview. A crawl that is
+signed in, or that runs a journey, does not, because a signed-in page can show someone's data and pixels are
+not masked. Use `--screenshot FILE` (on `build` or `crawl`) to attach your own PNG, JPEG or WebP, or
+`--no-screenshot` to skip the capture. The picture is saved as `screenshot.jpg` next to the report.
+
 ## Journeys
 
 A crawler cannot register, log in or check out on its own. A journey is a short JSON file that does, in the same browser session, before the crawl:

@@ -96,6 +96,8 @@ def test_overview_leads_with_what_to_check(page):
     assert page.js("document.querySelectorAll('.lead').length") >= 1
     assert page.js("document.querySelectorAll('.lead').length") <= 5          # a short list, not a wall
     assert page.js("!!document.querySelector('.donut')")
+    assert page.js("!!document.querySelector('.smap .tp')")                   # the technology stack map
+    assert "Inter" in page.js("getComputedStyle(document.body).fontFamily")      # the embedded fonts
     assert page.js("document.querySelector('.view').getBoundingClientRect().width") > 1000   # uses the full width
 
 

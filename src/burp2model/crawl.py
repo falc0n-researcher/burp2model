@@ -105,6 +105,7 @@ class CrawlConfig:
     journeys: list = field(default_factory=list)
     journey_vars: dict = field(default_factory=dict)
     journey_only: bool = False
+    screenshot: bool = False           # browser: capture the start page for the report
 
 
 @dataclass
@@ -125,6 +126,7 @@ class CrawlResult:
     stats: dict
     forms: list
     scope: list[str]
+    screenshot: bytes | None = None      # the start page, when a browser crawl took one
 
 
 class _Page(HTMLParser):

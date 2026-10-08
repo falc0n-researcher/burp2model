@@ -3167,5 +3167,80 @@
         "truncated": false
       }
     }
+  ],
+  "stack": [
+    {
+      "name": "Cloudflare",
+      "category": "Edge & CDN",
+      "kind": "",
+      "version": "",
+      "how": "header:server",
+      "evidence": [
+        9,
+        10
+      ]
+    },
+    {
+      "name": "Gunicorn",
+      "category": "Web server",
+      "kind": "",
+      "version": "21.2",
+      "how": "header:server",
+      "evidence": [
+        2,
+        3,
+        4,
+        5,
+        11,
+        12,
+        13,
+        14,
+        15,
+        17
+      ]
+    },
+    {
+      "name": "nginx",
+      "category": "Web server",
+      "kind": "",
+      "version": "1.24.0",
+      "how": "header:server",
+      "evidence": [
+        1,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "name": "Express",
+      "category": "Language & framework",
+      "kind": "",
+      "version": "",
+      "how": "header:x-powered-by",
+      "evidence": [
+        6
+      ]
+    },
+    {
+      "name": "GraphQL",
+      "category": "API",
+      "kind": "",
+      "version": "",
+      "how": "path",
+      "evidence": [
+        18
+      ]
+    },
+    {
+      "name": "Google Tag Manager",
+      "category": "Services",
+      "kind": "Analytics",
+      "version": "",
+      "how": "third-party host",
+      "evidence": [
+        22
+      ]
+    }
   ]
 }

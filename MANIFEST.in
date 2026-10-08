@@ -1,4 +1,4 @@
 include README.md LICENSE
 recursive-include samples *.xml
 recursive-include assets *.svg
-recursive-include src/burp2model/data *.dat
+recursive-include src/burp2model/data *.dat *.woff2 *.md

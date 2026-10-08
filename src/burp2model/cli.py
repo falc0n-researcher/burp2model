@@ -9,6 +9,7 @@ import re
 import sqlite3
 import sys
 
+from . import shot
 from . import __version__
 from .parse import Exchange, parse_items
 from .model import build, to_dict, from_dict, cross_role
@@ -209,6 +210,11 @@ def _build_from(args, exchanges: list, stats: dict) -> int:
               f"third-party. Check --scope.", file=sys.stderr)
     osint_path = os.path.join(outdir, "osint.json")
     osint_data = _collect_osint(args, m, osint_path)
+    try:
+        picture = _pick_screenshot(args, outdir)
+    except (OSError, ValueError) as e:
+        print(f"could not use the screenshot: {e}", file=sys.stderr)
+        return 2
 
     try:
         with open(os.path.join(outdir, "model.json"), "w", encoding="utf-8") as f:
@@ -216,7 +222,10 @@ def _build_from(args, exchanges: list, stats: dict) -> int:
         db_path = os.path.join(outdir, store.DB_NAME)
         dbs = store.write_db(m, db_path, osint=osint_data)
         write_html_report(m, os.path.join(outdir, "report.html"),
-                          osint=osint_data, lens=args.lens, db_path=db_path)
+                          osint=osint_data, lens=args.lens, db_path=db_path, screenshot=picture)
+        if picture:
+            with open(os.path.join(outdir, shot.filename(picture[0])), "wb") as f:
+                f.write(picture[1])
         write_svg(m, os.path.join(outdir, "build.svg"))
         with open(os.path.join(outdir, "context.json"), "w", encoding="utf-8") as f:
             # compact: this file is pasted into an AI, where indentation is tokens
@@ -253,6 +262,13 @@ def _build_from(args, exchanges: list, stats: dict) -> int:
           f"{dbs['exchanges']} requests · {dbs['external_nodes']} external (OSINT) nodes"
           f"  →  burp2model q {args.webapp} help")
     return 0
+
+
+def _pick_screenshot(args, outdir: str):
+    """A picture for the overview: the one given, else the crawl's, else one saved by an earlier build."""
+    if getattr(args, "screenshot", None):
+        return shot.load(args.screenshot)
+    return getattr(args, "_shot", None) or shot.existing(outdir)
 
 
 def _primary_host(m) -> str | None:
@@ -356,6 +372,13 @@ def cmd_q(args) -> int:
         conn.close()
 
 
+def _wants_screenshot(args, headers, cookies, journeys, local_storage) -> bool:
+    """Only a signed-out start page is captured on its own; a signed-in page may show someone's data."""
+    return not (args.no_screenshot or args.screenshot or args.auth_login or cookies or journeys
+                or local_storage or args.auth_storage
+                or any(k.lower() in ("authorization", "cookie") for k in headers))
+
+
 def cmd_crawl(args) -> int:
     from . import crawl as crawl_mod
     from .parse import parse_elements
@@ -429,7 +452,8 @@ def cmd_crawl(args) -> int:
             no_forms=args.no_forms, read_only=args.read_only, headful=args.headful,
             auth_storage=args.auth_storage, local_storage=local_storage,
             per_template_cap=args.per_template_cap, journeys=journeys, journey_vars=journey_vars,
-            journey_only=args.journey_only, max_assets=args.max_assets)
+            journey_only=args.journey_only, max_assets=args.max_assets,
+            screenshot=_wants_screenshot(args, headers, cookies, journeys, local_storage))
         crawler = crawl_mod.make_crawler(cfg)
     except ValueError as e:
         print(f"crawl: {e}", file=sys.stderr)
@@ -473,6 +497,7 @@ def cmd_crawl(args) -> int:
                   "unlike every burp2model output)", file=sys.stderr)
         except OSError as e:
             print(f"could not write {args.save_xml}: {e}", file=sys.stderr)
+    args._shot = ("image/jpeg", res.screenshot) if getattr(res, "screenshot", None) else None
     pstats: dict = {}
     exchanges = list(parse_elements(res.items, source="crawl", role=args.role, stats=pstats))
     if not exchanges:
@@ -935,6 +960,9 @@ def main(argv=None) -> int:
                    help="max items per section in context.json (default: 40)")
     b.add_argument("--out", default="burp2model-out",
                    help="output directory (default: burp2model-out)")
+    b.add_argument("--screenshot", metavar="FILE",
+                   help="a PNG, JPEG or WebP of the app to show on the report overview "
+                        "(pixels are not masked: check it first)")
     b.add_argument("--osint", action="store_true",
                    help="also run light external recon on the primary host (off by default; "
                         "sends DNS/TLS/HTTP requests; BURP2MODEL_OFFLINE=1 forces it off)")
@@ -1024,6 +1052,11 @@ def main(argv=None) -> int:
     cw.add_argument("--out", default="burp2model-out", help="output directory (default: burp2model-out)")
     cw.add_argument("--animate", action="store_true", help="play the build animation in the terminal")
     cw.add_argument("--no-type", action="store_true", help="animation: skip the typing effect")
+    cw.add_argument("--screenshot", metavar="FILE",
+                   help="a PNG, JPEG or WebP of the app to show on the report overview "
+                        "(pixels are not masked: check it first)")
+    cw.add_argument("--no-screenshot", action="store_true",
+                    help="do not capture the start page (an anonymous browser crawl does by default)")
     cw.add_argument("--osint", action="store_true",
                     help="also run light external recon on the primary host (off by default)")
     cw.add_argument("--osint-timeout", type=float, default=5.0, metavar="SEC")

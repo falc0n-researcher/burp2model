@@ -76,6 +76,7 @@ class Model:
         self.secrets: list[dict] = []
         self.scope: list[str] = []
         self.stats: dict = {}
+        self.stack: list[dict] = []
         self.evidence_log: list[dict] = []
         self._edge_index: dict[tuple, Edge] = {}
         self._secret_index: dict[tuple, dict] = {}
@@ -561,6 +562,7 @@ def build(exchanges: list[Exchange], name: str, seed_host: str | None = None,
             m.add_edge(src, eid, "REFERENCES", "INFERRED", i)
 
     _link_script_assets(m, exchanges)
+    m.stack = _build_stack(m, exchanges)
     _reconcile(m, referenced, runtime_seen)
     _emit_unknowns(m, exchanges)
     for n in m.nodes.values():
@@ -609,6 +611,40 @@ def _add_secret(m: Model, s: dict, idx: int) -> None:
     entry = {**s, "count": 1, "evidence": [idx]}
     m._secret_index[key] = entry
     m.secrets.append(entry)
+
+
+def _build_stack(m: Model, exchanges: list[Exchange]) -> list[dict]:
+    """The technologies the capture shows, each tied to the requests that showed it."""
+    from .stack import CATEGORIES, SERVICE_KIND, vendors_for
+    agg: dict[tuple[str, str], dict] = {}
+
+    def entry(name, cat, how, ver="", kind=""):
+        e = agg.setdefault((cat, name), {"name": name, "category": cat, "kind": kind,
+                                         "version": "", "how": how, "evidence": []})
+        if ver and not e["version"]:
+            e["version"] = ver
+        return e
+
+    for ex in exchanges:
+        if is_probe(ex) or not in_scope(ex.host, m.scope):
+            continue
+        for name, cat, how, ver in ex.stack:
+            e = entry(name, cat, how, ver, SERVICE_KIND.get(name, ""))
+            if ex.index not in e["evidence"] and len(e["evidence"]) < 10:
+                e["evidence"].append(ex.index)
+    tps = [n for n in m.nodes.values() if n.type == "third_party"]
+    by_host = {n.label: n for n in tps}
+    for vendor, kind, host in vendors_for(sorted(by_host)):
+        cat = "Edge & CDN" if kind == "Edge & CDN" else "Services"
+        e = entry(vendor, cat, "third-party host", "", "" if cat == "Edge & CDN" else kind)
+        for i in by_host[host].evidence[:10]:
+            if i not in e["evidence"] and len(e["evidence"]) < 10:
+                e["evidence"].append(i)
+    rank = {c: i for i, c in enumerate(CATEGORIES)}
+    out = sorted(agg.values(), key=lambda e: (rank.get(e["category"], 99), e["name"].lower()))
+    for e in out:
+        e["evidence"].sort()
+    return out
 
 
 def _link_script_assets(m: Model, exchanges: list[Exchange]) -> None:
@@ -800,6 +836,7 @@ def to_dict(m: Model) -> dict:
         "roles": sorted(m.roles),
         "secrets": m.secrets,
         "evidence": m.evidence_log,
+        "stack": m.stack,
     }
 
 
@@ -832,4 +869,5 @@ def from_dict(data: dict) -> Model:
     m.scope = data.get("scope", [])
     m.stats = data.get("stats", {})
     m.evidence_log = data.get("evidence", [])
+    m.stack = data.get("stack", [])
     return m
