@@ -4,8 +4,8 @@
 
 - **A network map.** Nodes are coloured icons (one per kind) on a dark canvas with arrowed links;
   select a node and its relationships are named on the edges (exposes, calls, references) while the
-  rest fades. Network is the default layout, with Cluster, Flow and Focus still available and a
-  light canvas option.
+  rest fades. Network is the default layout, with Cluster, Flow and Focus still available. The map
+  follows the report theme: a white canvas with deeper node colours in light, near-black in dark.
 
 - **One viewer everywhere.** Requests, To check, Ask and the new Reference page all open the same
   request and response viewer underneath the list. Scripts and pages are indented and coloured

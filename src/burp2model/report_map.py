@@ -35,7 +35,7 @@ MAP_CSS = r"""
 .mbtn{font:600 12px var(--sans);padding:5px 10px;border:1px solid var(--line2);border-radius:8px;background:var(--panel);color:var(--muted)}
 .mbtn:hover{color:var(--text)}
 .mbody{display:flex;flex:1;min-height:0}
-.mcv{position:relative;flex:1;min-width:0;background:radial-gradient(1200px 700px at 50% 40%,var(--panel2),var(--ink))}
+.mcv{position:relative;flex:1;min-width:0;background:radial-gradient(1200px 760px at 50% 42%,#ffffff,#edf0f5)}
 .mcv.dark{background:radial-gradient(1200px 760px at 50% 42%,#0d1118,#05070a)}
 .mcv.dark .mhud,.mcv.dark canvas.mini,.mcv.dark .mzoom button{background:#0e131a;border-color:#232b36;color:#98a4b3}
 .mcv.dark .mtip{background:#0e131a;border-color:#2a3340;color:#e8edf3}
@@ -108,13 +108,16 @@ function shapePath(shape,r){
 const ACCESS=new Set(["REACHED","SENT_CREDENTIAL"]);
 /* every kind of node has its own colour and glyph, so the picture reads without the legend */
 const TYPE_COL={host:"#8fa8cc",route:"#34d399",script:"#a78bfa",endpoint:"#4aa3ff",parameter:"#c4b5fd",operation:"#e879f9",third_party:"#22d3ee",auth:"#fbbf24",cookie:"#d6a85c",role:"#f472b6",tech:"#6ee7b7",infra:"#fb923c"};
-const typeCol=t=>TYPE_COL[t]||"#94a3b8";
+/* deeper tones on a light canvas so white glyphs stay readable */
+const TYPE_COL_LIGHT={host:"#5b7399",route:"#0f9d73",script:"#7c5cf0",endpoint:"#1d7fe0",parameter:"#8b7be0",operation:"#c026d3",third_party:"#0891b2",auth:"#d08400",cookie:"#a9742a",role:"#db2777",tech:"#16a34a",infra:"#ea580c"};
+const mapDark=()=>document.documentElement.getAttribute("data-theme")==="dark";
+const typeCol=t=>(mapDark()?TYPE_COL:TYPE_COL_LIGHT)[t]||"#94a3b8";
 const MAPS=(function(){
-  const base={mode:"net",dark:true,hidden:new Set((D.graph.nodes||[]).length>140?["param"]:[]),edgeOff:new Set((D.graph.edges||[]).length>300?["ACCESS"]:[]),sel:null,path:null,focusId:null};
-  try{const s=JSON.parse(localStorage.getItem("b2m-map2")||"null");if(s){base.mode=s.mode||base.mode;if(s.dark!=null)base.dark=!!s.dark;base.hidden=new Set(s.hidden||[...base.hidden]);base.edgeOff=new Set(s.edgeOff||[]);}}catch(e){}
+  const base={mode:"net",hidden:new Set((D.graph.nodes||[]).length>140?["param"]:[]),edgeOff:new Set((D.graph.edges||[]).length>300?["ACCESS"]:[]),sel:null,path:null,focusId:null};
+  try{const s=JSON.parse(localStorage.getItem("b2m-map2")||"null");if(s){base.mode=s.mode||base.mode;base.hidden=new Set(s.hidden||[...base.hidden]);base.edgeOff=new Set(s.edgeOff||[]);}}catch(e){}
   return base;
 })();
-function mapSave(){try{localStorage.setItem("b2m-map2",JSON.stringify({mode:MAPS.mode,dark:MAPS.dark,hidden:[...MAPS.hidden],edgeOff:[...MAPS.edgeOff]}));}catch(e){}}
+function mapSave(){try{localStorage.setItem("b2m-map2",JSON.stringify({mode:MAPS.mode,hidden:[...MAPS.hidden],edgeOff:[...MAPS.edgeOff]}));}catch(e){}}
 const ICON={host:"M4 6h16v5H4zM4 13h16v5H4z",route:"M5 4h9l5 5v11H5z",script:"M8 7l-5 5 5 5M16 7l5 5-5 5",endpoint:"M4 12h6m4 0h6M10 8l4 4-4 4",
   parameter:"M5 8h14M5 16h14",third_party:"M12 3l9 16H3z",auth:"M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z",cookie:"M12 3a9 9 0 1 0 9 9 4 4 0 0 1-4-4 4 4 0 0 1-5-5z",
   role:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",tech:"M12 3l8 4.5v9L12 21l-8-4.5v-9z",infra:"M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",operation:"M5 8h14M5 16h14"};
@@ -138,9 +141,9 @@ function vGraph(){
     <div class="msearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="msq" placeholder="Find a node…" autocomplete="off" spellcheck="false"><div class="msug" id="msug" hidden></div></div>
     <span style="flex:1"></span>
     <div class="mseg" id="mmode"><button data-mode="net" class="${MAPS.mode==="net"?"on":""}" title="Nodes and the links between them">Network</button><button data-mode="force" class="${MAPS.mode==="force"?"on":""}" title="Grouped by feature area">Cluster</button><button data-mode="flow" class="${MAPS.mode==="flow"?"on":""}" title="Layers left to right">Flow</button><button data-mode="focus" class="${MAPS.mode==="focus"?"on":""}" title="The selected node and what surrounds it">Focus</button></div>
-    <button class="mbtn" id="mdark" title="Dark or light canvas">${MAPS.dark?"Light canvas":"Dark canvas"}</button><button class="mbtn" id="mpng" title="Download the map as a PNG">PNG</button><div class="mchips" id="mlayers">${present.map(x=>`<button class="mchip${MAPS.hidden.has(x.cat.id)?" off":""}" data-layer="${x.cat.id}" title="Show or hide"><span class="sw" style="background:${x.cat.color}"></span>${esc(x.cat.short)} <span class="c">${x.n}</span></button>`).join("")}
+    <button class="mbtn" id="mpng" title="Download the map as a PNG">PNG</button><div class="mchips" id="mlayers">${present.map(x=>`<button class="mchip${MAPS.hidden.has(x.cat.id)?" off":""}" data-layer="${x.cat.id}" title="Show or hide"><span class="sw" style="background:${x.cat.color}"></span>${esc(x.cat.short)} <span class="c">${x.n}</span></button>`).join("")}
      <span class="div"></span>${states.map(s=>`<button class="mchip${MAPS.edgeOff.has(s)?" off":""}" data-es="${s}" title="Show or hide these edges"><span class="sw" style="background:none;border-top:2px ${s==="INFERRED"?"dashed":s==="EXTERNAL"?"dotted":"solid"} ${s==="INFERRED"?"var(--inferred)":s==="EXTERNAL"?"var(--l6)":s==="ACCESS"?"var(--faint)":"var(--observed)"};border-radius:0;height:0;margin-top:1px"></span>${SN[s]}</button>`).join("")}</div></div>
-   <div class="mbody"><div class="mcv${MAPS.dark?" dark":""}" id="mcv"><canvas class="main" id="mc"></canvas><canvas class="mini" id="mm" width="340" height="220"></canvas><div class="mhud" id="mhud"></div><div class="mtip" id="mtip"></div>
+   <div class="mbody"><div class="mcv${mapDark()?" dark":""}" id="mcv"><canvas class="main" id="mc"></canvas><canvas class="mini" id="mm" width="340" height="220"></canvas><div class="mhud" id="mhud"></div><div class="mtip" id="mtip"></div>
      <div class="mzoom"><button data-z="in" aria-label="Zoom in">+</button><button data-z="out" aria-label="Zoom out">−</button><button data-z="fit" aria-label="Fit" style="font-size:11px">Fit</button></div></div>
     <aside class="minsp" id="minsp"></aside></div></div>`;
 }
@@ -165,7 +168,7 @@ function initGraph(){
   const cs=getComputedStyle(document.documentElement);
   const col=v=>{const m=/^var\((--[\w-]+)\)$/.exec(v);return m?cs.getPropertyValue(m[1]).trim():v;};
   let C={},CV={};const readTheme=()=>{["text","muted","faint","line","line2","panel","panel2","ink","signal","observed","inferred","ok","warn","bad","l6"].forEach(k=>C[k]=cs.getPropertyValue("--"+k).trim());CAT.forEach(c=>c._c=col(c.color));
-    CV=MAPS.dark?{bg:"#06080c",edge:"#aeb6c4",lab:"#e8edf3",labm:"#a3adbb",halo:"#06080c",ghost:"#06080c",ring:"#ffffff"}:{bg:C.ink,edge:"#7c8794",lab:C.text,labm:C.muted,halo:C.ink,ghost:C.panel,ring:C.text};};
+    CV=mapDark()?{bg:"#06080c",edge:"#aeb6c4",lab:"#e8edf3",labm:"#a3adbb",halo:"#06080c",ghost:"#06080c",ring:"#ffffff"}:{bg:"#ffffff",edge:"#6b7685",lab:"#141924",labm:"#566170",halo:"#ffffff",ghost:"#ffffff",ring:"#141924"};if(wrap)wrap.classList.toggle("dark",mapDark());};
   readTheme();
   const themeObs=new MutationObserver(()=>{readTheme();dirty=true;});themeObs.observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
   const ICONP={};const iconPath=t=>ICONP[t]||(ICONP[t]=new Path2D(ICON[t]||ICON.endpoint));
@@ -452,7 +455,6 @@ function initGraph(){
   $$("[data-layer]").forEach(b=>b.onclick=()=>{const k=b.dataset.layer;MAPS.hidden.has(k)?MAPS.hidden.delete(k):MAPS.hidden.add(k);mapSave();MAPS.sel=MAPS.path=null;render();});
   $$("[data-es]").forEach(b=>b.onclick=()=>{const k=b.dataset.es;MAPS.edgeOff.has(k)?MAPS.edgeOff.delete(k):MAPS.edgeOff.add(k);mapSave();render();});
   $$("[data-mode]").forEach(b=>b.onclick=()=>{if(MAPS.mode!==b.dataset.mode){MAPS.mode=b.dataset.mode;if(MAPS.mode==="focus"&&MAPS.sel)MAPS.focusId=MAPS.sel;mapSave();render();}});
-  const dk=$("#mdark");if(dk)dk.onclick=()=>{MAPS.dark=!MAPS.dark;mapSave();render();};
   $("#mpng").onclick=()=>{const c=document.createElement("canvas");c.width=cv.width*2;c.height=cv.height*2;const x=c.getContext("2d");x.fillStyle=C.ink;x.fillRect(0,0,c.width,c.height);x.drawImage(cv,0,0,c.width,c.height);c.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=(D.app||"model")+".map.png";a.click();URL.revokeObjectURL(u);});};
   /* search with suggestions */
   const sq=$("#msq"),sg=$("#msug");let sgi=0,sgl=[];
