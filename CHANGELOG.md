@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A network map.** Nodes are coloured icons (one per kind) on a dark canvas with arrowed links;
+  select a node and its relationships are named on the edges (exposes, calls, references) while the
+  rest fades. Network is the default layout, with Cluster, Flow and Focus still available and a
+  light canvas option.
+
 - **One viewer everywhere.** Requests, To check, Ask and the new Reference page all open the same
   request and response viewer underneath the list. Scripts and pages are indented and coloured
   (the report now keeps 40 KB of each script and 20 KB of each page, up from 6 KB).

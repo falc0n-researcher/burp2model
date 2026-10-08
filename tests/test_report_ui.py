@@ -137,7 +137,7 @@ def test_one_ask_box_takes_plain_questions_and_bql(page):
 def test_map_draws_and_selects_a_node(page):
     page.js("location.hash='#graph'", wait=1.0)
     assert "nodes" in page.js("document.querySelector('#mhud').textContent")
-    for mode in ("flow", "focus", "force"):
+    for mode in ("flow", "focus", "force", "net"):
         page.js(f"document.querySelector('[data-mode={mode}]').click()", wait=0.8)
         assert "nodes" in page.js("document.querySelector('#mhud').textContent"), mode
     page.js("(()=>{const i=document.querySelector('#msq');i.value='checkout';i.dispatchEvent(new Event('input'));"

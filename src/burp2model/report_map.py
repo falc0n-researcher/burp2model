@@ -36,6 +36,9 @@ MAP_CSS = r"""
 .mbtn:hover{color:var(--text)}
 .mbody{display:flex;flex:1;min-height:0}
 .mcv{position:relative;flex:1;min-width:0;background:radial-gradient(1200px 700px at 50% 40%,var(--panel2),var(--ink))}
+.mcv.dark{background:radial-gradient(1200px 760px at 50% 42%,#0d1118,#05070a)}
+.mcv.dark .mhud,.mcv.dark canvas.mini,.mcv.dark .mzoom button{background:#0e131a;border-color:#232b36;color:#98a4b3}
+.mcv.dark .mtip{background:#0e131a;border-color:#2a3340;color:#e8edf3}
 .mcv canvas.main{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
 .mcv canvas.main.drag{cursor:grabbing}.mcv canvas.main.hit{cursor:pointer}
 .mcv canvas.mini{position:absolute;right:14px;bottom:14px;width:170px;height:110px;border:1px solid var(--line2);border-radius:10px;background:var(--panel);opacity:.94;cursor:pointer;box-shadow:var(--shadow)}
@@ -80,14 +83,14 @@ MAP_CSS = r"""
 MAP_JS = r"""
 /* ---------- MAP (canvas, deterministic layouts, inspector) ---------- */
 const CAT=[
-  {id:"infra",label:"Infrastructure",short:"Infra",types:["infra"],color:"var(--l6)",shape:"square"},
-  {id:"host",label:"Hosts",short:"Hosts",types:["host"],color:"var(--l1)",shape:"rsquare"},
-  {id:"tech",label:"Technology",short:"Tech",types:["tech"],color:"var(--l5)",shape:"hex"},
-  {id:"route",label:"Pages / routes",short:"Pages",types:["route"],color:"var(--l2)",shape:"circle"},
-  {id:"script",label:"Scripts",short:"Scripts",types:["script"],color:"var(--l3)",shape:"diamond"},
-  {id:"endpoint",label:"API endpoints",short:"Endpoints",types:["endpoint"],color:"var(--l4)",shape:"circle"},
-  {id:"param",label:"Parameters",short:"Params",types:["parameter","operation"],color:"var(--inferred)",shape:"dot"},
-  {id:"trust",label:"Trust & third parties",short:"Trust",types:["third_party","auth","cookie","role"],color:"var(--l5)",shape:"tri"},
+  {id:"infra",label:"Infrastructure",short:"Infra",types:["infra"],color:"#fb923c",shape:"square"},
+  {id:"host",label:"Hosts",short:"Hosts",types:["host"],color:"#8fa8cc",shape:"rsquare"},
+  {id:"tech",label:"Technology",short:"Tech",types:["tech"],color:"#6ee7b7",shape:"hex"},
+  {id:"route",label:"Pages / routes",short:"Pages",types:["route"],color:"#34d399",shape:"circle"},
+  {id:"script",label:"Scripts",short:"Scripts",types:["script"],color:"#a78bfa",shape:"diamond"},
+  {id:"endpoint",label:"API endpoints",short:"Endpoints",types:["endpoint"],color:"#4aa3ff",shape:"circle"},
+  {id:"param",label:"Parameters",short:"Params",types:["parameter","operation"],color:"#c4b5fd",shape:"dot"},
+  {id:"trust",label:"Trust & third parties",short:"Trust",types:["third_party","auth","cookie","role"],color:"#fbbf24",shape:"tri"},
 ];
 function catOf(t){for(let i=0;i<CAT.length;i++)if(CAT[i].types.includes(t))return i;return CAT.length-1;}
 function shapePath(shape,r){
@@ -103,12 +106,15 @@ function shapePath(shape,r){
   }
 }
 const ACCESS=new Set(["REACHED","SENT_CREDENTIAL"]);
+/* every kind of node has its own colour and glyph, so the picture reads without the legend */
+const TYPE_COL={host:"#8fa8cc",route:"#34d399",script:"#a78bfa",endpoint:"#4aa3ff",parameter:"#c4b5fd",operation:"#e879f9",third_party:"#22d3ee",auth:"#fbbf24",cookie:"#d6a85c",role:"#f472b6",tech:"#6ee7b7",infra:"#fb923c"};
+const typeCol=t=>TYPE_COL[t]||"#94a3b8";
 const MAPS=(function(){
-  const base={mode:"force",hidden:new Set((D.graph.nodes||[]).length>140?["param"]:[]),edgeOff:new Set((D.graph.edges||[]).length>300?["ACCESS"]:[]),sel:null,path:null,focusId:null};
-  try{const s=JSON.parse(localStorage.getItem("b2m-map2")||"null");if(s){base.mode=s.mode||base.mode;base.hidden=new Set(s.hidden||[...base.hidden]);base.edgeOff=new Set(s.edgeOff||[]);}}catch(e){}
+  const base={mode:"net",dark:true,hidden:new Set((D.graph.nodes||[]).length>140?["param"]:[]),edgeOff:new Set((D.graph.edges||[]).length>300?["ACCESS"]:[]),sel:null,path:null,focusId:null};
+  try{const s=JSON.parse(localStorage.getItem("b2m-map2")||"null");if(s){base.mode=s.mode||base.mode;if(s.dark!=null)base.dark=!!s.dark;base.hidden=new Set(s.hidden||[...base.hidden]);base.edgeOff=new Set(s.edgeOff||[]);}}catch(e){}
   return base;
 })();
-function mapSave(){try{localStorage.setItem("b2m-map2",JSON.stringify({mode:MAPS.mode,hidden:[...MAPS.hidden],edgeOff:[...MAPS.edgeOff]}));}catch(e){}}
+function mapSave(){try{localStorage.setItem("b2m-map2",JSON.stringify({mode:MAPS.mode,dark:MAPS.dark,hidden:[...MAPS.hidden],edgeOff:[...MAPS.edgeOff]}));}catch(e){}}
 const ICON={host:"M4 6h16v5H4zM4 13h16v5H4z",route:"M5 4h9l5 5v11H5z",script:"M8 7l-5 5 5 5M16 7l5 5-5 5",endpoint:"M4 12h6m4 0h6M10 8l4 4-4 4",
   parameter:"M5 8h14M5 16h14",third_party:"M12 3l9 16H3z",auth:"M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z",cookie:"M12 3a9 9 0 1 0 9 9 4 4 0 0 1-4-4 4 4 0 0 1-5-5z",
   role:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",tech:"M12 3l8 4.5v9L12 21l-8-4.5v-9z",infra:"M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",operation:"M5 8h14M5 16h14"};
@@ -131,10 +137,10 @@ function vGraph(){
   return `<div class="mapx" id="mapx" tabindex="-1"><div class="mtop"><h1>Map</h1>
     <div class="msearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="msq" placeholder="Find a node…" autocomplete="off" spellcheck="false"><div class="msug" id="msug" hidden></div></div>
     <span style="flex:1"></span>
-    <div class="mseg" id="mmode"><button data-mode="force" class="${MAPS.mode==="force"?"on":""}" title="Clusters by kind, springs along edges">Cluster</button><button data-mode="flow" class="${MAPS.mode==="flow"?"on":""}" title="Layers left to right">Flow</button><button data-mode="focus" class="${MAPS.mode==="focus"?"on":""}" title="The selected node and what surrounds it">Focus</button></div>
-    <button class="mbtn" id="mpng" title="Download the map as a PNG">PNG</button><div class="mchips" id="mlayers">${present.map(x=>`<button class="mchip${MAPS.hidden.has(x.cat.id)?" off":""}" data-layer="${x.cat.id}" title="Show or hide"><span class="sw" style="background:${x.cat.color}"></span>${esc(x.cat.short)} <span class="c">${x.n}</span></button>`).join("")}
+    <div class="mseg" id="mmode"><button data-mode="net" class="${MAPS.mode==="net"?"on":""}" title="Nodes and the links between them">Network</button><button data-mode="force" class="${MAPS.mode==="force"?"on":""}" title="Grouped by feature area">Cluster</button><button data-mode="flow" class="${MAPS.mode==="flow"?"on":""}" title="Layers left to right">Flow</button><button data-mode="focus" class="${MAPS.mode==="focus"?"on":""}" title="The selected node and what surrounds it">Focus</button></div>
+    <button class="mbtn" id="mdark" title="Dark or light canvas">${MAPS.dark?"Light canvas":"Dark canvas"}</button><button class="mbtn" id="mpng" title="Download the map as a PNG">PNG</button><div class="mchips" id="mlayers">${present.map(x=>`<button class="mchip${MAPS.hidden.has(x.cat.id)?" off":""}" data-layer="${x.cat.id}" title="Show or hide"><span class="sw" style="background:${x.cat.color}"></span>${esc(x.cat.short)} <span class="c">${x.n}</span></button>`).join("")}
      <span class="div"></span>${states.map(s=>`<button class="mchip${MAPS.edgeOff.has(s)?" off":""}" data-es="${s}" title="Show or hide these edges"><span class="sw" style="background:none;border-top:2px ${s==="INFERRED"?"dashed":s==="EXTERNAL"?"dotted":"solid"} ${s==="INFERRED"?"var(--inferred)":s==="EXTERNAL"?"var(--l6)":s==="ACCESS"?"var(--faint)":"var(--observed)"};border-radius:0;height:0;margin-top:1px"></span>${SN[s]}</button>`).join("")}</div></div>
-   <div class="mbody"><div class="mcv" id="mcv"><canvas class="main" id="mc"></canvas><canvas class="mini" id="mm" width="340" height="220"></canvas><div class="mhud" id="mhud"></div><div class="mtip" id="mtip"></div>
+   <div class="mbody"><div class="mcv${MAPS.dark?" dark":""}" id="mcv"><canvas class="main" id="mc"></canvas><canvas class="mini" id="mm" width="340" height="220"></canvas><div class="mhud" id="mhud"></div><div class="mtip" id="mtip"></div>
      <div class="mzoom"><button data-z="in" aria-label="Zoom in">+</button><button data-z="out" aria-label="Zoom out">−</button><button data-z="fit" aria-label="Fit" style="font-size:11px">Fit</button></div></div>
     <aside class="minsp" id="minsp"></aside></div></div>`;
 }
@@ -154,12 +160,15 @@ function initGraph(){
   nodes.forEach(n=>n.deg=0);edges.forEach(e=>{e.s.deg++;e.d.deg++;});
   const adj=new Map(nodes.map(n=>[n.id,[]]));edges.forEach(e=>{adj.get(e.s.id).push({n:e.d,e,out:true});adj.get(e.d.id).push({n:e.s,e,out:false});});
   const EPBY=Object.fromEntries(EP.map(e=>[e.id,e]));
-  const R=n=>(n.cat===1?9:n.cat===5?5:4.5)+Math.min(8,Math.sqrt(n.deg)*1.6);
+  const BASE_R={host:14,route:10,script:11,endpoint:9,parameter:6,operation:7,third_party:10,auth:9,cookie:9,role:10,tech:9,infra:9};
+  const R=n=>(BASE_R[n.type]||9)+Math.min(6,Math.sqrt(n.deg)*.8);
   const cs=getComputedStyle(document.documentElement);
   const col=v=>{const m=/^var\((--[\w-]+)\)$/.exec(v);return m?cs.getPropertyValue(m[1]).trim():v;};
-  let C={};const readTheme=()=>{["text","muted","faint","line","line2","panel","panel2","ink","signal","observed","inferred","ok","warn","bad","l6"].forEach(k=>C[k]=cs.getPropertyValue("--"+k).trim());CAT.forEach(c=>c._c=col(c.color));};
+  let C={},CV={};const readTheme=()=>{["text","muted","faint","line","line2","panel","panel2","ink","signal","observed","inferred","ok","warn","bad","l6"].forEach(k=>C[k]=cs.getPropertyValue("--"+k).trim());CAT.forEach(c=>c._c=col(c.color));
+    CV=MAPS.dark?{bg:"#06080c",edge:"#aeb6c4",lab:"#e8edf3",labm:"#a3adbb",halo:"#06080c",ghost:"#06080c",ring:"#ffffff"}:{bg:C.ink,edge:"#7c8794",lab:C.text,labm:C.muted,halo:C.ink,ghost:C.panel,ring:C.text};};
   readTheme();
   const themeObs=new MutationObserver(()=>{readTheme();dirty=true;});themeObs.observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+  const ICONP={};const iconPath=t=>ICONP[t]||(ICONP[t]=new Path2D(ICON[t]||ICON.endpoint));
   const pathCache={};const P2=(shape,r)=>{const k=shape+Math.round(r*2);return pathCache[k]||(pathCache[k]=new Path2D(shapePath(shape,Math.round(r*2)/2)));};
 
   /* ---- layouts (all deterministic) ---- */
@@ -174,37 +183,38 @@ function initGraph(){
     cols.forEach(ci=>{const nsub=Math.max(1,Math.ceil(by[ci].length/SUB)),off=(maxRows-Math.min(SUB,by[ci].length))*ROWH/2;
       by[ci].forEach((n,r)=>{n.tx=x+Math.floor(r/SUB)*COLW;n.ty=off+(r%SUB)*ROWH;});x+=nsub*COLW+60;});
   }
-  function layoutForce(){
+  function layoutForce(net){
+    const SP=net?1.1:1.5;
     /* every (kind, feature area) is a bubble. Bubbles are packed without overlap, grouped by kind around a ring,
        so the picture reads as neighbourhoods. Nodes then relax inside their bubble. */
     const groups=new Map();
     nodes.forEach(n=>{n.area=areaOf(n);const k=n.cat+"|"+(n.area||"");(groups.get(k)||groups.set(k,{cat:n.cat,name:n.area||CAT[n.cat].short,g:[]}).get(k)).g.push(n);});
     const bub=[...groups.values()].sort((x,y)=>x.cat-y.cat||y.g.length-x.g.length||x.name.localeCompare(y.name));
-    bub.forEach(b=>{b.r=16+9.5*Math.sqrt(b.g.length);});
+    bub.forEach(b=>{b.r=(16+9.5*Math.sqrt(b.g.length))*SP;});
     const regions=[];
     CAT.forEach((c,ci)=>{const bs=bub.filter(b=>b.cat===ci);if(!bs.length)return;
       const placed=[];
       bs.forEach((b,i)=>{
         if(!i){b.x=0;b.y=0;placed.push(b);return;}
         for(let rad=0,ang=0;;ang+=.55,rad+=.9){const x=Math.cos(ang)*rad*3.2,y=Math.sin(ang)*rad*3.2;
-          if(placed.every(q=>Math.hypot(q.x-x,q.y-y)>=q.r+b.r+34)){b.x=x;b.y=y;placed.push(b);break;}if(rad>4000){b.x=rad;b.y=0;placed.push(b);break;}}});
+          if(placed.every(q=>Math.hypot(q.x-x,q.y-y)>=q.r+b.r+34*SP)){b.x=x;b.y=y;placed.push(b);break;}if(rad>4000){b.x=rad;b.y=0;placed.push(b);break;}}});
       let mx=0,my=0;placed.forEach(b=>{mx+=b.x*b.g.length;my+=b.y*b.g.length;});const tot=placed.reduce((a,b)=>a+b.g.length,0);mx/=tot;my/=tot;
       placed.forEach(b=>{b.x-=mx;b.y-=my;});
       regions.push({ci,bs:placed,R:Math.max(...placed.map(b=>Math.hypot(b.x,b.y)+b.r))});});
     /* regions along a ring, spaced by their own size */
-    const need=regions.reduce((a,r)=>a+2*r.R+90,0),RING=Math.max(regions.length>1?need/(2*Math.PI):0,regions.length>1?Math.max(...regions.map(r=>r.R))+80:0);
+    const need=regions.reduce((a,r)=>a+2*r.R+90*SP,0),RING=Math.max(regions.length>1?need/(2*Math.PI):0,regions.length>1?Math.max(...regions.map(r=>r.R))+80*SP:0);
     let ang=-Math.PI/2;
-    regions.forEach(r=>{const share=(2*r.R+90)/Math.max(1,need)*2*Math.PI;ang+=share/2;
+    regions.forEach(r=>{const share=(2*r.R+90*SP)/Math.max(1,need)*2*Math.PI;ang+=share/2;
       const cx=regions.length>1?Math.cos(ang)*RING:0,cy=regions.length>1?Math.sin(ang)*RING*.82:0;ang+=share/2;
       r.bs.forEach(b=>{b.ax=cx+b.x;b.ay=cy+b.y;b.g.forEach(n=>{n.ax=b.ax;n.ay=b.ay;});});});
     MAPS.clusters=bub.filter(b=>b.g.length>=2||b.g[0].cat===1).map(b=>({g:b.g,name:b.name,cat:b.cat,r:b.r}));
     const cnt={};
     nodes.slice().sort((a,b)=>a.cat-b.cat||String(a.label).localeCompare(String(b.label))).forEach(n=>{
-      const k=n.ax+","+n.ay,i=cnt[k]=(cnt[k]||0)+1,a=i*2.399963,r=9*Math.sqrt(i);
+      const k=n.ax+","+n.ay,i=cnt[k]=(cnt[k]||0)+1,a=i*2.399963,r=9*SP*Math.sqrt(i);
       n.x=n.ax+Math.cos(a)*r;n.y=n.ay+Math.sin(a)*r;n.vx=n.vy=0;});
-    const sim={anchor:{},alpha:1};MAPS.sim=sim;
-    const steps=nodes.length>1500?60:nodes.length>600?140:240;
-    for(let i=0;i<steps;i++)tick(sim,true);
+    const sim=net?{net:true,alpha:1}:{anchor:{},alpha:1};MAPS.sim=sim;
+    const steps=nodes.length>1500?60:nodes.length>600?140:net?300:240;
+    for(let i=0;i<steps;i++)(net?tickNet:tick)(sim,true);
     nodes.forEach(n=>{n.tx=n.x;n.ty=n.y;});
     sim.alpha=0;
   }
@@ -223,6 +233,23 @@ function initGraph(){
       n.x+=n.vx;n.y+=n.vy;n.vx*=.58;n.vy*=.58;if(!isFinite(n.x)||!isFinite(n.y)){n.x=n.ax;n.y=n.ay;n.vx=n.vy=0;}});
     sim.alpha=pre?a*.985:a*.965;
   }
+  function layoutNet(){layoutForce(true);}
+  function tickNet(sim,pre){
+    const a=sim.alpha,N=nodes,CELL=150,grid=new Map();
+    N.forEach(n=>{const k=Math.floor(n.x/CELL)+","+Math.floor(n.y/CELL);(grid.get(k)||grid.set(k,[]).get(k)).push(n);});
+    N.forEach(n=>{const cx=Math.floor(n.x/CELL),cy=Math.floor(n.y/CELL);
+      for(let gx=cx-2;gx<=cx+2;gx++)for(let gy=cy-2;gy<=cy+2;gy++){const g=grid.get(gx+","+gy);if(!g)continue;
+        for(const m of g){if(m===n||m.id<n.id)continue;let dx=m.x-n.x,dy=m.y-n.y,d2=dx*dx+dy*dy;if(d2<.01){dx=(n.deg%7-3)*.1+.05;dy=(m.deg%5-2)*.1+.05;d2=dx*dx+dy*dy;}
+          if(d2>340*340)continue;const d=Math.sqrt(Math.max(d2,49)),f=(Math.min(45,6000/(d*d))+(d<R(n)+R(m)+26?6:0))*a,q=Math.sqrt(d2),fx=dx/q*f,fy=dy/q*f;n.vx-=fx;n.vy-=fy;m.vx+=fx;m.vy+=fy;}}});
+    edges.forEach(e=>{const dx=e.d.x-e.s.x,dy=e.d.y-e.s.y,d=Math.max(1,Math.sqrt(dx*dx+dy*dy)),hub=ACCESS.has(e.type)||Math.max(e.s.deg,e.d.deg)>24;
+      const rest=hub?240:e.type==="USES_PARAMETER"?60:125,k=hub?(ACCESS.has(e.type)?.004:0):.06,f=(d-rest)/d*k*a;
+      e.s.vx+=dx*f;e.s.vy+=dy*f;e.d.vx-=dx*f;e.d.vy-=dy*f;});
+    N.forEach(n=>{if(n.ax!=null){n.vx+=(n.ax-n.x)*.014*a;n.vy+=(n.ay-n.y)*.014*a;}else{n.vx-=n.x*.0025*a;n.vy-=n.y*.0025*a;}
+      if(n.fx!=null){n.x=n.fx;n.y=n.fy;n.vx=n.vy=0;return;}
+      const sp=Math.hypot(n.vx,n.vy);if(sp>30){n.vx*=30/sp;n.vy*=30/sp;}
+      n.x+=n.vx;n.y+=n.vy;n.vx*=.6;n.vy*=.6;if(!isFinite(n.x)||!isFinite(n.y)){n.x=n.y=0;n.vx=n.vy=0;}});
+    sim.alpha=pre?a*.988:a*.965;
+  }
   function layoutFocus(){
     const c=byId.get(MAPS.focusId||MAPS.sel)&&nset.has(MAPS.focusId||MAPS.sel)?byId.get(MAPS.focusId||MAPS.sel):nodes.filter(n=>(n.cat===3||n.cat===5)&&n.deg<60).sort((a,b)=>b.deg-a.deg||String(a.label).localeCompare(String(b.label)))[0]||nodes.slice().sort((a,b)=>b.deg-a.deg)[0];
     if(!c)return;MAPS.focusId=c.id;
@@ -239,11 +266,13 @@ function initGraph(){
   }
   function layout(){
     nodes.forEach(n=>{n.focusOut=false;});
-    if(MAPS.mode==="flow")layoutFlow();else if(MAPS.mode==="focus")layoutFocus();else layoutForce();
+    if(MAPS.mode==="flow")layoutFlow();else if(MAPS.mode==="focus")layoutFocus();else if(MAPS.mode==="force")layoutForce();else layoutNet();
   }
 
   /* ---- camera ---- */
   let W=1,H=1,dpr=window.devicePixelRatio||1,T={x:0,y:0,k:1},dirty=true,anim=null;
+  /* nodes keep a readable size when you zoom out, so the icons never shrink to dots */
+  const RS=n=>Math.max(R(n)*T.k,nodes.length>300?6:9);
   const resize=()=>{const r=wrap.getBoundingClientRect();W=Math.max(200,r.width);H=Math.max(200,r.height);dpr=window.devicePixelRatio||1;cv.width=W*dpr;cv.height=H*dpr;dirty=true;};
   const bounds=()=>{let a=1e9,b=1e9,c2=-1e9,d=-1e9;const list=MAPS.mode==="focus"?nodes.filter(n=>!n.focusOut):nodes;list.forEach(n=>{a=Math.min(a,n.tx);b=Math.min(b,n.ty);c2=Math.max(c2,n.tx);d=Math.max(d,n.ty);});return list.length?{x0:a,y0:b,x1:c2,y1:d}:{x0:-100,y0:-100,x1:100,y1:100};};
   function fit(animate){
@@ -279,8 +308,9 @@ function initGraph(){
     const focusId=hover||MAPS.sel,fs=pathSet||(focusId?nbrSet(focusId):null);
     const dimmed=(id)=>(hl&&!hl.has(id))||(fs&&!fs.has(id)&&!hl)||(MAPS.mode==="focus"&&byId.get(id).focusOut&&!hl);
     const sx=n=>n.x*T.k+T.x,sy=n=>n.y*T.k+T.y;
-    /* edges */
-    const vx0=-40,vy0=-40,vx1=W+40,vy1=H+40;
+    /* edges: thin lines with arrowheads; the busiest hubs' links fade so the rest can be read */
+    const vx0=-40,vy0=-40,vx1=W+40,vy1=H+40,labelEdges=[];
+    ctx.lineCap="round";
     for(const pass of [0,1]){
       for(const e of edges){
         const hi=pathEdges?pathEdges.has(e.s.id+">"+e.d.id):(focusId&&(e.s.id===focusId||e.d.id===focusId));
@@ -288,19 +318,23 @@ function initGraph(){
         const ax=sx(e.s),ay=sy(e.s),bx=sx(e.d),by=sy(e.d);
         if((ax<vx0&&bx<vx0)||(ax>vx1&&bx>vx1)||(ay<vy0&&by<vy0)||(ay>vy1&&by>vy1))continue;
         const dim=!hi&&(dimmed(e.s.id)||dimmed(e.d.id));
-        const base=e.state==="INFERRED"?C.inferred:e.state==="EXTERNAL"?C.l6:C.observed;
-        ctx.globalAlpha=hi?1:dim?.04:Math.max(.035,(e.state==="OBSERVED"?.38:.42)*Math.pow(Math.min(1,3.2/Math.sqrt(Math.max(e.s.deg,e.d.deg))),1.5));
-        ctx.strokeStyle=hi?(pathEdges?C.signal:base):base;ctx.lineWidth=hi?(pathEdges?2.6:1.9):1;
-        ctx.setLineDash(e.state==="INFERRED"?[5,4]:e.state==="EXTERNAL"?[1.5,4]:hi?[7,5]:[]);
-        if(hi)ctx.lineDashOffset=-dash;else ctx.lineDashOffset=0;
+        const base=e.state==="INFERRED"?"#a78bfa":e.state==="EXTERNAL"?"#fb923c":CV.edge;
+        const hubby=Math.pow(Math.min(1,3.2/Math.sqrt(Math.max(e.s.deg,e.d.deg))),1.4);
+        ctx.globalAlpha=hi?1:dim?.04:Math.max(.05,(MAPS.mode==="net"?.62:.4)*hubby);
+        ctx.strokeStyle=hi?(pathEdges?C.signal:base):base;ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=hi?(pathEdges?2.6:1.7):1;
+        ctx.setLineDash(e.state==="INFERRED"?[5,4]:e.state==="EXTERNAL"?[1.5,4]:hi&&pathEdges?[7,5]:[]);
+        ctx.lineDashOffset=hi&&pathEdges?-dash:0;
+        const rs=RS(e.s),rd=RS(e.d);
         ctx.beginPath();
-        if(MAPS.mode==="flow"){const sg=bx>=ax?1:-1,dx=Math.max(30,Math.abs(bx-ax)*.4);ctx.moveTo(ax,ay);ctx.bezierCurveTo(ax+sg*dx,ay,bx-sg*dx,by,bx,by);}
-        else{const mx=(ax+bx)/2,my=(ay+by)/2,nx=-(by-ay)*.09,ny=(bx-ax)*.09;ctx.moveTo(ax,ay);ctx.quadraticCurveTo(mx+nx,my+ny,bx,by);}
+        let ex=bx,ey=by,ang;
+        if(MAPS.mode==="flow"){const sg=bx>=ax?1:-1,dx=Math.max(30,Math.abs(bx-ax)*.4);ctx.moveTo(ax,ay);ctx.bezierCurveTo(ax+sg*dx,ay,bx-sg*dx,by,bx,by);ang=Math.atan2(by-ay,bx-ax);ex=bx-Math.cos(ang)*rd;ey=by-Math.sin(ang)*rd;}
+        else{ang=Math.atan2(by-ay,bx-ax);const len=Math.hypot(bx-ax,by-ay);
+          if(len<=rs+rd+2){continue;}
+          const x0=ax+Math.cos(ang)*rs,y0=ay+Math.sin(ang)*rs;ex=bx-Math.cos(ang)*(rd+1.5);ey=by-Math.sin(ang)*(rd+1.5);
+          ctx.moveTo(x0,y0);ctx.lineTo(ex,ey);}
         ctx.stroke();
-        if(hi||T.k>1.4){ /* direction */
-          const ang=Math.atan2(by-ay,bx-ax),rr=R(e.d)*T.k+3;
-          if(Math.hypot(bx-ax,by-ay)>rr*2.5){const px=bx-Math.cos(ang)*rr,py=by-Math.sin(ang)*rr;ctx.setLineDash([]);ctx.fillStyle=ctx.strokeStyle;
-            ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px-Math.cos(ang-.45)*8,py-Math.sin(ang-.45)*8);ctx.lineTo(px-Math.cos(ang+.45)*8,py-Math.sin(ang+.45)*8);ctx.closePath();ctx.fill();}}
+        if(Math.hypot(bx-ax,by-ay)>rs+rd+14&&(hi||T.k>.45)){const hs=hi?9:6.5;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-Math.cos(ang-.38)*hs,ey-Math.sin(ang-.38)*hs);ctx.lineTo(ex-Math.cos(ang+.38)*hs,ey-Math.sin(ang+.38)*hs);ctx.closePath();ctx.fill();}
+        if(hi||(T.k>=1.7&&hubby>.55&&Math.hypot(bx-ax,by-ay)>150))labelEdges.push({ax,ay,bx,by,t:humanize(e.type).toLowerCase(),hi,dim});
       }
     }
     ctx.setLineDash([]);ctx.globalAlpha=1;
@@ -324,31 +358,37 @@ function initGraph(){
     const labels=[];
     for(const n of order){
       const x=sx(n),y=sy(n);if(x<-30||y<-30||x>W+30||y>H+30)continue;
-      const r=R(n)*T.k,dim=dimmed(n.id),isSel=MAPS.sel===n.id,isHov=hover===n.id,match=hl&&hl.has(n.id);
-      const cat=CAT[n.cat],ep=EPBY[n.id],ghost=ep&&ep.state==="STATIC_ONLY";
-      ctx.globalAlpha=dim?.14:1;
+      const r=RS(n),dim=dimmed(n.id),isSel=MAPS.sel===n.id,isHov=hover===n.id,match=hl&&hl.has(n.id);
+      const cat=CAT[n.cat],ep=EPBY[n.id],ghost=ep&&ep.state==="STATIC_ONLY",colr=typeCol(n.type);
+      ctx.globalAlpha=dim?.16:1;
       ctx.save();ctx.translate(x,y);
-      if(isSel||isHov||match){ctx.beginPath();ctx.arc(0,0,r*1.15+7,0,7);ctx.fillStyle=cat._c;ctx.globalAlpha=(dim?.14:1)*.22;ctx.fill();ctx.globalAlpha=dim?.14:1;}
-      const p=P2(cat.shape,Math.max(2.5,r));
-      if(ghost){ctx.fillStyle=C.panel;ctx.fill(p);ctx.setLineDash([3,2.5]);ctx.lineWidth=1.8;ctx.strokeStyle=C.signal;ctx.stroke(p);ctx.setLineDash([]);}
-      else{ctx.fillStyle=cat._c;ctx.fill(p);ctx.lineWidth=isSel?3:1.6;ctx.strokeStyle=isSel||match?C.signal:C.panel;ctx.stroke(p);}
-      if(ep&&ep.privileged&&!ghost){ctx.beginPath();ctx.arc(r*.9,-r*.9,Math.max(2.2,r*.32),0,7);ctx.fillStyle=C.signal;ctx.fill();}
+      if(isSel||isHov||match){ctx.beginPath();ctx.arc(0,0,r+7,0,7);ctx.fillStyle=colr;ctx.globalAlpha=(dim?.16:1)*.25;ctx.fill();ctx.globalAlpha=dim?.16:1;}
+      ctx.beginPath();ctx.arc(0,0,Math.max(2.5,r),0,7);
+      if(ghost){ctx.fillStyle=CV.ghost;ctx.fill();ctx.setLineDash([3.5,3]);ctx.lineWidth=2;ctx.strokeStyle=C.signal;ctx.stroke();ctx.setLineDash([]);}
+      else{ctx.fillStyle=colr;ctx.fill();if(isSel||match){ctx.lineWidth=3;ctx.strokeStyle=isSel?CV.ring:C.signal;ctx.stroke();}}
+      if(r>=6.5){const s=r*1.12/12;ctx.save();ctx.scale(s,s);ctx.translate(-12,-12);ctx.lineWidth=2.1/ (s>1?1:1);ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle=ghost?colr:"#ffffff";ctx.stroke(iconPath(n.type));ctx.restore();}
+      if(ep&&ep.privileged&&!ghost){ctx.beginPath();ctx.arc(r*.75,-r*.75,Math.max(2.6,r*.28),0,7);ctx.fillStyle=C.signal;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle=CV.bg;ctx.stroke();}
       ctx.restore();
       if(!dim||match)labels.push({n,x,y,r,pri:(isSel?1e6:isHov?9e5:match?8e5:fs&&fs.has(n.id)?5e5:0)+n.deg});
     }
     ctx.globalAlpha=1;
+    /* relationship names along the edges */
+    ctx.font="10px Inter,system-ui,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+    for(const L of labelEdges){if(L.dim)continue;const mx=(L.ax+L.bx)/2,my=(L.ay+L.by)/2;let a=Math.atan2(L.by-L.ay,L.bx-L.ax);if(a>Math.PI/2||a<-Math.PI/2)a+=Math.PI;
+      ctx.save();ctx.translate(mx,my);ctx.rotate(a);ctx.lineWidth=3;ctx.strokeStyle=CV.halo;ctx.lineJoin="round";ctx.strokeText(L.t,0,-6);ctx.fillStyle=L.hi?CV.lab:CV.labm;ctx.globalAlpha=L.hi?1:.8;ctx.fillText(L.t,0,-6);ctx.restore();}
+    ctx.textAlign="start";ctx.globalAlpha=1;
     /* labels: busiest first, never overlapping */
     labels.sort((a,b)=>b.pri-a.pri);
-    const placed=[],showAll=T.k>=(MAPS.mode==="flow"?.42:1.05),hubCut=Math.max(4,nodes.map(n=>n.deg).sort((a,b)=>b-a)[Math.floor(nodes.length*.08)]||4);
+    const placed=[],showAll=T.k>=(MAPS.mode==="flow"?.42:MAPS.mode==="net"?.8:1.05),hubCut=Math.max(4,nodes.map(n=>n.deg).sort((a,b)=>b-a)[Math.floor(nodes.length*.08)]||4);
     ctx.font=`${T.k>2?12:11}px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace`;ctx.textBaseline="middle";
     for(const L of labels){
       const force=L.pri>=1e5;if(!force&&!showAll&&L.n.deg<hubCut)continue;
       let t=String(L.n.label||"");if(t.length>(force?60:30))t=t.slice(0,(force?59:29))+"…";
-      const w=ctx.measureText(t).width,x0=L.x+L.r+5,y0=L.y-7,box=[x0-2,y0,x0+w+2,y0+14];
+      const w=ctx.measureText(t).width,x0=L.x-w/2,ly=L.y+L.r+11,y0=ly-7,box=[x0-2,y0,x0+w+2,y0+14];
       if(!force&&placed.some(b=>!(box[2]<b[0]||box[0]>b[2]||box[3]<b[1]||box[1]>b[3])))continue;
       placed.push(box);
-      ctx.lineWidth=3.5;ctx.strokeStyle=C.ink;ctx.lineJoin="round";ctx.strokeText(t,x0,L.y);
-      ctx.fillStyle=L.pri>=5e5?C.text:C.muted;ctx.fillText(t,x0,L.y);
+      ctx.lineWidth=3.5;ctx.strokeStyle=CV.halo;ctx.lineJoin="round";ctx.strokeText(t,x0,ly);
+      ctx.fillStyle=L.pri>=5e5?CV.lab:CV.labm;ctx.fillText(t,x0,ly);
     }
     $("#mhud").textContent=`${nodes.length} nodes · ${edges.length} edges · ${Math.round(T.k*100)}%`;
     drawMini();
@@ -357,7 +397,7 @@ function initGraph(){
     const mw=mini.width,mh=mini.height;mctx.clearRect(0,0,mw,mh);
     const b=bounds(),pad=14,sw=Math.max(1,b.x1-b.x0),sh=Math.max(1,b.y1-b.y0),k=Math.min((mw-pad*2)/sw,(mh-pad*2)/sh);
     const ox=(mw-sw*k)/2-b.x0*k,oy=(mh-sh*k)/2-b.y0*k;mini._m={k,ox,oy};
-    nodes.forEach(n=>{mctx.fillStyle=CAT[n.cat]._c;mctx.globalAlpha=.85;mctx.fillRect(n.tx*k+ox-1.5,n.ty*k+oy-1.5,3,3);});
+    nodes.forEach(n=>{mctx.fillStyle=typeCol(n.type);mctx.globalAlpha=.85;mctx.fillRect(n.tx*k+ox-1.5,n.ty*k+oy-1.5,3,3);});
     mctx.globalAlpha=1;
     const a=toWorld(0,0),c2=toWorld(W,H);
     mctx.strokeStyle=C.signal;mctx.lineWidth=2;mctx.strokeRect(a.x*k+ox,a.y*k+oy,(c2.x-a.x)*k,(c2.y-a.y)*k);
@@ -367,7 +407,7 @@ function initGraph(){
     if(!document.body.contains(cv)){themeObs.disconnect();return;}
     let moving=false;
     if(anim){const t=Math.min(1,(now-anim.t0)/anim.dur),e=1-Math.pow(1-t,3);T={k:anim.from.k+(anim.to.k-anim.from.k)*e,x:anim.from.x+(anim.to.x-anim.from.x)*e,y:anim.from.y+(anim.to.y-anim.from.y)*e};if(t>=1)anim=null;moving=true;}
-    if(MAPS.sim&&MAPS.sim.alpha>.02){tick(MAPS.sim,false);nodes.forEach(n=>{n.tx=n.x;n.ty=n.y;});moving=true;}
+    if(MAPS.sim&&MAPS.sim.alpha>.02){(MAPS.sim.net?tickNet:tick)(MAPS.sim,false);nodes.forEach(n=>{n.tx=n.x;n.ty=n.y;});moving=true;}
     else for(const n of nodes){if(n.fx!=null)continue;const dx=n.tx-n.x,dy=n.ty-n.y;if(Math.abs(dx)>.15||Math.abs(dy)>.15){n.x+=dx*.22;n.y+=dy*.22;moving=true;}else{n.x=n.tx;n.y=n.ty;}}
     const animating=!!(pathEdges||MAPS.sel||hover);
     if(animating){dash=(dash+.35)%24;}
@@ -378,7 +418,7 @@ function initGraph(){
   /* ---- picking and interaction ---- */
   function pick(px,py){
     let best=null,bd=1e9;
-    for(const n of nodes){if(MAPS.mode==="focus"&&n.focusOut)continue;const dx=n.x*T.k+T.x-px,dy=n.y*T.k+T.y-py,d=dx*dx+dy*dy,r=Math.max(7,R(n)*T.k+3);if(d<r*r&&d<bd){bd=d;best=n;}}
+    for(const n of nodes){if(MAPS.mode==="focus"&&n.focusOut)continue;const dx=n.x*T.k+T.x-px,dy=n.y*T.k+T.y-py,d=dx*dx+dy*dy,r=RS(n)+3;if(d<r*r&&d<bd){bd=d;best=n;}}
     return best;
   }
   let down=null,dragN=null,moved=false;
@@ -387,7 +427,7 @@ function initGraph(){
     if(n){dragN=n;}else cv.classList.add("drag");});
   cv.addEventListener("pointermove",ev=>{const r=cv.getBoundingClientRect(),px=ev.clientX-r.left,py=ev.clientY-r.top;
     if(down){const dx=px-down.px,dy=py-down.py;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
-      if(dragN&&moved){const w=toWorld(px,py);dragN.x=dragN.tx=w.x;dragN.y=dragN.ty=w.y;if(MAPS.mode==="force"&&MAPS.sim){dragN.fx=w.x;dragN.fy=w.y;MAPS.sim.alpha=Math.max(MAPS.sim.alpha,.25);}dirty=true;}
+      if(dragN&&moved){const w=toWorld(px,py);dragN.x=dragN.tx=w.x;dragN.y=dragN.ty=w.y;if((MAPS.mode==="force"||MAPS.mode==="net")&&MAPS.sim){dragN.fx=w.x;dragN.fy=w.y;MAPS.sim.alpha=Math.max(MAPS.sim.alpha,.25);}dirty=true;}
       else if(!dragN&&moved){T.x=down.tx+dx;T.y=down.ty+dy;dirty=true;}
       return;}
     const n=pick(px,py);if((n&&n.id)!==hover){hover=n?n.id:null;dirty=true;cv.classList.toggle("hit",!!n);}
@@ -412,6 +452,7 @@ function initGraph(){
   $$("[data-layer]").forEach(b=>b.onclick=()=>{const k=b.dataset.layer;MAPS.hidden.has(k)?MAPS.hidden.delete(k):MAPS.hidden.add(k);mapSave();MAPS.sel=MAPS.path=null;render();});
   $$("[data-es]").forEach(b=>b.onclick=()=>{const k=b.dataset.es;MAPS.edgeOff.has(k)?MAPS.edgeOff.delete(k):MAPS.edgeOff.add(k);mapSave();render();});
   $$("[data-mode]").forEach(b=>b.onclick=()=>{if(MAPS.mode!==b.dataset.mode){MAPS.mode=b.dataset.mode;if(MAPS.mode==="focus"&&MAPS.sel)MAPS.focusId=MAPS.sel;mapSave();render();}});
+  const dk=$("#mdark");if(dk)dk.onclick=()=>{MAPS.dark=!MAPS.dark;mapSave();render();};
   $("#mpng").onclick=()=>{const c=document.createElement("canvas");c.width=cv.width*2;c.height=cv.height*2;const x=c.getContext("2d");x.fillStyle=C.ink;x.fillRect(0,0,c.width,c.height);x.drawImage(cv,0,0,c.width,c.height);c.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=(D.app||"model")+".map.png";a.click();URL.revokeObjectURL(u);});};
   /* search with suggestions */
   const sq=$("#msq"),sg=$("#msug");let sgi=0,sgl=[];
@@ -454,7 +495,7 @@ function initGraph(){
     $$("[data-pick]",el).forEach(r=>r.onclick=()=>choose(byId.get(r.dataset.pick)));
     const f=$("#nfocus");if(f)f.onclick=()=>{MAPS.mode="focus";MAPS.focusId=n.id;mapSave();render();};
     const d=$("#ndet");if(d)d.onclick=()=>openNode(n.id);
-    const r=$("#nreach");if(r)r.onclick=()=>{if(BQLDB){qRun(`reach "${n.label.replace(/"/g,'\\"')}"`);view="query";render();}};
+    const r=$("#nreach");if(r)r.onclick=()=>{if(BQLDB){qRun(`reach "${n.label.replace(/"/g,'\\"')}"`);aNL=null;view="ask";render();}};
     const iv=$("#ninv");if(iv)iv.onclick=()=>{INV.node=invKey(n);INV.q="";INV.sel=null;view="inventory";render();};
   }
 
