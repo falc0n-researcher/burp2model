@@ -5,13 +5,12 @@ Skipped when no Chrome/Chromium is installed (the same rule as the browser-crawl
 
 import json
 import os
-import subprocess
 import tempfile
 import time
 
 import pytest
 
-from burp2model.browser import CDP, WebSocket, find_chrome
+from burp2model.browser import CDP, WebSocket, find_chrome, launch_chrome
 from burp2model.cli import main
 
 pytestmark = pytest.mark.skipif(find_chrome() is None, reason="no Chrome/Chromium installed")
@@ -26,19 +25,9 @@ class Page:
 
     def __init__(self, report):
         self.tmp = tempfile.mkdtemp(prefix="b2m-ui-")
-        args = [find_chrome(), "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars",
-                "--window-size=1400,900", "--remote-debugging-port=0", f"--user-data-dir={self.tmp}",
-                "--allow-file-access-from-files", "about:blank"]
-        if os.environ.get("BURP2MODEL_CHROME_NO_SANDBOX") == "1" or (hasattr(os, "geteuid") and os.geteuid() == 0):
-            args.append("--no-sandbox")
-        self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        port_file = os.path.join(self.tmp, "DevToolsActivePort")
-        for _ in range(150):
-            if os.path.exists(port_file) and len(open(port_file).read().split("\n")) >= 2:
-                break
-            time.sleep(0.1)
-        port, path = open(port_file).read().split("\n")[:2]
-        self.cdp = CDP(WebSocket(f"ws://127.0.0.1:{port}{path}"))
+        self.proc, url = launch_chrome(find_chrome(), self.tmp,
+                                       ["--window-size=1400,900", "--allow-file-access-from-files"])
+        self.cdp = CDP(WebSocket(url))
         tid = self.cdp.call("Target.createTarget", {"url": "about:blank"})["targetId"]
         self.session = self.cdp.call("Target.attachToTarget", {"targetId": tid, "flatten": True})["sessionId"]
         self.errors = []

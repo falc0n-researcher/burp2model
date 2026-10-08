@@ -70,6 +70,46 @@ def find_chrome(explicit: str | None = None) -> str | None:
 
 # ------------------------------------------------------------- WebSocket -----
 
+def launch_chrome(chrome: str, tmp: str, extra: list[str] | None = None, headless: bool = True,
+                  attempts: int = 3):
+    """Start Chrome with DevTools on a free port; return (process, websocket url).
+
+    A cold Chrome on a busy CI runner sometimes exits or never opens its port, so a failed start is
+    retried before giving up."""
+    args = [chrome, "--no-first-run", "--no-default-browser-check", "--disable-gpu",
+            "--disable-extensions", "--disable-background-networking", "--disable-sync", "--mute-audio",
+            "--disable-dev-shm-usage", "--hide-scrollbars", "--remote-debugging-port=0",
+            f"--user-data-dir={tmp}", "--disable-features=Translate,MediaRouter", "--disable-component-update"]
+    if headless:
+        args.insert(1, "--headless=new")
+    if (hasattr(os, "geteuid") and os.geteuid() == 0) or os.environ.get("BURP2MODEL_CHROME_NO_SANDBOX") == "1":
+        args.append("--no-sandbox")        # containers and CI runners that cannot create a sandbox
+    args += extra or []
+    args.append("about:blank")
+    port_file = os.path.join(tmp, "DevToolsActivePort")
+    last = "the browser did not open its DevTools port"
+    for _ in range(attempts):
+        if os.path.exists(port_file):
+            os.remove(port_file)
+        proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(200):
+            if os.path.exists(port_file):
+                lines = open(port_file).read().split("\n")
+                if len(lines) >= 2 and lines[1]:
+                    return proc, f"ws://127.0.0.1:{lines[0].strip()}{lines[1].strip()}"
+            if proc.poll() is not None:
+                last = "the browser exited during start-up"
+                break
+            time.sleep(0.1)
+        if proc.poll() is None:
+            proc.kill()
+        try:
+            proc.wait(5)
+        except subprocess.TimeoutExpired:
+            pass
+    raise RuntimeError(last)
+
+
 class WebSocket:
     """A minimal RFC 6455 client: text frames, fragments, ping/pong, close."""
 
@@ -346,32 +386,11 @@ class BrowserCrawler(Crawler):
     # ------------------------------------------------------------ lifecycle --
     def _launch(self) -> None:
         self.tmp = tempfile.mkdtemp(prefix="b2m-chrome-")
-        args = [self.chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
-                "--disable-extensions", "--disable-background-networking", "--disable-sync", "--mute-audio",
-                "--disable-dev-shm-usage", "--hide-scrollbars", "--window-size=1366,900",
-                "--remote-debugging-port=0", f"--user-data-dir={self.tmp}", "--disable-popup-blocking",
-                "--disable-features=Translate,MediaRouter", "--disable-component-update"]
+        extra = ["--window-size=1366,900", "--disable-popup-blocking"]
         if self.cfg.insecure:
-            args.append("--ignore-certificate-errors")
-        if (hasattr(os, "geteuid") and os.geteuid() == 0) or os.environ.get("BURP2MODEL_CHROME_NO_SANDBOX") == "1":
-            args.append("--no-sandbox")        # containers and CI runners that cannot create a sandbox
-        if self.cfg.headful:
-            args.remove("--headless=new")
-        args.append("about:blank")
-        self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        port_file = os.path.join(self.tmp, "DevToolsActivePort")
-        for _ in range(150):
-            if os.path.exists(port_file):
-                lines = open(port_file).read().split("\n")
-                if len(lines) >= 2 and lines[1]:
-                    break
-            if self.proc.poll() is not None:
-                raise RuntimeError("the browser exited during start-up")
-            time.sleep(0.1)
-        else:
-            raise RuntimeError("the browser did not open its DevTools port")
-        port, path = lines[0].strip(), lines[1].strip()
-        self.cdp = CDP(WebSocket(f"ws://127.0.0.1:{port}{path}"))
+            extra.append("--ignore-certificate-errors")
+        self.proc, url = launch_chrome(self.chrome, self.tmp, extra, headless=not self.cfg.headful)
+        self.cdp = CDP(WebSocket(url))
         self.cdp.urgent = self._handle
 
     def _close(self) -> None:
