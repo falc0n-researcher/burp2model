@@ -64,21 +64,7 @@ INV_CSS = r"""
 .tr .c-len{text-align:right}
 .inv-empty{padding:34px 20px;color:var(--faint);text-align:center;font:13px var(--sans)}
 .inv-view{flex:1;min-height:120px;display:flex;background:var(--panel);overflow:hidden}
-.inv-view.vert{flex-direction:column}
-.pane2{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--line)}
-.inv-view.vert .pane2{border-right:0;border-bottom:1px solid var(--line)}
-.pane2:last-child{border:0}
-.pane2 .ph{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--panel2);border-bottom:1px solid var(--line);flex:none}
-.pane2 .ph b{font:700 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
-.ptab{font:600 11px var(--mono);padding:3px 9px;border-radius:5px;border:1px solid transparent;background:none;color:var(--muted)}
-.ptab.on{background:var(--panel);border-color:var(--line2);color:var(--text)}
-.ph .sp{flex:1}
-.pbtn{font:600 11px var(--mono);padding:3px 8px;border-radius:5px;border:1px solid var(--line2);background:var(--panel);color:var(--muted)}
-.pbtn:hover{color:var(--text)}
-.pane2 pre{flex:1;margin:0;overflow:auto;padding:10px 12px;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-all;background:var(--panel)}
-.pane2 .ln{color:var(--signal);font-weight:700}.pane2 .hn{color:var(--observed)}.pane2 .hv{color:var(--text)}.pane2 .rd{color:var(--inferred);font-weight:700}
-.pane2 .jk{color:var(--observed)}.pane2 .js{color:var(--ok)}.pane2 .jn{color:var(--warn)}.pane2 .jb{color:var(--inferred)}
-.pane2 .bd2{color:var(--text)}.pane2 .tn2{color:var(--faint);font-style:italic}
+.inv-view>.rr{flex:1}
 .ghostcard{padding:22px 24px;color:var(--muted);font-size:13px;max-width:640px}
 .ghostcard h3{margin:0 0 6px;font:700 15px var(--sans);color:var(--text)}
 .ghostcard .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -92,9 +78,9 @@ const INV_COLS=[
   {k:"id",t:"#",w:54,dir:1},{k:"host",t:"Host",w:150,dir:1},{k:"method",t:"Method",w:74,dir:1},{k:"url",t:"URL",w:0,dir:1},
   {k:"params",t:"Params",w:64,dir:-1},{k:"status",t:"Status",w:66,dir:1},{k:"len",t:"Length",w:76,dir:-1},{k:"mime",t:"MIME type",w:92,dir:1},{k:"role",t:"Role",w:100,dir:1}];
 const INV=Object.assign({q:"",methods:new Set(),sc:new Set(),role:"",paramsOnly:false,sel:null,node:"",sortKey:"id",sortDir:1,
-  tw:250,th:300,layout:"h",open:new Set(),tab:{req:"pretty",res:"pretty"},widths:{},bql:null,bqlErr:null},
-  (function(){try{const s=JSON.parse(localStorage.getItem("b2m-inv")||"{}")||{};const o={};["tw","th","layout","widths","tab"].forEach(k=>{if(s[k]!=null)o[k]=s[k];});return o;}catch(e){return {};}})());
-function invSave(){try{localStorage.setItem("b2m-inv",JSON.stringify({tw:INV.tw,th:INV.th,layout:INV.layout,widths:INV.widths,tab:INV.tab}));}catch(e){}}
+  tw:250,th:300,open:new Set(),tab:{req:"pretty",res:"pretty"},widths:{},bql:null,bqlErr:null},
+  (function(){try{const s=JSON.parse(localStorage.getItem("b2m-inv")||"{}")||{};const o={};["tw","th","widths"].forEach(k=>{if(s[k]!=null)o[k]=s[k];});return o;}catch(e){return {};}})());
+function invSave(){try{localStorage.setItem("b2m-inv",JSON.stringify({tw:INV.tw,th:INV.th,widths:INV.widths}));}catch(e){}}
 const INV_ROW=EVL.map(e=>{
   const path=e.path||"",qi=path.indexOf("?"),clean=qi<0?path:path.slice(0,qi);
   const body=e.response&&e.response.body?e.response.body.length:0;
@@ -153,12 +139,12 @@ function vEvidence(){
     <span style="width:6px"></span>${["2","3","4","5"].map(x=>`<button class="ichip s${x}${INV.sc.has(x)?" on":""}" data-sc="${x}">${x}xx</button>`).join("")}
     <button class="ichip${INV.paramsOnly?" on":""}" id="invparams">params</button>
     ${roles.length?`<select id="invrole"><option value="">all roles</option>${roles.map(r=>`<option${INV.role===r?" selected":""}>${esc(r)}</option>`).join("")}</select>`:""}
-    <button class="ichip" id="invclear" title="Clear every filter">clear</button><button class="ichip" id="invlay" title="Request and response side by side, or stacked">layout</button></div>
+    <button class="ichip" id="invclear" title="Clear every filter">clear</button></div>
    <span class="inv-stat" id="invstat"></span></div>
    <div id="inverr"></div>
    <div class="inv-main"><aside class="inv-tree" id="invtree" style="--tw:${INV.tw}px"></aside><div class="inv-gut v" id="gv"></div>
     <section class="inv-right"><div class="inv-tbl" id="invtbl" style="height:${INV.th}px;flex:none"><div class="th" id="invth"></div><div class="tbody" id="invbody" tabindex="0"></div></div>
-     <div class="inv-gut h" id="gh"></div><div class="inv-view${INV.layout==="v"?" vert":""}" id="invview"></div></section></div></div>`;
+     <div class="inv-gut h" id="gh"></div><div class="inv-view" id="invview"></div></section></div></div>`;
 }
 function invColsCss(){
   const w=INV_COLS.map(c=>c.w?(INV.widths[c.k]||c.w)+"px":"minmax(180px,1fr)").join(" ");
@@ -203,21 +189,7 @@ function initEvq(){
     if(rows[i]){select(rows[i].id);const y=i*ROWH;if(y<body.scrollTop)body.scrollTop=y;else if(y+ROWH>body.scrollTop+body.clientHeight)body.scrollTop=y+ROWH-body.clientHeight;}});
   function select(id){INV.sel=id;drawBody();drawView();}
 
-  /* viewer */
-  function jsonPretty(txt){
-    try{const o=JSON.parse(txt);return esc(JSON.stringify(o,null,2)).replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g,
-      (m,s,c,b)=>s?(c?`<span class="jk">${s}</span>${c}`:`<span class="js">${s}</span>`):b?`<span class="jb">${m}</span>`:`<span class="jn">${m}</span>`);}catch(e){return null;}
-  }
-  function paneHtml(m,mode){
-    if(!m||(!m.line&&!(m.headers||[]).length&&!m.body))return '<pre><span class="tn2">Not captured in this export.</span></pre>';
-    const raw=`${m.line||""}\n${(m.headers||[]).map(([k,v])=>k+": "+v).join("\n")}${m.body?"\n\n"+m.body:""}`;
-    if(mode==="raw")return `<pre>${esc(raw)}${m.truncated?'\n<span class="tn2">… body truncated</span>':""}</pre>`;
-    const head=`<span class="ln">${esc(m.line||"")}</span>\n${(m.headers||[]).map(([k,v])=>`<span class="hn">${esc(k)}</span>: <span class="${/\[REDACTED/i.test(v)?"rd":"hv"}">${esc(v)}</span>`).join("\n")}`;
-    let b="";
-    if(m.body){const j=jsonPretty(m.body);b="\n\n"+(j!=null?j:`<span class="bd2">${esc(m.body)}</span>`)+(m.truncated?'\n<span class="tn2">… body truncated</span>':"");}
-    else if(m.truncated)b='\n\n<span class="tn2">(body present but not stored)</span>';
-    return `<pre>${head}${b}</pre>`;
-  }
+  /* viewer: the shared request/response component */
   function drawView(){
     const vw=$("#invview");
     const r=INV_ROW.find(x=>x.id===INV.sel);
@@ -226,11 +198,8 @@ function initEvq(){
       vw.innerHTML=ghost.length?`<div class="ghostcard"><h3>${methodm(ghost[0].method)} ${esc(ghost[0].path)}</h3>Named in the client code, never requested in this capture, so there is no request or response to show.
         <div class="tags">${ghost[0].referenced_by.map(x=>`<span>${esc(x)}</span>`).join("")}</div></div>`
         :`<div class="inv-empty" style="flex:1">Select a request to see it here. Arrow keys move through the table.</div>`;return;}
-    const e=r.e,mk=(t,m,k)=>`<div class="pane2"><div class="ph"><b>${t}</b><button class="ptab${INV.tab[k]==="pretty"?" on":""}" data-pt="${k}:pretty">Pretty</button><button class="ptab${INV.tab[k]==="raw"?" on":""}" data-pt="${k}:raw">Raw</button><span class="sp"></span>
-      ${k==="req"?`<button class="pbtn" data-act="copy">Copy URL</button><button class="pbtn" data-act="open">Details</button>`:`<span style="font:600 11px var(--mono);color:var(--muted)">${e.status==null?"":e.status}${e.mime?" · "+esc(e.mime):""}</span>`}</div>${paneHtml(m,INV.tab[k])}</div>`;
-    vw.innerHTML=mk("Request",e.request,"req")+mk("Response",e.response,"res");
-    $$("[data-pt]",vw).forEach(b=>b.onclick=()=>{const [k,v]=b.dataset.pt.split(":");INV.tab[k]=v;invSave();drawView();});
-    $$("[data-act]",vw).forEach(b=>b.onclick=()=>{if(b.dataset.act==="open")openEv(e.id);else{const u=`${e.host}${e.path}`;fallbackCopy(u,()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy URL",1200);});}});
+    const e=r.e;
+    rrMount(vw,[e.id],{actions:[["Copy URL",(i,b)=>fallbackCopy(`${e.host}${e.path}`,()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy URL",1200);})],["Details",()=>openEv(e.id)]]});
   }
 
   /* site map */
@@ -269,7 +238,6 @@ function initEvq(){
   $$("#invchips [data-m]").forEach(b=>b.onclick=()=>{const m=b.dataset.m;INV.methods.has(m)?INV.methods.delete(m):INV.methods.add(m);refresh();});
   $$("#invchips [data-sc]").forEach(b=>b.onclick=()=>{const m=b.dataset.sc;INV.sc.has(m)?INV.sc.delete(m):INV.sc.add(m);refresh();});
   $("#invparams").onclick=()=>{INV.paramsOnly=!INV.paramsOnly;refresh();};
-  $("#invlay").onclick=()=>{INV.layout=INV.layout==="v"?"h":"v";$("#invview").classList.toggle("vert",INV.layout==="v");invSave();};
   const rs=$("#invrole");if(rs)rs.onchange=()=>{INV.role=rs.value;refresh();};
   $("#invclear").onclick=()=>{INV.q="";INV.bql=null;INV.bqlErr=null;INV.methods.clear();INV.sc.clear();INV.role="";INV.paramsOnly=false;INV.node="";qi.value="";if(rs)rs.value="";refresh();};
   /* splitters */

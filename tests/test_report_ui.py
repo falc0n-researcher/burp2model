@@ -16,8 +16,8 @@ from burp2model.cli import main
 pytestmark = pytest.mark.skipif(find_chrome() is None, reason="no Chrome/Chromium installed")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VIEWS = ["overview", "ask", "graph", "priorities", "surface", "code", "supply", "trust",
-         "crossrole", "unknowns", "inventory", "infra"]
+VIEWS = ["overview", "priorities", "graph", "inventory", "ask", "reference",
+         "surface", "code", "supply", "trust", "crossrole", "unknowns", "infra"]       # the last ones are old links
 
 
 class Page:
@@ -103,8 +103,8 @@ def test_overview_leads_with_what_to_check(page):
 
 def test_evidence_is_labelled_evd_not_ev_underscore(page):
     page.js("location.hash='#inventory'", wait=0.6)
-    page.js("document.querySelector('[data-id]').click()")
-    page.js("document.querySelector('[data-act=open]').click()", wait=0.5)
+    page.js("document.querySelector('.tr').click()")
+    page.js("document.querySelector('[data-ra=\"1\"]').click()", wait=0.5)
     assert "EVD " in page.js("document.querySelector('#dtitle').textContent")
     assert "ev_" not in page.js("document.querySelector('#drawer').textContent")
 
@@ -114,7 +114,7 @@ def test_inventory_lists_every_request_and_filters(page):
     stat = page.js("document.querySelector('#invstat').textContent")
     total = int(stat.split(" of ")[1].split()[0])
     assert total > 10 and stat.startswith(f"{total} of")
-    assert page.js("document.querySelectorAll('#invview .pane2').length") == 2       # request and response
+    assert page.js("document.querySelectorAll('#invview .rrp').length") == 2       # request and response
     page.js("document.querySelector('[data-m=POST]').click()")
     assert int(page.js("document.querySelector('#invstat').textContent").split(" of ")[0]) < total
     page.js("document.querySelector('#invclear').click()")
@@ -143,4 +143,43 @@ def test_map_draws_and_selects_a_node(page):
     page.js("(()=>{const i=document.querySelector('#msq');i.value='checkout';i.dispatchEvent(new Event('input'));"
             "document.querySelector('#msug button').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));})()")
     assert "checkout" in page.js("document.querySelector('#minsp').textContent")
+    assert page.errors == []
+
+
+def test_to_check_shows_the_request_behind_a_lead(page):
+    page.js("location.hash='#priorities'", wait=0.6)
+    page.js("document.querySelector('[data-ctab=leads]').click()", wait=0.4)
+    assert page.js("document.querySelectorAll('.lrow').length") >= 1
+    assert page.js("!document.querySelector('#spbot').hidden")                      # the viewer is open
+    assert page.js("document.querySelectorAll('#spbot .rrp').length") == 2           # request and response
+    page.js("document.querySelector('[data-ctab=open]').click()", wait=0.4)
+    assert page.js("document.querySelectorAll('.qrow').length") >= 0
+    assert page.errors == []
+
+
+def test_reference_peels_the_app_in_layers(page):
+    page.js("location.hash='#reference'", wait=0.6)
+    page.js("REF.focusId='root';REF.pickId=null;REF.rowId=null;render()", wait=0.6)
+    assert page.js("document.querySelectorAll('#sun path[data-n]').length") > 3
+    page.js("document.querySelector('#sun path[data-n=endpoints]').dispatchEvent(new MouseEvent('click',{bubbles:true}))", wait=0.5)
+    rows = page.js("document.querySelectorAll('#refdetail tr[data-row]').length")
+    assert rows == page.js("D.endpoints.length")                                     # every endpoint is listed
+    assert page.js("!document.querySelector('#spbot').hidden")                      # and its request is below
+    page.js("document.querySelector('#sun .ctr').dispatchEvent(new MouseEvent('click',{bubbles:true}))", wait=0.4)
+    assert page.js("document.querySelectorAll('#refdetail .layer').length") >= 2     # back at the layers
+    assert page.errors == []
+
+
+def test_old_section_links_open_the_reference(page):
+    page.js("location.hash='#code'", wait=0.6)
+    assert "Scripts" in page.js("document.querySelector('#reft').textContent")
+    page.js("location.hash='#surface'", wait=0.6)
+    assert "Endpoints" in page.js("document.querySelector('#reft').textContent")
+    assert page.errors == []
+
+
+def test_scripts_are_beautified_for_reading(page):
+    assert page.js("beautifyJS('function a(){if(x){return 1}else{y=2}};var o={a:1,b:\"x;y\"}').split(String.fromCharCode(10)).length") > 6
+    assert 'x;y' in page.js("beautifyJS('var s=\"x;y\"')")                        # strings are left alone
+    assert page.js("beautifyHTML('<html><body><p>hi</p></body></html>').split(String.fromCharCode(10)).length") == 7
     assert page.errors == []

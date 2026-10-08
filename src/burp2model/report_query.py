@@ -8,8 +8,6 @@ for graph paths.
 
 QRY_CSS = r"""
 /* ask: one box for plain questions and BQL */
-.m-ask{padding:26px 32px 50px}
-.askx{max-width:none}
 .atabs{display:flex;gap:4px;margin:16px 0 10px;border-bottom:1px solid var(--line)}
 .atab{font:600 12.5px var(--sans);padding:8px 14px;border:0;background:none;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
 .atab.on{color:var(--text);border-bottom-color:var(--signal)}
@@ -219,15 +217,16 @@ function aChips(){
   return qHist.length?qHist.slice(0,10).map(q=>`<button class="achip mono" data-q="${esc(q)}">${esc(q.length>70?q.slice(0,69)+"…":q)}</button>`).join(""):'<span style="color:var(--faint);font-size:13px">Nothing yet. Questions you run will show up here.</span>';
 }
 function vAsk(){
-  return `<div class="askx"><h1 class="vt">Ask</h1><p class="vsub">Ask in plain English, or type a BQL query for exact filters and graph paths. Answers come from this report.</p>
+  return splitShell(`<h1 class="vt">Ask</h1><p class="vsub">Ask in plain English, or type a BQL query for exact filters and graph paths. Answers come from this report. Pick a row to see its request below.</p>
    <div class="qed"><div class="hl" id="qhl"></div><textarea id="qin" spellcheck="false" autocomplete="off" placeholder='What is in the code but never called?    ·    req.method:POST AND resp.code.gte:400    ·    reach "POST /api/checkout"'>${esc(qText)}</textarea>
     <div class="qbar2"><span class="hint"><kbd>Enter</kbd> to ask · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line</span><button class="qrun2" id="qgo">Ask</button></div>
     <div class="qac" id="qac" hidden></div></div>
    <div class="atabs"><button class="atab${aTab==="questions"?" on":""}" data-atab="questions">Questions</button>${BQLDB?`<button class="atab${aTab==="bql"?" on":""}" data-atab="bql">BQL examples</button>`:""}<button class="atab${aTab==="recent"?" on":""}" data-atab="recent">Recent</button></div>
    <div class="achips" id="achips">${aChips()}</div>
-   <div class="qres" id="qout">${aOut()}</div></div>`;
+   <div class="qres" id="qout">${aOut()}</div>`);
 }
 function initAsk(){
+  splitInit();
   const inp=$("#qin"),hl=$("#qhl"),ac=$("#qac");
   const paint=()=>{hl.innerHTML=looksBql(inp.value)?qHighlight(inp.value):esc(inp.value)+"\n";hl.scrollTop=inp.scrollTop;const h=Math.max(76,Math.min(240,inp.scrollHeight));if(inp.scrollHeight>inp.clientHeight)inp.style.height=h+"px";};
   const out=()=>{$("#qout").innerHTML=aOut();wire();};
@@ -281,13 +280,18 @@ function initAsk(){
   });
   function wire(){
     const o=$("#qout");
-    $$("[data-ep]",o).forEach(el=>el.onclick=()=>openEp(el.dataset.ep));
-    $$("[data-ev]",o).forEach(r=>r.onclick=()=>openEv(r.dataset.ev));
-    $$("[data-node]",o).forEach(r=>r.onclick=()=>{try{openNode(r.dataset.node);}catch(e){}});
+    const mark=el=>{$$(".sel",o).forEach(x=>x.classList.remove("sel"));el.classList.add("sel");};
+    $$("[data-ep]",o).forEach(el=>el.onclick=()=>{const e=EP.find(x=>x.id===el.dataset.ep);if(!e)return;mark(el);
+      splitShow(e.evidence,{title:e.label,find:e.state==="STATIC_ONLY"?e.path:null,empty:{head:"Not requested",text:"The code names this endpoint but nothing in the capture called it."}});});
+    $$("[data-ev]",o).forEach(r=>r.onclick=()=>{mark(r);splitShow([+r.dataset.ev],{});});
+    $$("[data-node]",o).forEach(r=>r.onclick=()=>{mark(r);const id=r.dataset.node,ep=EP.find(x=>x.id===id),n=(D.graph.nodes||[]).find(x=>x.id===id);
+      splitShow((ep&&ep.evidence)||(n&&n.evidence)||[],{title:(n&&n.label)||id,empty:{head:"Nothing to open",text:"This node has no request of its own."}});});
     $$("[data-sk]",o).forEach(h=>h.onclick=()=>{const k=h.dataset.sk;qSort=qSort&&qSort.k===k?{k,d:-qSort.d}:{k,d:1};out();});
     $$("[data-add]",o).forEach(b=>b.onclick=()=>{inp.value=inp.value.replace(/\s+limit\s+\d+\s*$/i,"").trim()+" AND "+b.dataset.add;paint();go();});
     const cj=$("#qcopyj");if(cj)cj.onclick=()=>fallbackCopy(JSON.stringify(qRes,null,2),()=>{cj.textContent="Copied";setTimeout(()=>cj.textContent="Copy JSON",1200);});
     const cv=$("#qcsv");if(cv)cv.onclick=()=>qDownload((D.app||"query")+".bql.csv",qCsv(qRes),"text/csv");
+    const first=$("[data-ep],[data-ev],[data-node]",o);
+    if(first)first.click();else splitShow([]);
   }
   $("#qgo").onclick=go;
   $$("[data-atab]").forEach(b=>b.onclick=()=>{aTab=b.dataset.atab;$$(".atab").forEach(x=>x.classList.toggle("on",x===b));$("#achips").innerHTML=aChips();bindChips();});
@@ -297,6 +301,6 @@ function initAsk(){
     const h=$("#qhelp");if(h)h.onclick=()=>{aNL=null;qErr=null;qRes={kind:"text",columns:[],rows:[],note:"",total:null};out();};
   }
   bindChips();paint();wire();
-  inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);
+  if(!inp.value)inp.focus();
 }
 """

@@ -28,6 +28,8 @@ from .methodology import METHODOLOGY_PROMPT, investigation_plan
 from .model import PRIV_RE, Model, to_dict
 from .bql_js import BQL_JS
 from .report_dash import DASH_CSS, DASH_JS
+from .report_view import RR_CSS, RR_JS
+from .report_pages import PG_CSS, PG_JS
 from .report_inventory import INV_CSS, INV_JS
 from .report_query import QRY_CSS, QRY_JS
 from .report_map import MAP_CSS, MAP_JS
@@ -301,7 +303,7 @@ def write_html_report(m: Model, path: str, osint: dict | None = None,
             conn.close()
     html = (_TEMPLATE.replace("__BQLJS__", BQL_JS)
             .replace("__DASHCSS__", DASH_CSS).replace("__DASHJS__", DASH_JS)
-            .replace("__INVCSS__", INV_CSS).replace("__INVJS__", INV_JS)
+            .replace("__RRCSS__", RR_CSS).replace("__PGCSS__", PG_CSS).replace("__PGJS__", PG_JS).replace("__RRJS__", RR_JS).replace("__INVCSS__", INV_CSS).replace("__INVJS__", INV_JS)
             .replace("__QRYCSS__", QRY_CSS).replace("__QRYJS__", QRY_JS)
             .replace("__MAPCSS__", MAP_CSS).replace("__TYPECSS__", TYPE_CSS).replace("__FONTCSS__", font_css()).replace("__MAPJS__", MAP_JS)
             .replace("__DATA__", _safe_json(payload)))
@@ -494,35 +496,18 @@ background:var(--panel);margin-bottom:10px;cursor:pointer}
 /* drawer */
 .scrim{position:fixed;inset:0;background:rgba(20,25,36,.35);opacity:0;visibility:hidden;transition:.18s;z-index:50}
 .scrim.on{opacity:1;visibility:visible}
-.drawer{position:fixed;top:0;right:0;height:100%;width:min(460px,92vw);background:var(--panel);border-left:1px solid var(--line);
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(720px,94vw);background:var(--panel);border-left:1px solid var(--line);
 box-shadow:var(--shadow);transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:51;display:flex;flex-direction:column}
 .drawer.on{transform:none}
 .drawer .dh{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
 .drawer .dh .x{margin-left:auto;width:30px;height:30px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
 .drawer .db{overflow:auto;padding:18px}
+.drv{height:560px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .drawer h4{font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:20px 0 8px}
 .drawer h4:first-child{margin-top:0}
 .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:13px}
 .kv .k{color:var(--muted)}
 .kv .v{word-break:break-word}
-.evrow{border:1px solid var(--line);border-radius:8px;margin-bottom:8px;font-size:12.5px;overflow:hidden}
-.evrow>summary{padding:9px 11px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
-.evrow>summary::-webkit-details-marker{display:none}
-.evrow>summary::before{content:"▸";color:var(--faint);font-size:10px;transition:transform .15s}
-.evrow[open]>summary::before{transform:rotate(90deg)}
-.evrow .id{font:600 11px var(--mono);color:var(--signal)}
-.evrow .meta{color:var(--muted);font-family:var(--mono);font-size:11px;word-break:break-all;flex:1}
-.http{border-top:1px solid var(--line);background:var(--panel3)}
-.http .tabs{display:flex;gap:2px;padding:8px 10px 0}
-.http .tab{font:600 11px var(--mono);padding:5px 11px;border-radius:7px 7px 0 0;color:var(--muted);border:1px solid transparent;background:none}
-.http .tab.on{color:var(--text);background:var(--panel);border-color:var(--line);border-bottom-color:var(--panel)}
-.http pre{margin:0;padding:12px 13px;font:11.5px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto;border-top:1px solid var(--line)}
-.http .ln{color:var(--signal);font-weight:700}
-.http .hn{color:var(--observed)}.http .hv{color:var(--text)}
-.http .rd{color:var(--inferred);font-weight:600}
-.http .bd2{color:var(--muted)}
-.http .trunc-note{color:var(--faint);font-style:italic}
-.http .empty2{padding:14px;color:var(--faint);font-size:12px}
 .taglist{display:flex;flex-wrap:wrap;gap:6px}
 .taglist span{font:500 12px var(--mono);padding:3px 8px;border-radius:6px;background:var(--panel2);color:var(--text)}
 .foot{color:var(--faint);font-size:12px;border-top:1px solid var(--line);padding:16px 0 0;margin-top:24px}
@@ -545,6 +530,8 @@ box-shadow:var(--shadow);transform:translateX(100%);transition:transform .22s cu
 .prio .sig b{color:var(--text);font-weight:600}
 
 __DASHCSS__
+__RRCSS__
+__PGCSS__
 __INVCSS__
 __QRYCSS__
 __MAPCSS__
@@ -708,17 +695,11 @@ const weakCookies=(D.cookies||[]).filter(k=>!k.httponly||!k.secure);
 const hasRoles=(D.roles||[]).length>=2;
 const VIEWS=[
   {id:"overview",name:"Overview",grp:"Start here",ct:()=>null},
-  {id:"priorities",name:"To check",grp:"Start here",hot:true,ct:()=>PRIO.length+weakCookies.length},
+  {id:"priorities",name:"To check",grp:"Start here",ct:()=>PRIO.length+weakCookies.length},
   {id:"graph",name:"Map",grp:"Start here",ct:()=>null},
   {id:"inventory",name:"Requests",grp:"Start here",ct:()=>EVL.length},
   {id:"ask",name:"Ask",grp:"Start here",ct:()=>null},
-  {id:"surface",name:"Endpoints",grp:"Reference",dot:"var(--l4)",ct:()=>EP.length},
-  {id:"code",name:"Client code",grp:"Reference",dot:"var(--l3)",ct:()=>D.scripts.length},
-  {id:"supply",name:"Third parties",grp:"Reference",dot:"var(--l5)",ct:()=>D.third_parties.length},
-  {id:"trust",name:"Trust",grp:"Reference",dot:"var(--l5)",ct:()=>D.auth.length+D.cookies.length},
-  {id:"crossrole",name:"Cross-role",grp:"Reference",dot:"var(--l6)",ct:()=>hasRoles?EP.filter(e=>e.roles.length).length:null,cond:hasRoles},
-  {id:"unknowns",name:"Open questions",grp:"Reference",dot:"var(--l6)",ct:()=>D.unknowns.length},
-  {id:"infra",name:"Infrastructure",grp:"Reference",dot:"var(--inferred)",ct:()=>BQLDB&&BQLDB.osint?BQLDB.facts.length:null,cond:!!BQLDB},
+  {id:"reference",name:"Reference",grp:"Start here",ct:()=>null},
 ];
 let view="overview", filters={method:new Set(),host:new Set(),role:new Set(),cred:new Set()}, sortKey="label", sortDir=1, query="";
 
@@ -806,104 +787,6 @@ function vInfra(){
 }
 
 /* ---------- PRIORITIES ---------- */
-function vPriorities(){
-  let h=`<h1 class="vt">To check</h1><p class="vsub">Endpoints and gaps worth a look first, ranked. Each one is a lead to verify, not a finding. Click one to see the requests behind it.</p>`;
-  if(!PRIO.length && !weakCookies.length) return h+`<div class="empty">Nothing stood out in this capture. That is a statement about the capture, not the target.</div>`;
-  h+=PRIO.map((p,i)=>prioCard(p,i)).join("");
-  if(weakCookies.length){
-    h+=`<h1 class="vt" style="font-size:16px;margin:22px 0 10px">Cookie flags</h1>`;
-    h+=weakCookies.map(k=>{const miss=[!k.httponly&&"HttpOnly",!k.secure&&"Secure"].filter(Boolean);
-      return `<div class="prio sev-warn"><div class="rank">⚑</div><div class="body"><div class="ttl"><span class="mono">${esc(k.name)}</span> <span style="color:var(--muted);font-weight:400">cookie set without ${miss.join(" + ")}</span></div>
-      <div class="why">SameSite=${esc(k.samesite||"unset")}. Missing ${miss.join("/")} weakens the cookie against theft or cross-site use.</div>
-      <div class="nx"><b>Next</b> Confirm whether this cookie carries session or auth state.</div></div></div>`;}).join("");
-  }
-  return h;
-}
-
-/* ---------- ATTACK SURFACE ---------- */
-function facets(){
-  const hosts=[...new Set(EP.map(e=>e.host))].sort();
-  const methods=[...new Set(EP.map(e=>e.method))].sort();
-  const roles=D.roles||[];
-  const grp=(lab,key,opts,fmt)=>`<div class="fg"><span class="lab">${lab}</span><div class="chipwrap">
-   ${opts.map(o=>`<button class="chip${filters[key].has(o)?' on':''}" data-fk="${key}" data-fv="${esc(o)}">${fmt?fmt(o):esc(o)}</button>`).join("")}</div></div>`;
-  return `<div class="filters">
-   ${grp("Method","method",methods)}
-   ${grp("Host","host",hosts)}
-   ${roles.length?grp("Reached by","role",roles):""}
-   ${grp("Credentials","cred",["with","without"],o=>o==="with"?"sent":"none seen")}
-  </div>`;
-}
-function epPass(e){
-  if(filters.method.size&&!filters.method.has(e.method))return false;
-  if(filters.host.size&&!filters.host.has(e.host))return false;
-  if(filters.role.size&&![...filters.role].every(r=>e.roles.includes(r)))return false;
-  if(filters.cred.size){const has=e.credentials.length>0;if(filters.cred.has("with")&&!has)return false;if(filters.cred.has("without")&&has)return false;}
-  return matchQ(e);
-}
-function vSurface(){
-  const rows=EP.filter(epPass).sort(sortEP);
-  const th=(k,l)=>`<th data-sort="${k}">${l} <span class="ar">${sortKey===k?(sortDir>0?"▲":"▼"):""}</span></th>`;
-  return `<h1 class="vt">Endpoints</h1><p class="vsub">Every API endpoint the model knows, from the requests in your capture and from URLs found in the client code. Click any row for its parameters and the full request &amp; response.</p>
-  ${facets()}
-  <div class="card"><div class="hd">Endpoints <span class="ct">${rows.length} of ${EP.length}</span></div><div class="bd" style="padding:0">
-  <table><thead><tr>${th("method","M")}${th("label","Endpoint")}${th("host","Host")}${th("statuses","Status")}${th("params","Params")}<th>Evidence</th></tr></thead><tbody>
-  ${rows.length?rows.map(e=>`<tr data-ep="${esc(e.id)}">
-    <td>${methodm(e.method)}</td>
-    <td><span class="mono trunc" title="${esc(e.path)}">${esc(e.path)}</span>${e.privileged?' <span class="m w">admin</span>':""}</td>
-    <td class="mono" style="color:var(--muted)">${esc(e.host)}</td>
-    <td>${statuses(e.statuses)}</td>
-    <td class="mono" style="color:var(--muted)">${e.params.length||"—"}</td>
-    <td class="mono" style="color:var(--faint);font-size:11px">${(e.evidence||[]).slice(0,3).map(EVD).join(", ")||"—"}</td></tr>`).join(""):`<tr><td colspan="6"><div class="empty">No endpoints match these filters.</div></td></tr>`}
-  </tbody></table></div></div>`;
-}
-function sortEP(a,b){let x=a[sortKey],y=b[sortKey];if(sortKey==="params"){x=a.params.length;y=b.params.length;}if(sortKey==="statuses"){x=a.statuses[0]||0;y=b.statuses[0]||0;}
-  if(Array.isArray(x))x=x.join();if(Array.isArray(y))y=y.join();return (x>y?1:x<y?-1:0)*sortDir;}
-
-/* ---------- CLIENT CODE ---------- */
-function vCode(){
-  if(!D.scripts.length) return `<h1 class="vt">Client code</h1><p class="vsub">No JavaScript was captured. Re-run the capture with the app's script bundles included, and the map can add the endpoints the code references.</p><div class="empty">0 scripts in this model.</div>`;
-  return `<h1 class="vt">Client code</h1><p class="vsub">Scripts served to the browser and the endpoints they reference. A reference is <b>inferred</b>, a URL in code is not proof of a call.</p>
-  ${D.scripts.filter(s=>matchQ({label:s.label,host:s.host,params:s.references})).map(s=>`<div class="card"><div class="hd">${methodm("JS")} <span class="mono">${esc(s.label)}</span> <span class="ct">${esc(s.host)} · ${s.references.length} ref${s.references.length===1?"":"s"}</span></div>
-   <div class="bd" style="padding:12px 16px">${s.references.length?`<div class="taglist">${s.references.map(r=>`<span>${esc(r)}</span>`).join("")}</div>`:'<div style="color:var(--faint)">No endpoint references extracted.</div>'}</div></div>`).join("")}`;
-}
-
-/* ---------- SUPPLY CHAIN ---------- */
-function vSupply(){
-  if(!D.third_parties.length) return `<h1 class="vt">Supply chain</h1><p class="vsub">Off-scope hosts the app talked to or referenced.</p><div class="empty">No third parties in this capture.</div>`;
-  return `<h1 class="vt">Supply chain</h1><p class="vsub">Hosts outside the app's own domain that it loaded code from or sent requests to. Each is code you don't control running in your users' context.</p>
-  <div class="card"><div class="bd" style="padding:0"><table><thead><tr><th>Third party</th><th>Requests</th><th>Referenced by</th><th>Evidence</th></tr></thead><tbody>
-  ${D.third_parties.filter(t=>matchQ({label:t.label,params:t.referenced_by})).map(t=>`<tr><td class="mono">${esc(t.label)}</td><td class="mono">${t.requests}</td>
-   <td class="mono" style="color:var(--muted)">${(t.referenced_by||[]).map(esc).join(", ")||"—"}</td>
-   <td class="mono" style="color:var(--faint);font-size:11px">${(t.evidence||[]).slice(0,3).map(EVD).join(", ")}</td></tr>`).join("")}
-  </tbody></table></div></div>`;
-}
-
-/* ---------- TRUST ---------- */
-function vTrust(){
-  const cookies=D.cookies||[],auth=D.auth||[];
-  let h=`<h1 class="vt">Trust</h1><p class="vsub">How the app authenticates and keeps state: credential schemes seen on requests, and cookies with their protective flags.</p>`;
-  h+=`<div class="card"><div class="hd">Authentication <span class="ct">${auth.length}</span></div><div class="bd" style="padding:0">`;
-  h+=auth.length?`<table><thead><tr><th>Scheme</th><th>Seen on endpoints</th></tr></thead><tbody>${auth.map(a=>`<tr><td class="mono">${esc(a.label)}</td><td class="mono" style="color:var(--muted)">${a.endpoints.length}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No credentials observed in the capture.</div>`;
-  h+=`</div></div>`;
-  h+=`<div class="card"><div class="hd">Cookies <span class="ct">${cookies.length}</span></div><div class="bd" style="padding:0">`;
-  h+=cookies.length?`<table><thead><tr><th>Name</th><th>HttpOnly</th><th>Secure</th><th>SameSite</th></tr></thead><tbody>${cookies.map(k=>{
-    const f=(v)=>v?'<span class="st g">yes</span>':'<span class="st r">no</span>';
-    return `<tr><td class="mono">${esc(k.name)}</td><td>${f(k.httponly)}</td><td>${f(k.secure)}</td><td class="mono">${esc(k.samesite||"unset")}</td></tr>`;}).join("")}</tbody></table>`:`<div class="empty">No Set-Cookie observed.</div>`;
-  h+=`</div></div>`;
-  if((D.operations||[]).length)h+=`<div class="card"><div class="hd">GraphQL operations <span class="ct">${D.operations.length}</span></div><div class="bd" style="padding:12px 16px"><div class="taglist">${D.operations.map(o=>`<span>${esc(o.label)}</span>`).join("")}</div></div></div>`;
-  const secrets=D.secrets||[];
-  h+=`<div class="card"><div class="hd">Masked secrets <span class="ct">${secrets.length}</span></div><div class="bd" style="padding:0">`;
-  h+=secrets.length?`<table><thead><tr><th>Kind</th><th>Length</th><th>Entropy</th><th>Seen</th><th>Evidence</th></tr></thead><tbody>${secrets.map(s=>
-    `<tr><td class="mono">${esc(s.kind)}</td><td class="mono" style="color:var(--muted)">${s.length} chars</td>
-     <td class="mono" style="color:var(--muted)">${(s.entropy??0).toFixed(2)} bits/char</td><td class="mono">×${s.count}</td>
-     <td class="mono" style="color:var(--faint);font-size:11px">${(s.evidence||[]).slice(0,3).map(EVD).join(", ")}</td></tr>`).join("")}</tbody></table>
-   <div class="glegend" style="border-top:1px solid var(--line)">Values were masked before anything reached disk; only kind, shape and a keyed fingerprint are kept.</div>`
-   :`<div class="empty">No secret-shaped values were observed in the capture.</div>`;
-  h+=`</div></div>`;
-  return h;
-}
-
 /* ---------- CROSS-ROLE ---------- */
 function vCrossrole(){
   const roles=D.roles||[];
@@ -938,15 +821,9 @@ const OPEN_TITLE={
   CAPTURE_ITEMS_SKIPPED:"Some requests could not be parsed",
 };
 function openTitle(t){return OPEN_TITLE[t]||humanize(t);}
-function vUnknowns(){
-  let h=`<h1 class="vt">Open questions</h1><p class="vsub">What this capture could not answer, spelled out rather than left blank. Each says what we saw, what stays unknown, and how to find out.</p>`;
-  if(!D.unknowns.length)return h+`<div class="empty">Nothing was left open in this capture.</div>`;
-  h+=D.unknowns.map(u=>`<div class="unk"><div class="ut">${esc(openTitle(u.type))}</div><div class="ue mono">${esc(u.entity)}</div>
-   <ul>${u.we_know.map(k=>`<li>${esc(k)}</li>`).join("")}<li style="color:var(--signal)">Unknown: ${esc(u.we_dont_know)}</li></ul>
-   <div class="nx"><b>To find out</b> ${esc(u.next)}</div></div>`).join("");
-  return h;
-}
+__PGJS__
 
+__RRJS__
 __INVJS__
 function openEv(i){
   const ev=D.evidence["ev_"+i];if(!ev)return;
@@ -957,38 +834,18 @@ function openEv(i){
     ${ev.mime?`<div class="k">MIME</div><div class="v mono">${esc(ev.mime)}</div>`:""}
     ${ev.role?`<div class="k">Role</div><div class="v mono">${esc(ev.role)}</div>`:""}
     ${ev.source?`<div class="k">Source</div><div class="v mono">${esc(ev.source)}${ev.item!=null?` · item ${ev.item}`:""}</div>`:""}
-   </div><h4>Request &amp; response</h4>${evidenceBlock(i,true)}`;
+   </div><h4>Request &amp; response</h4><div class="drv" id="drv"></div>`;
+  rrMount($("#drv"),[i],{vert:true,title:" "});
   $("#drawer").classList.add("on");$("#scrim").classList.add("on");$("#drawer").setAttribute("aria-hidden","false");
 }
 
 __MAPJS__
-
-/* ---------- HTTP panes (Burp-style, fully redacted) ---------- */
-function httpHeaders(hs){return (hs||[]).map(([k,v])=>`<span class="hn">${esc(k)}</span>: <span class="${/\[REDACTED/i.test(v)?'rd':'hv'}">${esc(v)}</span>`).join("\n");}
-function httpMsg(m){
-  if(!m||(!m.line&&!(m.headers||[]).length&&!m.body))return `<div class="empty2">Not captured in this export.</div>`;
-  const body=m.body?`\n\n<span class="bd2">${esc(m.body)}</span>${m.truncated?'\n<span class="trunc-note">… body truncated</span>':''}`
-    :(m.truncated?'\n<span class="trunc-note">(body present but not stored)</span>':'');
-  return `<pre><span class="ln">${esc(m.line||"")}</span>\n${httpHeaders(m.headers)}${body}</pre>`;
-}
-function evidenceBlock(i,open){
-  const ev=D.evidence["ev_"+i];
-  const meta=ev?`${esc(ev.method)} ${esc(ev.host)}${esc(ev.path)} → ${ev.status==null?"?":ev.status}`:"";
-  const uid="e"+i+"x"+Math.random().toString(36).slice(2,7);
-  const hasHttp=ev&&(ev.request||ev.response);
-  return `<details class="evrow"${open?" open":""}><summary><span class="id">${EVD(i)}</span><span class="meta">${meta}</span></summary>${
-   hasHttp?`<div class="http"><div class="tabs"><button class="tab on" data-tab="${uid}r">Request</button><button class="tab" data-tab="${uid}s">Response</button></div>
-    <div id="${uid}r" class="pane">${httpMsg(ev.request)}</div><div id="${uid}s" class="pane hide">${httpMsg(ev.response)}</div>
-    <div style="padding:7px 12px;color:var(--faint);font-size:11px;border-top:1px solid var(--line)">Every value masked at capture time.</div></div>`
-   :`<div class="http"><div class="empty2">No request/response body was stored for this evidence id.</div></div>`}</details>`;
-}
 
 /* ---------- drawer ---------- */
 function openEp(id){
   const e=EP.find(x=>x.id===id);if(!e)return;
   const sbr=e.status_by_role||{};
   const staticOnly=e.state==="STATIC_ONLY";
-  const evrows=(e.evidence||[]).map((i,k)=>evidenceBlock(i,k===0)).join("");
   const kv=(k,v)=>v!=null&&v!==""&&!(Array.isArray(v)&&!v.length)?`<div class="k">${k}</div><div class="v">${v}</div>`:"";
   $("#dtitle").innerHTML=`${methodm(e.method)} <span class="mono">${esc(e.path)}</span>`;
   $("#dbody").innerHTML=`
@@ -1004,7 +861,8 @@ function openEp(id){
    ${e.params.length?`<h4>Parameters (${e.params.length})</h4><div class="taglist">${e.params.map(p=>`<span>${esc(p)}</span>`).join("")}</div>`:""}
    ${e.referenced_by.length?`<h4>Referenced by (inferred)</h4><div class="taglist">${e.referenced_by.map(p=>`<span>${esc(p)}</span>`).join("")}</div>`:""}
    ${e.called_from.length?`<h4>Called from (observed)</h4><div class="taglist">${e.called_from.map(p=>`<span>${esc(p)}</span>`).join("")}</div>`:""}
-   <h4>Evidence: request and response</h4>${evrows||'<div style="color:var(--faint)">—</div>'}`;
+   <h4>Evidence: request and response</h4>${(e.evidence||[]).length?'<div class="drv" id="drv"></div>':'<div style="color:var(--faint)">None captured.</div>'}`;
+  if((e.evidence||[]).length)rrMount($("#drv"),e.evidence,{vert:true,title:" "});
   $("#drawer").classList.add("on");$("#scrim").classList.add("on");$("#drawer").setAttribute("aria-hidden","false");
 }
 const NBYID=Object.fromEntries((D.graph.nodes||[]).map(n=>[n.id,n]));
@@ -1020,17 +878,16 @@ function openNode(id){
    </div>
    ${n.type==="infra"?`<div class="callout" style="margin-top:14px"><span class="i">i</span><p>Collected by external recon (<span class="mono">burp2model osint</span>), not from the capture. It describes the app's public footprint.</p></div>`:""}
    ${conns.length?`<h4>Connections (${conns.length})</h4><div class="taglist">${conns.map(e=>{const o=e.s===id?e.d:e.s;const nn=NBYID[o];const dir=e.s===id?"→":"←";return `<span>${dir} ${esc(humanize(e.type))}: ${esc(nn?nn.label:o)}</span>`;}).join("")}</div>`:""}
-   ${(n.evidence||[]).length?`<h4>Evidence: request and response</h4>${n.evidence.map((i,k)=>evidenceBlock(i,k===0)).join("")}`:""}`;
+   ${(n.evidence||[]).length?'<h4>Evidence: request and response</h4><div class="drv" id="drv"></div>':""}`;
+  if((n.evidence||[]).length)rrMount($("#drv"),n.evidence,{vert:true,title:" "});
   $("#drawer").classList.add("on");$("#scrim").classList.add("on");$("#drawer").setAttribute("aria-hidden","false");
 }
 function closeDrawer(){$("#drawer").classList.remove("on");$("#scrim").classList.remove("on");$("#drawer").setAttribute("aria-hidden","true");}
 $("#scrim").onclick=closeDrawer;$("#dclose").onclick=closeDrawer;
 addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();});
-/* request/response tab switching inside the drawer (delegated) */
-$("#dbody").addEventListener("click",e=>{const t=e.target.closest(".tab");if(!t)return;const pane=document.getElementById(t.dataset.tab);if(!pane)return;const wrap=t.closest(".http");$$(".tab",wrap).forEach(x=>x.classList.remove("on"));t.classList.add("on");$$(".pane",wrap).forEach(p=>p.classList.add("hide"));pane.classList.remove("hide");});
 
 /* ---------- wire ---------- */
-const RENDER={overview:vOverview,ask:vAsk,priorities:vPriorities,surface:vSurface,code:vCode,supply:vSupply,trust:vTrust,crossrole:vCrossrole,unknowns:vUnknowns,inventory:vEvidence,graph:vGraph,infra:vInfra};
+const RENDER={overview:vOverview,priorities:vPriorities,graph:vGraph,inventory:vEvidence,ask:vAsk,reference:vReference};
 function render(){
   renderNav();
   try{if(!(view==="ask"&&(location.hash||"").startsWith("#query=")))history.replaceState(null,"","#"+view);}catch(e){}
@@ -1041,18 +898,20 @@ function render(){
   if(view==="graph")initGraph();
   if(view==="ask")initAsk();
   if(view==="overview")initOverview();
+  if(view==="priorities")initPriorities();
+  if(view==="reference")initReference();
   if(view==="inventory")initEvq();
   // row / card clicks → drawer
   $$("[data-ep]",main).forEach(el=>el.onclick=()=>openEp(el.dataset.ep));
   $$("[data-ev]",main).forEach(el=>el.onclick=()=>openEv(el.dataset.ev));
   $$("th[data-sort]",main).forEach(th=>th.onclick=()=>{const k=th.dataset.sort;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}render();});
   $$(".chip[data-fk]",main).forEach(ch=>ch.onclick=()=>{const s=filters[ch.dataset.fk];s.has(ch.dataset.fv)?s.delete(ch.dataset.fv):s.add(ch.dataset.fv);render();});
-  $$("[data-goto]",main).forEach(b=>b.onclick=()=>{view=b.dataset.goto;render();});
+  $$("[data-goto]",main).forEach(b=>b.onclick=()=>{go(b.dataset.goto);render();});
 }
 $("#q").addEventListener("input",e=>{query=e.target.value.trim();
   // a search jumps to the most relevant list view if on a summary view
   // on the Map, a search highlights matching nodes in place instead
-  if(query&&["overview","ask","priorities"].includes(view))view="surface";
+  REF.q=query;if(query&&["overview","ask","priorities"].includes(view))go("surface");
   render();});
 addEventListener("keydown",e=>{
   if(e.key==="/"&&!e.metaKey&&!e.ctrlKey&&!/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)){e.preventDefault();$("#q").focus();}
@@ -1064,11 +923,12 @@ function fromHash(){
   if(h.startsWith("query=")){let q="";try{q=decodeURIComponent(h.slice(6));}catch(e){}view="ask";if(q&&q!==qText){qText=q;aNL=null;qErr=null;qRes=null;if(looksBql(q)&&BQLDB)qRun(q);else aNL=askEngine(q);}return true;}
   if(h==="evidence"){view="inventory";return true;}
   if(h==="query"){view="ask";return true;}
+  if(LEGACY[h]){go(h);return true;}
   if(RENDER[h]){view=h;return true;}
   return false;
 }
 fromHash();
-addEventListener("hashchange",()=>{const was=view;if(fromHash()&&(view!==was||view==="ask"))render();});
+addEventListener("hashchange",()=>{const was=view,h=(location.hash||"").slice(1);if(fromHash()&&(view!==was||view==="ask"||LEGACY[h]))render();});
 render();
 </script>
 </body>

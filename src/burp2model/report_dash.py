@@ -374,7 +374,7 @@ function leadCard(p,i){
     <div class="t">${methodm(e.method)}<span>${esc(e.path)}</span></div>
     <div class="w">${esc(l.ttl)}${p.sig.length>1?` <span style="color:var(--faint);font-weight:500">+${p.sig.length-1} more</span>`:""}</div>
     <div class="y">${esc(l.why)}</div><div class="nx"><b>Do next</b>${esc(l.next)}</div></div>
-    <div class="acts"><button class="abtn pri" data-ep="${esc(e.id)}">Open</button><button class="abtn" data-lead-map="${esc(e.id)}">On the map</button></div></div>`;
+    <div class="acts"><button class="abtn pri" data-open-ep="${esc(e.id)}">Open</button><button class="abtn" data-lead-map="${esc(e.id)}">On the map</button></div></div>`;
 }
 function vOverview(){
   const st=c.api_state||{},both=st.BOTH||0,rt=st.RUNTIME_ONLY||0,so=st.STATIC_ONLY||0,eptot=both+rt+so;
@@ -417,6 +417,7 @@ function vOverview(){
   <details class="more"><summary>More numbers <span>timeline, busiest endpoints, third parties, hosts</span></summary><div class="inner">${vMore()}</div></details>`;
 }
 function initOverview(){
+  $$("[data-open-ep]").forEach(b=>b.onclick=e=>{e.stopPropagation();REF.focusId="endpoints";REF.pickId="ep:"+b.dataset.openEp;REF.rowId=b.dataset.openEp;REF.q="";view="reference";render();});
   $$("[data-ev]",$("#main")).forEach(b=>b.onclick=e=>{e.stopPropagation();openEv(b.dataset.ev);});
   const sh=$("[data-shot]");
   if(sh)sh.onclick=()=>{const d=document.createElement("div");d.className="lightbox";d.innerHTML=`<img src="${esc(D.screenshot)}" alt="Screenshot">`;d.onclick=()=>d.remove();document.body.append(d);};

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **One viewer everywhere.** Requests, To check, Ask and the new Reference page all open the same
+  request and response viewer underneath the list. Scripts and pages are indented and coloured
+  (the report now keeps 40 KB of each script and 20 KB of each page, up from 6 KB).
+- **To check** merges the leads and the open questions, with severity filters.
+- **Reference** is a layered chart of the app (pages, scripts, endpoints, third parties, trust,
+  infrastructure). Click a ring to list what is in it, then a row to read its request. It replaces
+  the separate Endpoints, Client code, Third parties, Trust, Cross-role and Infrastructure pages;
+  their old links still work.
+
 - **Technology stack.** The model reads servers, CDNs, frameworks and third-party services from headers,
   cookies, pages and hosts, each tied to its evidence. The overview draws it as a stack map and shows an
   infrastructure summary (host, hosting, IP, TLS, DNS, mail auth, headers set) with only the fields found.

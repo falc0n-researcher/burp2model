@@ -42,6 +42,7 @@ from .redact import (
 )
 
 BODY_KEEP = 20000
+CODE_KEEP = 40000           # a script the report shows beautified: keep more of it
 
 _SESSION_COOKIE_HINTS = ("sess", "sid", "auth", "token", "jwt", "remember", "login", "user")
 _CREDENTIAL_HEADER_HINTS = ("api-key", "apikey", "auth-token", "access-token", "x-token")
@@ -669,7 +670,7 @@ def _parse_item(elem, idx: int, role: str | None) -> Exchange | None:
         if is_js:
             hdr_map = next((v for k, v in resp_headers if k.lower() in ("sourcemap", "x-sourcemap")), None)
             js_assets = extract_script_assets(resp_full_r, host, ptemplate, hdr_map)
-        resp_body_r = resp_full_r[:BODY_KEEP]
+        resp_body_r = resp_full_r[:CODE_KEEP if is_js else BODY_KEEP]
         stack_text = resp_full_r
     else:
         resp_body_r, s6 = redact_body(resp_body_b[:BODY_KEEP * 5].decode("utf-8", "replace"))
@@ -685,14 +686,14 @@ def _parse_item(elem, idx: int, role: str | None) -> Exchange | None:
     # The request line is rebuilt with the redacted path; every header value
     # and both bodies are already masked. No raw value is present.
     _ver = req_start.split(" ")[-1] if req_start.count(" ") >= 2 else "HTTP/1.1"
-    _EV_BODY = 6000
+    _EV_BODY = CODE_KEEP if is_js else BODY_KEEP if is_html else 6000      # scripts and pages show in full in the report
     _hdr = lambda hs: [[k, redact_named(v)] for k, v in hs]   # scrub URLs in header values
     ev = {
         "request": {
             "line": redact_named(f"{method} {red_path} {_ver}".strip()),
             "headers": _hdr(req_headers_r),
-            "body": redact_named(req_body_r[:_EV_BODY]),
-            "truncated": len(req_body_r) > _EV_BODY,
+            "body": redact_named(req_body_r[:6000]),
+            "truncated": len(req_body_r) > 6000,
         },
         "response": {
             "line": (resp_start or (f"HTTP/1.1 {status}" if status is not None else "")).strip(),
