@@ -198,9 +198,11 @@ def _build_from(args, exchanges: list, stats: dict) -> int:
     else:
         _clear_inputs(outdir, only=DEFAULT_INPUT)
     _save_input(outdir, args.role or DEFAULT_INPUT, exchanges, stats)
+    exchanges.clear()                   # the saved input is the source from here; free the copy
     all_ex, all_stats, merged = _load_inputs(outdir)
 
     m = build(all_ex, name=args.webapp, scope=_scope(args), stats=all_stats)
+    all_ex.clear()                      # the model holds what it needs; keeps peak memory down
     if m.counts()["hosts"] == 0:
         print(f"warning: no captured host matched the scope "
               f"({', '.join(m.scope) or 'none'}); every request was treated as "

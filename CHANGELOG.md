@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Large exports use about half the Python memory: parsed requests are freed once saved and
+  once the model is built (a 20,000-request build peaked at 224 MB, down from 437 MB). Output
+  is unchanged.
+
 ## 1.0.1 — 2026-10-08
 
 - **`build` is fully offline by default.** External recon (DNS, TLS, headers) no longer runs
