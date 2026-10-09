@@ -1,5 +1,5 @@
 """burp2model — turn a Burp Suite history into an evidence-backed web-app model."""
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 from .parse import parse_items, Exchange          # noqa: F401
 from .model import build, to_dict, from_dict, cross_role, Model  # noqa: F401

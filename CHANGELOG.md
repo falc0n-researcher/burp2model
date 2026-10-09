@@ -1,47 +1,42 @@
 # Changelog
 
-## Unreleased
+## 1.0.2 — 2026-10-09
 
-- **A network map.** Nodes are coloured icons (one per kind) on a dark canvas with arrowed links;
-  select a node and its relationships are named on the edges (exposes, calls, references) while the
-  rest fades. Network is the default layout, with Cluster, Flow and Focus still available. The map
-  follows the report theme: a white canvas with deeper node colours in light, near-black in dark.
+A new report, a technology stack, and lower memory use on large exports.
 
-- **One viewer everywhere.** Requests, To check, Ask and the new Reference page all open the same
-  request and response viewer underneath the list. Scripts and pages are indented and coloured
-  (the report now keeps 40 KB of each script and 20 KB of each page, up from 6 KB).
-- **To check** merges the leads and the open questions, with severity filters.
+### Report
+- **Overview in a minute.** A short summary, five leads to check first (each with a next step), the
+  infrastructure and technology stack, and two small charts. The rest sits under "More numbers".
+- **Map.** A network of coloured icon nodes with arrowed links. Select a node and its relationships are
+  named on the edges (exposes, calls, references) while the rest fades; shift-click a second node to trace
+  the shortest path. Network, Cluster, Flow and Focus layouts, search and filters. It follows the report
+  theme: white canvas and deeper colours in light, near-black in dark.
+- **Requests.** A Burp-style site map, sortable request table, and the masked request and response.
+- **One viewer everywhere.** Requests, To check, Ask and Reference all open the same request and response
+  viewer under the list. Scripts and pages are indented and coloured; the report keeps 40 KB of each script
+  and 20 KB of each page (up from 6 KB).
+- **To check** merges leads and open questions. **Ask** takes plain questions or BQL in one box.
 - **Reference** is a layered chart of the app (pages, scripts, endpoints, third parties, trust,
-  infrastructure). Click a ring to list what is in it, then a row to read its request. It replaces
-  the separate Endpoints, Client code, Third parties, Trust, Cross-role and Infrastructure pages;
-  their old links still work.
+  infrastructure). Click a ring to list it, a row to read its request. The old Endpoints, Client code,
+  Third parties, Trust, Cross-role and Infrastructure links open it.
+- **Fonts.** Inter, Space Grotesk and JetBrains Mono are embedded (about 150 KB, SIL OFL), so it looks the
+  same offline.
+- **Evidence ids start at 1** and show as EVD 1, EVD 2 in the report. Files and the CLI still use `ev_1`,
+  `ev_2`; BQL accepts either form.
+- A headless-Chrome test drives every view.
 
-- **Technology stack.** The model reads servers, CDNs, frameworks and third-party services from headers,
-  cookies, pages and hosts, each tied to its evidence. The overview draws it as a stack map and shows an
-  infrastructure summary (host, hosting, IP, TLS, DNS, mail auth, headers set) with only the fields found.
-  The stack is in `model.json` and `context.json`.
-- **Screenshot on the overview.** An anonymous browser crawl captures the start page. Attach your own with
+### Model
+- **Technology stack.** Servers, CDNs, frameworks and third-party services read from headers, cookies,
+  pages and hosts, each tied to its evidence. In `model.json` and `context.json`.
+- **Screenshot.** An anonymous browser crawl captures the start page for the overview. Attach your own with
   `--screenshot FILE`, or skip it with `--no-screenshot`. Signed-in crawls never capture one on their own.
-- **Fonts.** The report embeds Inter, Space Grotesk and JetBrains Mono (about 150 KB, SIL OFL), so it looks
-  the same offline.
 
-- **Evidence ids start at 1** and the report shows them as EVD 1, EVD 2 (the files and CLI still
-  use `ev_1`, `ev_2`). BQL accepts either form.
-- **Ask and Query are one view.** One box takes plain questions or BQL.
-- **The report reads in about a minute.** The overview is a short summary, five leads to check
-  first with a next step each, and two small charts; the rest sits under "More numbers". The
-  sidebar is "Start here" and "Reference". Every view uses the full width.
-- **A new report.** The dashboard has charts and rankings instead of lists. The map is drawn on a
-  canvas as neighbourhoods by feature area, with a node inspector, path tracing, Flow and Focus
-  layouts, search and filters. The inventory is laid out like Burp: a site-map tree, a sortable
-  request table and the masked request and response side by side. The query console highlights
-  and completes BQL and offers queries built from your own model. A browser test drives every view.
-- Docs now say plainly that masked, truncated request and response bodies are stored in
-  `model.json`, `graph.db` and the report.
-
-- Large exports use about half the Python memory: parsed requests are freed once saved and
-  once the model is built (a 20,000-request build peaked at 224 MB, down from 437 MB). Output
-  is unchanged.
+### Fixes and docs
+- Large exports use about half the Python memory: parsed requests are freed once saved and once the model
+  is built (a 20,000-request build peaked at 224 MB, down from 437 MB). Output is unchanged.
+- A failed Chrome start is retried before a browser crawl or test gives up.
+- Docs now say plainly that masked, truncated request and response bodies are stored in `model.json`,
+  `graph.db` and the report.
 
 ## 1.0.1 — 2026-10-08
 
