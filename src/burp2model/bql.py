@@ -273,8 +273,8 @@ def _term_sql(target: str, fname: str, op: str, value: str, params: list) -> str
 
     if fname == "node.role" and op in ("eq", "ne"):
         params.append(f'%"{_esc_like(value)}"%')
-        return (f"nodes.roles LIKE ? ESCAPE '\\'" if op == "eq"
-                else f"nodes.roles NOT LIKE ? ESCAPE '\\'")
+        return ("nodes.roles LIKE ? ESCAPE '\\'" if op == "eq"
+                else "nodes.roles NOT LIKE ? ESCAPE '\\'")
 
     if kind == "int":
         if op in ("cont", "ncont", "like", "regex"):

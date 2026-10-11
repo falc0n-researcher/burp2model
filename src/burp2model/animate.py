@@ -104,10 +104,10 @@ def render_svg(m: Model) -> str:
         # prompt line (typed via width mask)
         '<text x="28" y="78" fill="#e85002" font-size="15" font-weight="700">'
         '$ burp2model burp_history.xml</text>',
-        f'<rect x="28" y="66" width="0" height="18" fill="#0d1117">'
-        f'<animate attributeName="width" from="360" to="0" dur="1s" fill="freeze"/></rect>',
-        f'<text x="392" y="78" fill="#3a424e" font-size="15">'
-        f'<animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>▋</text>',
+        '<rect x="28" y="66" width="0" height="18" fill="#0d1117">'
+        '<animate attributeName="width" from="360" to="0" dur="1s" fill="freeze"/></rect>',
+        '<text x="392" y="78" fill="#3a424e" font-size="15">'
+        '<animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>▋</text>',
     ]
 
     # stage lines, each fades in in sequence
