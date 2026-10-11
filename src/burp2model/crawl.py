@@ -584,7 +584,6 @@ class Crawler:
                 variables[name] = val
 
     def _journey_request(self, spec: dict, origin: str, variables: dict) -> None:
-        from . import journey as jy
         url = spec.get("url") or urllib.parse.urljoin(origin + "/", spec["path"])
         body, ctype = None, None
         if "json" in spec:

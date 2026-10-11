@@ -295,7 +295,6 @@ _GAP_WEIGHT = {
 def rank_gaps(m: Model) -> dict:
     """Rank the model's unknowns by how much resolving each improves the picture,
     each with the smallest next step. Good recon says what you have not seen yet."""
-    rg = ReasonGraph(m)
     priv_paths = {n.label for n in m.nodes.values()
                   if n.type == "endpoint" and PRIV_RE.search(n.attrs.get("path", "") or "")}
     ranked = []

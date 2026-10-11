@@ -43,7 +43,7 @@ import urllib.parse
 from collections import deque
 from xml.etree.ElementTree import Element, SubElement
 
-from .crawl import _UNSAFE, CrawlConfig, CrawlResult, Crawler, Task, _burp_mime, _decode
+from .crawl import _UNSAFE, CrawlConfig, CrawlResult, Crawler, Task, _burp_mime
 from .redact import route_template, template_path
 
 _CANDIDATES = [
