@@ -13,7 +13,6 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
-import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 import java.awt.Component;
 import java.awt.Desktop;
@@ -35,11 +34,13 @@ import java.util.regex.Pattern;
 
 /**
  * A thin bridge: right-click requests in Burp, "Send to burp2model", and the selection goes to a local
- * `burp2model serve` process, which builds the model. No modeling happens here.
+ * burp2model process, which builds the model. The extension starts that process itself when it is not
+ * running, so there is nothing to set up. No modeling happens here.
  */
 public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvider {
     private MontoyaApi api;
     private Preferences prefs;
+    private Process server;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     @Override
@@ -49,7 +50,12 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         api.extension().setName("burp2model");
         api.userInterface().registerContextMenuItemsProvider(this);
         api.userInterface().registerSuiteTab("burp2model", settingsPanel());
-        api.logging().logToOutput("burp2model ready. Start `burp2model serve -w NAME`, then set the token in the burp2model tab.");
+        api.extension().registerUnloadingHandler(() -> {
+            if (server != null) {
+                server.destroy();
+            }
+        });
+        api.logging().logToOutput("burp2model ready. Right-click requests and choose Send to burp2model.");
     }
 
     // ------------------------------------------------------------------ menu
@@ -69,12 +75,10 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
     }
 
     private void send(List<HttpRequestResponse> picked) {
-        String token = prefs.getString("token");
-        if (token == null || token.isBlank()) {
-            api.logging().raiseErrorEvent("burp2model: set the token in the burp2model tab first.");
+        String port = orDefault(prefs.getString("port"), "8765");
+        if (!ensureServer(port)) {
             return;
         }
-        String port = orDefault(prefs.getString("port"), "8765");
         String role = orDefault(prefs.getString("role"), "");
         StringBuilder query = new StringBuilder("?label=").append(enc("burp-" + System.currentTimeMillis() / 1000));
         if (!role.isBlank()) {
@@ -84,7 +88,7 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             java.net.http.HttpRequest req = java.net.http.HttpRequest
                     .newBuilder(URI.create("http://127.0.0.1:" + port + "/ingest" + query))
                     .timeout(Duration.ofMinutes(10))
-                    .header("X-B2M-Token", token)
+                    .header("X-B2M-Client", "burp-extension")
                     .POST(BodyPublishers.ofString(toItemsXml(picked), StandardCharsets.UTF_8))
                     .build();
             java.net.http.HttpResponse<String> res = http.send(req, BodyHandlers.ofString());
@@ -98,6 +102,58 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         } catch (Exception ex) {
             api.logging().raiseErrorEvent("burp2model: could not reach 127.0.0.1:" + port
                     + ". Is `burp2model serve` running? (" + ex.getMessage() + ")");
+        }
+    }
+
+    // ------------------------------------------------------------ the local process
+
+    /** True once a burp2model receiver answers on the port; starts one if none does. */
+    private synchronized boolean ensureServer(String port) {
+        if (healthy(port)) {
+            return true;
+        }
+        String app = orDefault(prefs.getString("app"), "burp");
+        String cmd = orDefault(prefs.getString("command"), "burp2model");
+        String line = cmd + " serve -w " + app + " --port " + port;
+        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        String shell = orDefault(System.getenv("SHELL"), "/bin/sh");
+        // a login shell, so a Burp started from the dock still finds the user's PATH
+        List<String> argv = windows ? List.of("cmd", "/c", line) : List.of(shell, "-lc", line);
+        try {
+            server = new ProcessBuilder(argv).redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        } catch (Exception ex) {
+            api.logging().raiseErrorEvent("burp2model: could not start `" + line + "` (" + ex.getMessage() + ")");
+            return false;
+        }
+        for (int i = 0; i < 40; i++) {
+            if (healthy(port)) {
+                api.logging().logToOutput("burp2model: started `" + line + "`.");
+                return true;
+            }
+            if (!server.isAlive()) {
+                break;
+            }
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        api.logging().raiseErrorEvent("burp2model: `" + line + "` did not come up. Install it with `pip install burp2model`"
+                + " or set its full path in the burp2model tab.");
+        return false;
+    }
+
+    private boolean healthy(String port) {
+        try {
+            java.net.http.HttpRequest req = java.net.http.HttpRequest
+                    .newBuilder(URI.create("http://127.0.0.1:" + port + "/health"))
+                    .timeout(Duration.ofSeconds(2)).header("X-B2M-Client", "burp-extension").GET().build();
+            return http.send(req, BodyHandlers.discarding()).statusCode() == 200;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -163,20 +219,22 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
     private Component settingsPanel() {
         JPanel p = new JPanel(new GridBagLayout());
         JTextField port = new JTextField(orDefault(prefs.getString("port"), "8765"), 8);
-        JPasswordField token = new JPasswordField(orDefault(prefs.getString("token"), ""), 30);
+        JTextField app = new JTextField(orDefault(prefs.getString("app"), "burp"), 14);
+        JTextField command = new JTextField(orDefault(prefs.getString("command"), "burp2model"), 30);
         JTextField role = new JTextField(orDefault(prefs.getString("role"), ""), 14);
         JButton save = new JButton("Save");
         save.addActionListener(e -> {
             prefs.setString("port", port.getText().trim());
-            prefs.setString("token", new String(token.getPassword()).trim());
+            prefs.setString("app", app.getText().trim());
+            prefs.setString("command", command.getText().trim());
             prefs.setString("role", role.getText().trim());
             api.logging().logToOutput("burp2model: settings saved.");
         });
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(6, 8, 6, 8);
         c.anchor = GridBagConstraints.WEST;
-        String[] names = {"Port", "Token (printed by `burp2model serve`)", "Role (optional, e.g. admin)"};
-        Component[] fields = {port, token, role};
+        String[] names = {"Model name", "Port", "burp2model command (full path if not on PATH)", "Role (optional, e.g. admin)"};
+        Component[] fields = {app, port, command, role};
         for (int i = 0; i < names.length; i++) {
             c.gridx = 0;
             c.gridy = i;

@@ -861,7 +861,7 @@ def cmd_gaps(args) -> int:
 def cmd_serve(args) -> int:
     from . import serve
     _init_key()
-    return serve.serve(args.webapp, args.out, port=args.port, token=args.token)
+    return serve.serve(args.webapp, args.out, port=args.port)
 
 
 def cmd_changes(args) -> int:
@@ -1222,7 +1222,6 @@ def main(argv=None) -> int:
     sv = sub.add_parser("serve", help="listen on localhost for the Burp extension, which sends the selected requests")
     sv.add_argument("--webapp", "-w", required=True, type=_name("webapp"), help="name for the model")
     sv.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default: 8765)")
-    sv.add_argument("--token", help="shared secret the extension sends (default: a random one is printed)")
     sv.add_argument("--out", default="burp2model-out", help="output directory (default: burp2model-out)")
     sv.set_defaults(func=cmd_serve)
 

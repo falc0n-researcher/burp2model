@@ -20,7 +20,7 @@ def server(tmp_path, monkeypatch):
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
-    srv = serve.make_server("shop", str(tmp_path / "out"), "sekret", port)
+    srv = serve.make_server("shop", str(tmp_path / "out"), port)
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
     yield port, tmp_path / "out"
@@ -28,9 +28,9 @@ def server(tmp_path, monkeypatch):
     srv.server_close()
 
 
-def call(port, method, path, body=None, token="sekret", host=None):
+def call(port, method, path, body=None, client="burp-extension", host=None):
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
-    headers = {"X-B2M-Token": token}
+    headers = {"X-B2M-Client": client} if client else {}
     if host:
         headers["Host"] = host
     c.request(method, path, body=body, headers=headers)
@@ -52,11 +52,12 @@ def test_a_selection_becomes_a_build_and_a_report(server):
     conn.close()
 
 
-def test_health_needs_the_token(server):
+def test_a_request_without_the_client_header_is_refused(server):
+    """A web page can POST cross-site, but cannot add a custom header without a preflight."""
     port, _ = server
     assert call(port, "GET", "/health")[0] == 200
-    assert call(port, "GET", "/health", token="nope")[0] == 401
-    assert call(port, "POST", "/ingest", b"<x/>", token="")[0] == 401
+    assert call(port, "GET", "/health", client="")[0] == 403
+    assert call(port, "POST", "/ingest", b"<x/>", client="somebody-else")[0] == 403
 
 
 def test_a_web_page_cannot_reach_it_by_another_host_name(server):

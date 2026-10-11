@@ -1,15 +1,15 @@
 """A local endpoint for the Burp extension: it POSTs the selected requests, burp2model builds the model.
 
-Loopback only, a shared token on every request, and a size cap. The body is the same XML Burp's own
+Loopback only, no setup. A web page cannot drive it: only loopback host names are accepted and every
+request must carry a custom header, which a browser will not send across sites without a preflight that
+this server never answers. There is also a size cap. The body is the same XML Burp's own
 "Save items" writes, so the engine that reads exports is the one that reads these.
 """
 
 from __future__ import annotations
 
-import hmac
 import json
 import os
-import secrets
 import sys
 import tempfile
 import threading
@@ -20,7 +20,7 @@ MAX_BODY = 512 * 1024 * 1024
 DEFAULT_PORT = 8765
 
 
-def make_server(app: str, out: str, token: str, port: int = DEFAULT_PORT, build=None,
+def make_server(app: str, out: str, port: int = DEFAULT_PORT, build=None,
                 host: str = "127.0.0.1") -> ThreadingHTTPServer:
     """`build(argv)` runs one burp2model build and returns its exit code (the CLI's `main`)."""
     if build is None:
@@ -44,12 +44,13 @@ def make_server(app: str, out: str, token: str, port: int = DEFAULT_PORT, build=
             self.wfile.write(body)
 
         def _guard(self) -> bool:
-            # a web page must not be able to drive this: only loopback host names, and the token
+            # a web page must not be able to drive this: only loopback host names, and a custom header
+            # that a cross-site request cannot add without a preflight (which is never answered)
             if self.headers.get("Host", "") not in allowed_hosts:
                 self._send(403, {"error": "unexpected Host header"})
                 return False
-            if not hmac.compare_digest(self.headers.get("X-B2M-Token", ""), token):
-                self._send(401, {"error": "missing or wrong token"})
+            if self.headers.get("X-B2M-Client", "") != "burp-extension":
+                self._send(403, {"error": "missing client header"})
                 return False
             return True
 
@@ -120,16 +121,14 @@ def make_server(app: str, out: str, token: str, port: int = DEFAULT_PORT, build=
     return ThreadingHTTPServer((host, port), Handler)
 
 
-def serve(app: str, out: str, port: int = DEFAULT_PORT, token: str | None = None, open_report: bool = False) -> int:
-    token = token or secrets.token_urlsafe(24)
+def serve(app: str, out: str, port: int = DEFAULT_PORT) -> int:
     try:
-        srv = make_server(app, out, token, port)
+        srv = make_server(app, out, port)
     except OSError as e:
         print(f"serve: cannot listen on 127.0.0.1:{port}: {e}", file=sys.stderr)
         return 2
     print(f"burp2model is listening on http://127.0.0.1:{port} for the Burp extension\n"
-          f"  token: {token}\n  app: {app} -> {os.path.join(out, app)}\n"
-          f"  in Burp: Extensions > burp2model > Settings, then paste the token. Ctrl-C stops.", file=sys.stderr)
+          f"  app: {app} -> {os.path.join(out, app)}   (Ctrl-C stops)", file=sys.stderr)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
