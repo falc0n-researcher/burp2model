@@ -1136,7 +1136,9 @@ public final class MainPanel extends JPanel {
                 Cookies, tokens, keys and personal data are masked before anything is stored; only names and shapes are kept.
                 It is a model builder, never a scanner: leads are hypotheses to verify in an authorised session.
 
-                Models live in ~/.burp2model/models/<name>/.  Nothing is sent anywhere unless you run Recon or paste a package into your own AI.""");
+                Models live in ~/.burp2model/models/<name>/.  Nothing is sent anywhere unless you run Recon or paste a package into your own AI.
+
+                burp2model extension """ + burp2model.engine.Version.EXTENSION + "  ·  https://github.com/falc0n-researcher/burp2model");
         about.setEditable(false);
         about.setOpaque(false);
         about.setFont(Theme.font(12f, Font.PLAIN));

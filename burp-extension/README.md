@@ -6,6 +6,8 @@ burp2model, inside Burp. Right-click requests, choose **Send to burp2model**, an
 
 ## Use it
 
+Get `burp2model.jar` from the [extension releases](https://github.com/falc0n-researcher/burp2model/releases?q=extension), or build it (below).
+
 1. In Burp: **Extensions > Add > Java**, pick `burp2model.jar`.
 2. In Proxy history or Site map, select requests, right-click, **Send to burp2model**.
 3. Open the **burp2model** tab.

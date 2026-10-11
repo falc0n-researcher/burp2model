@@ -10,7 +10,7 @@ to your own AI instead of raw traffic.
 
 [![PyPI](https://img.shields.io/badge/pip-burp2model-e85002?style=for-the-badge)](https://pypi.org/project/burp2model/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a424e?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-331_passing-0fa79a?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/tests-332_passing-0fa79a?style=for-the-badge)](tests/)
 [![Secrets masked](https://img.shields.io/badge/secrets-masked_before_write-0e8fd6?style=for-the-badge)](#boundaries)
 [![Docs](https://img.shields.io/badge/docs-github_pages-7a5cff?style=for-the-badge)](https://falc0n-researcher.github.io/burp2model/)
 
@@ -33,6 +33,12 @@ rather than guessed at. It is a **model builder, not a scanner or exploit tool**
 ```bash
 pip install burp2model        # Python 3.9+, no dependencies
 ```
+
+## Burp Suite extension
+
+Prefer to stay in Burp? The [extension](burp-extension/) builds the same model inside Burp: right-click requests, **Send to burp2model**, and the **burp2model** tab fills with the surface, ranked leads, a map, every request with its masked request and response, and a query console. It is one Java jar, with no Python and no files to export, and it is released separately from the command line tool: get `burp2model.jar` from the [releases](https://github.com/falc0n-researcher/burp2model/releases?q=extension).
+
+<img src="burp-extension/assets/overview.png" alt="The burp2model tab inside Burp" width="700">
 
 ## Quickstart
 
