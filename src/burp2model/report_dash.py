@@ -389,7 +389,7 @@ function vOverview(){
   const hot=PRIO.filter(p=>p.sev==="hot").length,roles=D.roles||[],reqTot=EVL.length;
   const sum=[`<b>${c.endpoints||0}</b> API endpoints on <b>${c.routes||0}</b> pages, from <b>${fmtN(reqTot)}</b> captured requests${roles.length>1?` as <b>${roles.length}</b> roles`:""}.`];
   if(so)sum.push(`<b>${so}</b> ${so===1?"endpoint is":"endpoints are"} named in the code but never called.`);
-  sum.push(PRIO.length?`Start with the ${Math.min(5,PRIO.length)} leads below.`:"Nothing stands out. The map is the next stop.");
+  sum.push(PRIO.length?`Start with the ${Math.min(5,PRIO.length)===1?"lead":Math.min(5,PRIO.length)+" leads"} below.`:"Nothing stands out. The map is the next stop.");
   const stc=tally(EVL,e=>statusClass(e.status));
   const stOrder=["2xx","3xx","4xx","5xx"].map(k=>({label:k,v:(stc.find(x=>x[0]===k)||[0,0])[1],color:SC_COL[k]}));
   const unk=c.unknowns||0;

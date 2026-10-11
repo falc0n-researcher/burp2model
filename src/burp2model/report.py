@@ -690,9 +690,11 @@ document.addEventListener("click",e=>{if(!e.target.closest(".copyai"))$("#copyop
    One card per endpoint. Each matching signal is listed on the card; the
    card's severity is the strongest signal's. */
 const SEV_RANK={hot:0,warn:1,info:2};
+const STATIC_N=EP.filter(e=>e.state==="STATIC_ONLY").length;
 function signalsFor(e){
   const sig=[];
-  if(e.state==="STATIC_ONLY") sig.push({sev:"hot",ttl:"Referenced in code, never called",
+  /* a few code-only paths are leads; dozens are just what a big bundle names, so they do not crowd out the rest */
+  if(e.state==="STATIC_ONLY") sig.push({sev:STATIC_N>12&&!e.privileged?"info":"hot",ttl:"Referenced in code, never called",
     why:"The client code names this endpoint but no request to it was captured, so nobody has walked this path.",
     next:"Request it directly in an authorised session and observe the response."});
   if(e.privileged&&e.requests>0) sig.push({sev:"hot",ttl:"Privileged-looking path was reached",
@@ -722,7 +724,7 @@ function priorities(){
     sig.sort((a,b)=>SEV_RANK[a.sev]-SEV_RANK[b.sev]);
     out.push({sev:sig[0].sev,ep:e,sig});
   });
-  return out.sort((a,b)=>SEV_RANK[a.sev]-SEV_RANK[b.sev]||b.sig.length-a.sig.length||a.ep.label.localeCompare(b.ep.label));
+  return out.sort((a,b)=>SEV_RANK[a.sev]-SEV_RANK[b.sev]||b.sig.length-a.sig.length||(b.ep.requests>0)-(a.ep.requests>0)||a.ep.label.localeCompare(b.ep.label));
 }
 const PRIO=priorities();
 

@@ -209,6 +209,8 @@ def redact_value_patterns(text: str) -> tuple[str, list[SecretFingerprint]]:
                 # 13-19 digits alone is a timestamp as often as a card
                 if not (13 <= len(digits) <= 19) or not _luhn_ok(digits):
                     return val
+                if len(digits) == 13 and digits[0] == "1":      # a millisecond timestamp, not a card
+                    return val
             prints.append(fingerprint(val, kind=kind))
             return f"[REDACTED:{kind}]"
         text = pattern.sub(_sub, text)
@@ -251,6 +253,8 @@ _JSON_ANY = re.compile(r'"((?:[^"\\]|\\.){1,64})"(\s*:\s*)("(?:[^"\\]|\\.)*"|-?\
 _INPUT_TAG = re.compile(r"<input\b[^>]*>", re.I)
 _ATTR_NAME = re.compile(r"""\bname\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.I)
 _ATTR_VALUE = re.compile(r"""(\bvalue\s*=\s*)(?:"[^"]*"|'[^']*'|[^\s>]+)""", re.I)
+_TAG = re.compile(r"<[A-Za-z][^<>]{0,2000}>")
+_ATTR_PAIR = re.compile(r"""([A-Za-z_:][\w:.\-]{0,63})(\s*=\s*)("[^"]*"|'[^']*')""")
 _HEADER_LINE = re.compile(
     r"(?i)\b(Cookie|Set-Cookie|Authorization|Proxy-Authorization|X-Auth-Token|X-API-Key|X-CSRF-Token|"
     r"X-XSRF-Token)(\s*:\s*)[^\r\n<]+")
@@ -288,9 +292,29 @@ def redact_named(text: str) -> str:
             return _ATTR_VALUE.sub(lambda v: v.group(1) + '"' + REDACTED + '"', tag, count=1)
         return tag
 
+    def _tag(m: re.Match) -> str:
+        # any attribute whose name says secret (`data-context-token="…"`), and the `content` of a
+        # `<meta name="csrf-token">`, carries a value the same way a hidden field does
+        tag = m.group(0)
+        if tag[:6].lower() == "<input":
+            return tag
+        pairs = _ATTR_PAIR.findall(tag)
+        meta_secret = tag[:5].lower() == "<meta" and any(
+            k.lower() == "name" and sens(v[1:-1]) for k, _, v in pairs)
+
+        def _attr(a: re.Match) -> str:
+            name, eq, val = a.group(1), a.group(2), a.group(3)
+            if val[1:-1] in ("", REDACTED) or _is_error_constant(val[1:-1]):
+                return a.group(0)
+            if sens(name) or (meta_secret and name.lower() == "content"):
+                return name + eq + '"' + REDACTED + '"'
+            return a.group(0)
+        return _ATTR_PAIR.sub(_attr, tag)
+
     # an HTML hidden field (`<input name="user_token" value="…">`) is a name/value pair too,
     # and a page that echoes request headers (`Cookie: PHPSESSID=…`) carries them in its body
     text = _INPUT_TAG.sub(_input, text)
+    text = _TAG.sub(_tag, text)
     text = _HEADER_LINE.sub(lambda m: m.group(1) + m.group(2) + REDACTED, text)
     text = _KV_ANY.sub(_kv, text)
     text = _JSON_ANY.sub(_json, text)

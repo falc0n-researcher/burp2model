@@ -327,3 +327,10 @@ def test_plain_build_makes_no_network_recon(tmp_path, monkeypatch):
     monkeypatch.setattr(osint, "run", boom)
     xml = export(tmp_path, [item(host="shop.example.com", path="/", resp_ct="text/html", resp_body="hi")])
     assert main([xml, "-w", "app", "--out", str(tmp_path / "o")]) == 0
+
+
+def test_a_bracketed_string_in_minified_code_does_not_cost_the_whole_response():
+    from burp2model.extract import extract_js_refs
+    code = 'fetch("/api/ok");const a="https://[{param}]/x",b="https://[REDACTED:email]/y";fetch("/api/also")'
+    paths = {r[2] for r in extract_js_refs(code)}
+    assert "/api/ok" in paths and "/api/also" in paths
