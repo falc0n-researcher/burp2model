@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Lower memory on large exports: the report is written in pieces, so a 40 MB export peaks near 440 MB instead of 860 MB. The report is byte-identical.
+- `reaches-privileged` also shows the shortest path from the host to each endpoint.
+
 ## 1.0.4 — 2026-10-11
 
 - Four more `burp2model q` verbs: `provenance NODE`, `static-only`, `changed-since BUILD` and `reaches-privileged ROLE`. Each answer cites evidence and works offline. (They are CLI-only; the report console says so.)

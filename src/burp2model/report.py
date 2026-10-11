@@ -40,11 +40,15 @@ from .report_fonts import TYPE_CSS, font_css
 SCHEMA_VERSION = 2
 
 
-def _safe_json(obj) -> str:
-    """JSON safe to embed inside an inline <script> element."""
-    s = json.dumps(obj, ensure_ascii=False, sort_keys=False)
+def _escape_script(s: str) -> str:
+    """Make a piece of JSON safe to embed inside an inline <script> element."""
     return (s.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
             .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
+
+
+def _safe_json(obj) -> str:
+    """JSON safe to embed inside an inline <script> element."""
+    return _escape_script(json.dumps(obj, ensure_ascii=False, sort_keys=False))
 
 
 def _params_index(m: Model) -> dict[str, list[str]]:
@@ -323,10 +327,14 @@ def write_html_report(m: Model, path: str, osint: dict | None = None,
             .replace("__DASHCSS__", DASH_CSS).replace("__DASHJS__", DASH_JS)
             .replace("__RRCSS__", RR_CSS).replace("__PGCSS__", PG_CSS).replace("__PGJS__", PG_JS).replace("__RRJS__", RR_JS).replace("__INVCSS__", INV_CSS).replace("__INVJS__", INV_JS)
             .replace("__QRYCSS__", QRY_CSS).replace("__QRYJS__", QRY_JS)
-            .replace("__MAPCSS__", MAP_CSS).replace("__TYPECSS__", TYPE_CSS).replace("__FONTCSS__", font_css()).replace("__MAPJS__", MAP_JS)
-            .replace("__DATA__", _safe_json(payload)))
+            .replace("__MAPCSS__", MAP_CSS).replace("__TYPECSS__", TYPE_CSS).replace("__FONTCSS__", font_css()).replace("__MAPJS__", MAP_JS))
+    head, _, tail = html.partition("__DATA__")
+    # stream the data in pieces: a large capture never exists as one more full-size string
     with open(path, "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(head)
+        for piece in json.JSONEncoder(ensure_ascii=False).iterencode(payload):
+            f.write(_escape_script(piece))
+        f.write(tail)
 
 
 _TEMPLATE = r"""<!doctype html>
