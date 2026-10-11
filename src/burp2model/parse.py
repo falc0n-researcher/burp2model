@@ -49,6 +49,19 @@ _TECH_HEADERS = ("server", "x-powered-by", "x-aspnet-version", "x-aspnetmvc-vers
                  "x-generator", "x-runtime", "x-framework")
 
 
+def ev_pack(ev: dict) -> bytes:
+    """The request and response panes as compressed JSON: redacted text packs ~5x, and a large capture
+    otherwise holds every pane as Python dicts and lists. Empty stays empty."""
+    if not ev:
+        return b""
+    return zlib.compress(json.dumps({"request": ev.get("request"), "response": ev.get("response")},
+                                    ensure_ascii=False).encode("utf-8"), 1)
+
+
+def ev_unpack(z: bytes) -> dict:
+    return json.loads(zlib.decompress(z).decode("utf-8")) if z else {}
+
+
 @dataclass
 class Exchange:
     """One redacted request/response pair."""
@@ -87,7 +100,16 @@ class Exchange:
     preflight: bool = False
     # a fully redacted view of the exchange, for the report's request/response
     # panes: request line, headers and body all masked; values never present.
-    ev: dict = field(default_factory=dict)
+    # kept compressed (see ev_pack); `ev` reads and writes it as a dict
+    ev_z: bytes = b""
+
+    @property
+    def ev(self) -> dict:
+        return ev_unpack(self.ev_z)
+
+    @ev.setter
+    def ev(self, value: dict) -> None:
+        self.ev_z = ev_pack(value)
 
     @property
     def url(self) -> str:
@@ -138,7 +160,7 @@ class Exchange:
             stack=[tuple(x) for x in r.get("stack", [])],
             scan_truncated=r.get("scan_truncated", False),
             gql_ops=r.get("gql_ops", []), preflight=r.get("preflight", False),
-            ev=r.get("ev", {}),
+            ev_z=ev_pack(r.get("ev", {})),
         )
 
 
@@ -732,5 +754,5 @@ def _parse_item(elem, idx: int, role: str | None) -> Exchange | None:
         scan_truncated=scan_truncated,
         gql_ops=gql_ops,
         preflight=preflight,
-        ev=ev,
+        ev_z=ev_pack(ev),
     )

@@ -140,7 +140,7 @@ def _entity_evidence(m: Model, arg: str) -> str:
                   key=lambda n: (n.label != arg, len(n.label), n.label))[:10]
     if not hits:
         return "\n".join([f"no entity matching {arg!r} in the {m.name} model", SOURCE])
-    by_id = {e["id"]: e for e in m.evidence_log}
+    by_id = {e["id"]: e for e in m.evidence_log.meta()}
     lines = []
     for n in hits:
         lines.append(f"{n.type} {n.label}")
@@ -559,7 +559,7 @@ def context_package(m: Model, lens: str = "attention", cap: int = 40,
         package["rules"] = CONTEXT_RULES + [
             "OSINT is external recon, not from the capture; label it as such and don't "
             "conflate a subdomain or open port with an observed endpoint."]
-    by_id = {e["id"]: e for e in m.evidence_log}
+    by_id = {e["id"]: e for e in m.evidence_log.meta()}
     package["evidence"] = {
         f"ev_{i}": {k: by_id[i][k] for k in ("method", "host", "path", "status", "role",
                                              "source", "item")}

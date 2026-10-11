@@ -12,7 +12,7 @@ import sys
 from . import shot
 from . import __version__
 from .parse import Exchange, parse_items
-from .model import build, to_dict, from_dict, cross_role
+from .model import build, dump_model, from_dict, cross_role
 from .context import LENSES, SOURCE, query as run_query, context_package
 from .animate import render_terminal, write_svg
 from .redact import set_fingerprint_key
@@ -84,6 +84,35 @@ def _save_input(outdir: str, key: str, exchanges: list[Exchange], stats: dict) -
             f.write(json.dumps(ex.to_record()) + "\n")
 
 
+def _stage_input(outdir: str, exchanges, stats: dict) -> tuple[str, int]:
+    """Write parsed exchanges straight to a staging file as they stream in, so a large export is never
+    held in memory. The stats line goes last, when the counts are final. Returns (path, exchanges written)."""
+    d = _inputs_dir(outdir)
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, ".staging")
+    n = 0
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            for ex in exchanges:
+                f.write(json.dumps(ex.to_record()) + "\n")
+                n += 1
+            f.write(json.dumps({"_stats": stats, "_version": INPUTS_VERSION}) + "\n")
+    except BaseException:
+        if os.path.exists(path):
+            os.remove(path)
+        raise
+    return path, n
+
+
+def _drop_if_empty(outdir: str) -> None:
+    """A build that read nothing leaves no folders behind."""
+    for d in (_inputs_dir(outdir), outdir):
+        try:
+            os.rmdir(d)
+        except OSError:
+            pass
+
+
 def _clear_inputs(outdir: str, only: str | None = None) -> None:
     d = _inputs_dir(outdir)
     if not os.path.isdir(d):
@@ -150,12 +179,16 @@ def _scope(args) -> list[str] | None:
 def cmd_build(args) -> int:
     _init_key()
     stats: dict = {}
+    outdir = os.path.join(args.out, args.webapp)
+    os.makedirs(outdir, exist_ok=True)
+    staged = None
     try:
-        exchanges = list(parse_items(
+        staged, count = _stage_input(outdir, parse_items(
             args.log, role=args.role, stats=stats,
             skip_tools=tuple((args.skip_tools or "").split(",")),
-            only_tools=tuple((args.only_tools or "").split(","))))
+            only_tools=tuple((args.only_tools or "").split(","))), stats)
     except (OSError, ValueError, SyntaxError) as e:
+        _drop_if_empty(outdir)
         if str(args.log).lower().endswith(".csv"):
             extra = ("\nExpected a Burp Logger++ CSV export with Method, Host, Request and Response "
                      "columns (Request/Response base64 or raw HTTP).")
@@ -175,7 +208,9 @@ def cmd_build(args) -> int:
             print("  note: this export includes Scanner traffic (active-scan probes). They show up as "
                   "endpoints in the model; add --skip-tools Scanner to model the app without them.",
                   file=sys.stderr)
-    if not exchanges:
+    if not count:
+        os.remove(staged)
+        _drop_if_empty(outdir)
         if stats.get("items", 0) == 0:
             print(f"{args.log}: no <item> elements found. This does not look like a Burp "
                   "'Save items' export.\n"
@@ -186,10 +221,10 @@ def cmd_build(args) -> int:
                   "Check the export is a full Burp 'Save items' XML with base64-encoded "
                   "requests and responses.", file=sys.stderr)
         return 2
-    return _build_from(args, exchanges, stats)
+    return _build_from(args, [], stats, staged=staged)
 
 
-def _build_from(args, exchanges: list, stats: dict) -> int:
+def _build_from(args, exchanges: list, stats: dict, staged: str | None = None) -> int:
     """Everything after parsing: save inputs, merge roles, build, write every output."""
     outdir = os.path.join(args.out, args.webapp)
     os.makedirs(outdir, exist_ok=True)
@@ -199,7 +234,10 @@ def _build_from(args, exchanges: list, stats: dict) -> int:
         _clear_inputs(outdir)
     else:
         _clear_inputs(outdir, only=DEFAULT_INPUT)
-    _save_input(outdir, args.role or DEFAULT_INPUT, exchanges, stats)
+    if staged:
+        os.replace(staged, os.path.join(_inputs_dir(outdir), (args.role or DEFAULT_INPUT) + ".jsonl"))
+    else:
+        _save_input(outdir, args.role or DEFAULT_INPUT, exchanges, stats)
     exchanges.clear()                   # the saved input is the source from here; free the copy
     all_ex, all_stats, merged = _load_inputs(outdir)
 
@@ -219,7 +257,7 @@ def _build_from(args, exchanges: list, stats: dict) -> int:
 
     try:
         with open(os.path.join(outdir, "model.json"), "w", encoding="utf-8") as f:
-            json.dump(to_dict(m), f, indent=2)
+            f.writelines(dump_model(m, indent=2))
         db_path = os.path.join(outdir, store.DB_NAME)
         dbs = store.write_db(m, db_path, osint=osint_data, label=getattr(args, "label", None))
         write_html_report(m, os.path.join(outdir, "report.html"),

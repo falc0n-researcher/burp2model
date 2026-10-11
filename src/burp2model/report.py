@@ -166,8 +166,12 @@ def _osint_graph(osint: dict, primary_host: str | None, node_ids: set[str] | Non
     return nodes, edges, summary
 
 
-def build_payload(m: Model, osint: dict | None = None, lens: str = "attention") -> dict:
-    data = to_dict(m)
+_EVIDENCE = "\u0000evidence"      # stands in for the request log until it is streamed out
+
+
+def build_payload(m: Model, osint: dict | None = None, lens: str = "attention",
+                  lazy_evidence: bool = False) -> dict:
+    data = to_dict(m, evidence=not lazy_evidence)
     nodes = {n["id"]: n for n in data["nodes"]}
     params = _params_index(m)
 
@@ -286,7 +290,7 @@ def build_payload(m: Model, osint: dict | None = None, lens: str = "attention") 
         "context": context_package(m, lens=lens, osint=osint),
         "methodology": {"prompt": METHODOLOGY_PROMPT, "scaffold": investigation_plan(m)},
         "osint": o_summary,
-        "evidence": {f"ev_{e['id']}": e for e in data.get("evidence", [])},
+        "evidence": _EVIDENCE if lazy_evidence else {f"ev_{e['id']}": e for e in data.get("evidence", [])},
     }
 
 
@@ -308,7 +312,7 @@ def write_html_report(m: Model, path: str, osint: dict | None = None,
                       lens: str = "attention", db_path: str | None = None,
                       screenshot: tuple[str, bytes] | None = None,
                       changes: dict | None = None) -> None:
-    payload = build_payload(m, osint=osint, lens=lens)
+    payload = build_payload(m, osint=osint, lens=lens, lazy_evidence=True)
     if changes:
         payload["changes"] = changes
     if screenshot:
@@ -332,8 +336,16 @@ def write_html_report(m: Model, path: str, osint: dict | None = None,
     # stream the data in pieces: a large capture never exists as one more full-size string
     with open(path, "w", encoding="utf-8") as f:
         f.write(head)
+        marker = json.dumps(_EVIDENCE)
         for piece in json.JSONEncoder(ensure_ascii=False).iterencode(payload):
-            f.write(_escape_script(piece))
+            if piece.endswith(marker):              # the key and ": " ride along in the same piece
+                f.write(_escape_script(piece[:-len(marker)] + "{"))
+                for i, e in enumerate(m.evidence_log):
+                    f.write(_escape_script(("" if not i else ", ") + json.dumps(f"ev_{e['id']}") + ": "
+                                           + json.dumps(e, ensure_ascii=False)))
+                f.write(_escape_script("}"))
+            else:
+                f.write(_escape_script(piece))
         f.write(tail)
 
 
