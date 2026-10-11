@@ -199,6 +199,11 @@ _NODE_FIELDS = {
     "node.label": ("nodes.label", "text"), "node.layer": ("nodes.layer", "int"),
     "node.source": ("nodes.source", "text"), "node.role": ("nodes.roles", "text"),
     "node.state": ("CAST(json_extract(nodes.attrs,'$.api_state') AS TEXT)", "text"),
+    # history across builds (CLI only; the report holds one build)
+    "node.first_seen": ("(SELECT first_seen FROM entity_history h WHERE h.kind='node' AND h.key=nodes.id)", "text"),
+    "node.last_seen": ("(SELECT last_seen FROM entity_history h WHERE h.kind='node' AND h.key=nodes.id)", "text"),
+    "node.first_build": ("(SELECT first_build FROM entity_history h WHERE h.kind='node' AND h.key=nodes.id)", "int"),
+    "node.last_build": ("(SELECT last_build FROM entity_history h WHERE h.kind='node' AND h.key=nodes.id)", "int"),
 }
 _NODE_TEXT = ("nodes.label", "nodes.id")
 

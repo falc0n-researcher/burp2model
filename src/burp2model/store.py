@@ -31,9 +31,10 @@ from datetime import datetime, timezone
 
 from .model import Model, to_dict
 
-DB_SCHEMA_VERSION = 1
+DB_SCHEMA_VERSION = 2
 DB_NAME = "graph.db"
-KEEP_BUILDS = 20
+# Builds are kept forever so drift can be diffed over any span. Set BURP2MODEL_KEEP_BUILDS=N to keep
+# only the newest N (a very large model costs a compressed copy per build).
 
 _GRAPH_TABLES = ("nodes", "edges", "node_evidence", "edge_evidence",
                  "exchanges", "unknowns", "secrets")
@@ -72,7 +73,13 @@ CREATE TABLE IF NOT EXISTS osint_facts (
 );
 CREATE TABLE IF NOT EXISTS builds (
   id INTEGER PRIMARY KEY, built_at TEXT, nodes INTEGER, edges INTEGER,
-  exchanges INTEGER, osint_run INTEGER, model_gz BLOB
+  exchanges INTEGER, osint_run INTEGER, model_gz BLOB, label TEXT
+);
+-- when each node and edge was first and last in a build; never rewritten, so it spans every run
+CREATE TABLE IF NOT EXISTS entity_history (
+  kind TEXT NOT NULL, key TEXT NOT NULL,          -- node: its id; edge: src|type|dst
+  first_build INTEGER, last_build INTEGER, first_seen TEXT, last_seen TEXT,
+  PRIMARY KEY (kind, key)
 );
 CREATE INDEX IF NOT EXISTS ix_nodes_type ON nodes(type);
 CREATE INDEX IF NOT EXISTS ix_edges_src ON edges(src, type);
@@ -107,6 +114,11 @@ def _init(conn: sqlite3.Connection) -> None:
     elif int(row[0]) > DB_SCHEMA_VERSION:
         raise ValueError(f"{DB_NAME} schema {row[0]} is newer than this burp2model "
                          f"(understands {DB_SCHEMA_VERSION}); upgrade the package")
+    elif int(row[0]) < DB_SCHEMA_VERSION:
+        # a graph.db from before build labels and entity history: add the column, keep every build
+        if "label" not in {r[1] for r in conn.execute("PRAGMA table_info(builds)")}:
+            conn.execute("ALTER TABLE builds ADD COLUMN label TEXT")
+        conn.execute("UPDATE meta SET value=? WHERE key='schema'", (str(DB_SCHEMA_VERSION),))
 
 
 def open_db(path: str) -> sqlite3.Connection:
@@ -129,7 +141,7 @@ def _headers_text(headers) -> str:
 
 # ------------------------------------------------------------------ write ----
 
-def write_db(m: Model, path: str, osint: dict | None = None) -> dict:
+def write_db(m: Model, path: str, osint: dict | None = None, label: str | None = None) -> dict:
     """(Re)build graph.db from a Model, folding in OSINT. Returns a summary."""
     conn = connect(path)
     try:
@@ -148,12 +160,15 @@ def write_db(m: Model, path: str, osint: dict | None = None) -> dict:
                 latest = conn.execute("SELECT data FROM osint_runs WHERE id=?",
                                       (run_id,)).fetchone()
                 _write_osint_graph(conn, json.loads(latest[0]), m)
-            _snapshot(conn, m, run_id)
+            build_id = _snapshot(conn, m, run_id, label)
+            _record_history(conn, m, build_id)
             conn.execute("INSERT OR REPLACE INTO meta VALUES ('app', ?)", (m.name,))
             conn.execute("INSERT OR REPLACE INTO meta VALUES ('built_at', ?)", (_now(),))
             conn.execute("INSERT OR REPLACE INTO meta VALUES ('scope', ?)",
                          (json.dumps(m.scope),))
-        return summary(conn)
+        out = summary(conn)
+        out["build"] = build_id
+        return out
     finally:
         conn.close()
 
@@ -192,13 +207,70 @@ def _write_graph(conn: sqlite3.Connection, m: Model) -> None:
                       s.get("count", 1), json.dumps(s.get("evidence", []))))
 
 
-def _snapshot(conn: sqlite3.Connection, m: Model, osint_run: int | None) -> None:
+def _snapshot(conn: sqlite3.Connection, m: Model, osint_run: int | None, label: str | None = None) -> int:
+    """Append this build's model to the history; returns its build id."""
     blob = gzip.compress(json.dumps(to_dict(m)).encode("utf-8"), mtime=0)
-    conn.execute("INSERT INTO builds(built_at,nodes,edges,exchanges,osint_run,model_gz) "
-                 "VALUES (?,?,?,?,?,?)",
-                 (_now(), len(m.nodes), len(m.edges), len(m.evidence_log), osint_run, blob))
-    conn.execute("DELETE FROM builds WHERE id <= (SELECT max(id) FROM builds) - ?",
-                 (KEEP_BUILDS,))
+    cur = conn.execute("INSERT INTO builds(built_at,nodes,edges,exchanges,osint_run,model_gz,label) "
+                       "VALUES (?,?,?,?,?,?,?)",
+                       (_now(), len(m.nodes), len(m.edges), len(m.evidence_log), osint_run, blob,
+                        (label or None)))
+    keep = os.environ.get("BURP2MODEL_KEEP_BUILDS", "")
+    if keep.isdigit() and int(keep) > 0:
+        conn.execute("DELETE FROM builds WHERE id <= (SELECT max(id) FROM builds) - ?", (int(keep),))
+    return cur.lastrowid
+
+
+def edge_key(src: str, etype: str, dst: str) -> str:
+    return f"{src}|{etype}|{dst}"
+
+
+def _record_history(conn: sqlite3.Connection, m: Model, build_id: int) -> None:
+    """First and last build and time each node and edge was seen. Older rows are only ever extended."""
+    now = _now()
+    rows = [("node", nid) for nid in m.nodes] + [("edge", edge_key(e.src, e.type, e.dst)) for e in m.edges]
+    conn.executemany(
+        "INSERT INTO entity_history(kind,key,first_build,last_build,first_seen,last_seen) "
+        "VALUES (?,?,?,?,?,?) ON CONFLICT(kind,key) DO UPDATE SET last_build=excluded.last_build, "
+        "last_seen=excluded.last_seen",
+        [(k, key, build_id, build_id, now, now) for k, key in rows])
+
+
+def list_builds(conn: sqlite3.Connection) -> list[dict]:
+    return [{"id": r["id"], "built_at": r["built_at"], "nodes": r["nodes"], "edges": r["edges"],
+             "exchanges": r["exchanges"], "label": r["label"] or ""}
+            for r in conn.execute("SELECT id,built_at,nodes,edges,exchanges,label FROM builds ORDER BY id")]
+
+
+def resolve_build(conn: sqlite3.Connection, ref: str | int | None) -> int:
+    """A build id from `latest`, `previous`, `first`, a number, or a label (newest match)."""
+    ids = [r[0] for r in conn.execute("SELECT id FROM builds ORDER BY id")]
+    if not ids:
+        raise ValueError("graph.db has no builds yet")
+    ref = "latest" if ref is None else ref
+    s = str(ref).strip().lower()
+    if s == "latest":
+        return ids[-1]
+    if s in ("previous", "prev"):
+        if len(ids) < 2:
+            raise ValueError("graph.db holds only one build so far; build again after the app changes")
+        return ids[-2]
+    if s == "first":
+        return ids[0]
+    if s.lstrip("#").isdigit():
+        n = int(s.lstrip("#"))
+        if n not in ids:
+            raise ValueError(f"no build #{n} in graph.db (have {ids[0]}..{ids[-1]})")
+        return n
+    row = conn.execute("SELECT id FROM builds WHERE lower(label)=? ORDER BY id DESC LIMIT 1", (s,)).fetchone()
+    if row:
+        return row[0]
+    raise ValueError(f"no build matches {ref!r}; use an id, latest, previous, first or a label")
+
+
+def history(conn: sqlite3.Connection, kind: str, key: str) -> dict | None:
+    r = conn.execute("SELECT first_build,last_build,first_seen,last_seen FROM entity_history "
+                     "WHERE kind=? AND key=?", (kind, key)).fetchone()
+    return dict(r) if r else None
 
 
 # ------------------------------------------------------------------ OSINT ----

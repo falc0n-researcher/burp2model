@@ -143,7 +143,7 @@ function splitInit(){
 }
 /* old section names keep working as links */
 const LEGACY={surface:["reference","endpoints"],code:["reference","scripts"],supply:["reference","parties"],trust:["reference","trust"],
-  crossrole:["reference","roles"],infra:["reference","infra"],unknowns:["priorities","open"],query:["ask"],evidence:["inventory"]};
+  crossrole:["reference","roles"],infra:["reference","infra"],unknowns:["priorities","open"],changes:["priorities","changes"],query:["ask"],evidence:["inventory"]};
 function go(id){
   const l=LEGACY[id];
   if(!l){view=id;return;}
@@ -178,9 +178,9 @@ function chkLeadRow(it,i){
 }
 function vPriorities(){
   const leads=chkLeads(),open=D.unknowns||[];
-  const body=CHK.tab==="leads"?chkLeadsHtml(leads):chkOpenHtml(open);
+  const body=CHK.tab==="changes"&&hasChanges()?chkChangesHtml():CHK.tab==="open"?chkOpenHtml(open):chkLeadsHtml(leads);
   return splitShell(`<h1 class="vt">To check</h1><p class="vsub">Leads worth a look first, and the questions this capture could not answer. Pick one to see the requests behind it below.</p>
-   <div class="tabs"><button data-ctab="leads" class="${CHK.tab==="leads"?"on":""}">Leads<span class="n">${leads.length}</span></button><button data-ctab="open" class="${CHK.tab==="open"?"on":""}">Open questions<span class="n">${open.length}</span></button></div>${body}`);
+   <div class="tabs"><button data-ctab="leads" class="${CHK.tab==="leads"?"on":""}">Leads<span class="n">${leads.length}</span></button><button data-ctab="open" class="${CHK.tab==="open"?"on":""}">Open questions<span class="n">${open.length}</span></button>${hasChanges()?`<button data-ctab="changes" class="${CHK.tab==="changes"?"on":""}">Changes<span class="n">${chgItems().length}</span></button>`:""}</div>${body}`);
 }
 function chkLeadsHtml(leads){
   if(!leads.length)return '<div class="empty">Nothing stood out in this capture. That says something about the capture, not the target.</div>';
@@ -198,6 +198,29 @@ function chkOpenHtml(open){
    <div id="openlist">${[...groups.entries()].map(([k,xs])=>`<div class="qgrp">${esc(openTitle(k))}<span class="n">${xs.length}</span></div>${xs.slice(0,60).map(([u,i])=>`<div class="qrow${CHK.sel===i?" sel":""}" data-open="${i}"><div class="e">${esc(u.entity)}</div>
      <ul>${u.we_know.map(x=>`<li>${esc(x)}</li>`).join("")}<li class="un">Unknown: ${esc(u.we_dont_know)}</li></ul><div class="nx"><b>To find out</b>${esc(u.next)}</div></div>`).join("")}${xs.length>60?`<div class="more" style="color:var(--faint);font-size:12px">+ ${xs.length-60} more of this kind</div>`:""}`).join("")}</div>`;
 }
+/* what moved since the previous build: workflows, changed fingerprints, new and gone */
+const hasChanges=()=>!!(D.changes&&!D.changes.same);
+function chgItems(){
+  const c=D.changes;if(!c)return [];const it=[];
+  (c.workflows||[]).forEach(w=>it.push({k:w.kind==="new_workflow"?"new workflow":"removed workflow",sev:w.kind==="new_workflow"?"hot":"info",title:w.title,sub:w.summary,chain:(w.chain||[]).join(" → "),ids:w.kind==="new_workflow"?w.evidence:[],gone:w.kind!=="new_workflow"}));
+  (c.changed||[]).forEach(x=>it.push({k:"changed",sev:"warn",title:x.label,sub:x.kind,lines:x.changes.map(y=>y.summary),ids:x.evidence||[]}));
+  ((c.new||{}).nodes||[]).forEach(x=>it.push({k:"new",sev:"info",title:x.label,sub:x.kind,ids:x.evidence||[]}));
+  ((c.new||{}).stack||[]).forEach(x=>it.push({k:"new",sev:"info",title:x.label,sub:x.category,ids:x.evidence||[]}));
+  ((c.new||{}).edges||[]).forEach(x=>it.push({k:"new",sev:"info",title:`${x.from} ${x.edge} ${x.to}`,sub:"link",ids:x.evidence||[]}));
+  ((c.gone||{}).nodes||[]).forEach(x=>it.push({k:"gone",sev:"info",title:x.label,sub:x.kind+(x.last_seen?` · last seen ${x.last_seen.slice(0,10)}`:""),ids:[],gone:true}));
+  ((c.gone||{}).stack||[]).forEach(x=>it.push({k:"gone",sev:"info",title:x.label,sub:x.category,ids:[],gone:true}));
+  ((c.gone||{}).edges||[]).forEach(x=>it.push({k:"gone",sev:"info",title:`${x.from} ${x.edge} ${x.to}`,sub:"link",ids:[],gone:true}));
+  return it;
+}
+function chkChangesHtml(){
+  const c=D.changes,s=c.summary,it=chgItems(),f=c.from||{},t=c.to||{};
+  const tag=m=>m&&m.id?`build ${m.id}${m.label?` (${esc(m.label)})`:m.built_at?` (${esc(m.built_at.slice(0,10))})`:""}`:"";
+  return `<p class="vsub" style="margin-top:-6px">${tag(f)} → ${tag(t)}: ${s.new_workflows} new workflow${s.new_workflows===1?"":"s"}, ${s.changed} changed, ${s.new} new, ${s.gone} gone. Connected additions are grouped into one line.</p>
+   <div id="chglist">${it.map((x,i)=>`<div class="lrow sev-${x.sev}${CHK.sel===i?" sel":""}" data-chg="${i}"><div class="rk">${i+1}</div><div>
+     <div class="t"><span class="sevb">${esc(x.k)}</span><span class="p">${esc(x.title)}</span></div>
+     ${x.sub?`<div class="y">${esc(x.sub)}</div>`:""}${x.chain?`<div class="w" style="font-weight:500">${esc(x.chain)}</div>`:""}
+     ${(x.lines||[]).map(l=>`<div class="w">${esc(l)}</div>`).join("")}</div></div>`).join("")}</div>`;
+}
 function initPriorities(){
   splitInit();
   const leads=chkLeads(),open=D.unknowns||[];
@@ -207,8 +230,9 @@ function initPriorities(){
   const pick=(attr,list,show)=>$$(`[${attr}]`).forEach(r=>r.onclick=()=>{const i=+r.dataset[attr.replace("data-","")];CHK.sel=i;
     $$(`[${attr}]`).forEach(x=>x.classList.toggle("sel",x===r));show(list[i]);});
   pick("data-lead",leads,it=>splitShow(it.ids,{title:it.title,find:it.find,empty:{head:"No request for this one",text:"It was named in the code or the capture, but nothing was requested."}}));
+  pick("data-chg",chgItems(),it=>splitShow(it.ids,{title:it.title,empty:{head:it.gone?"No longer there":"No request of its own",text:it.gone?"The older build had this and the newer one does not, so there is nothing to open.":"This change comes from how things are linked, not from one request."}}));
   pick("data-open",open,u=>{const ids=evForLabel(u.entity);splitShow(ids,{title:u.entity,empty:{head:"Nothing to open",text:"This question is about something the capture does not contain, so there is no request to show."}});});
-  const first=CHK.tab==="leads"?$("[data-lead]"):$("[data-open]");
+  const first=CHK.tab==="leads"?$("[data-lead]"):CHK.tab==="changes"?$("[data-chg]"):$("[data-open]");
   if(first)first.click();
 }
 

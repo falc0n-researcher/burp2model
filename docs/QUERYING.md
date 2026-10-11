@@ -59,8 +59,28 @@ $ burp2model graph shop --reach /api/checkout
 ```bash
 burp2model gaps shop                               # unknowns ranked by value of resolving them
 burp2model changes shop --against old/model.json   # drift by area, never "a bug"
+burp2model builds shop                              # the builds kept in graph.db (label one with --label)
+burp2model diff shop 3 7                            # new workflows, changed fingerprints, gone things
 burp2model falsify shop                            # prompt that tries to disprove each hypothesis
 burp2model methodology shop [--prompt]             # target-specific plan, or the AI prompt for it
 ```
+
+### What changed between builds
+
+Every build is kept in `graph.db`. `diff` compares two of them by deterministic id:
+
+```
+shop: build 1 (2026-10-01) → build 2 (2026-10-08)
+  1 new workflow(s) · 2 new · 2 changed · 3 gone
+
+NEW WORKFLOWS (connected additions, one line each)
+  ▸ route /checkout  (5 things: 1 script, 1 endpoint, 2 parameters)
+      /checkout → checkout.js → POST /api/pay → +2 parameters
+CHANGED
+  ~ GET /api/admin/users  [endpoint]      statuses 200 → 403
+  ~ www.shop.test  [host]                 header server: nginx/1.24.0 → cloudflare
+```
+
+A new page, the script it loads, the endpoint that script names and its parameters are one line, not a dozen. The same build twice gives no drift. In BQL, `node.first_build` and `node.last_build` (also `first_seen`, `last_seen`) say when a thing first and last appeared. Set `BURP2MODEL_KEEP_BUILDS=N` to keep only the newest N builds.
 
 All results are hypotheses to verify in an authorized session. The same five analyst roles are packaged in [`skills/`](../skills/). A sample report is in [`examples/juiceshop/report.html`](examples/juiceshop/report.html).

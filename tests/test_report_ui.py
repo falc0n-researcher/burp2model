@@ -183,3 +183,24 @@ def test_scripts_are_beautified_for_reading(page):
     assert 'x;y' in page.js("beautifyJS('var s=\"x;y\"')")                        # strings are left alone
     assert page.js("beautifyHTML('<html><body><p>hi</p></body></html>').split(String.fromCharCode(10)).length") == 7
     assert page.errors == []
+
+
+def test_changes_tab_shows_what_moved_since_the_previous_build(tmp_path_factory):
+    from test_diff import v1, v2
+    from test_gaps import export
+    out = tmp_path_factory.mktemp("chg")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("BURP2MODEL_FP_KEY", "ci")
+        mp.setenv("BURP2MODEL_OFFLINE", "1")
+        for i, items in enumerate((v1(), v2())):
+            assert main([export(out, items, name=f"c{i}.xml"), "-w", "shop", "--out", str(out / "o")]) == 0
+    p = Page(str(out / "o" / "shop" / "report.html"))
+    try:
+        assert p.js("!!document.querySelector('.chgbar')")                       # the overview says so
+        p.js("location.hash='#changes'", wait=0.6)
+        assert p.js("document.querySelectorAll('[data-chg]').length") >= 3
+        assert "workflow" in p.js("document.querySelector('[data-chg]').textContent")
+        assert p.js("!document.querySelector('#spbot').hidden")
+        assert p.errors == []
+    finally:
+        p.close()

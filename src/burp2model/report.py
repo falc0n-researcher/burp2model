@@ -288,8 +288,11 @@ def build_payload(m: Model, osint: dict | None = None, lens: str = "attention") 
 
 def write_html_report(m: Model, path: str, osint: dict | None = None,
                       lens: str = "attention", db_path: str | None = None,
-                      screenshot: tuple[str, bytes] | None = None) -> None:
+                      screenshot: tuple[str, bytes] | None = None,
+                      changes: dict | None = None) -> None:
     payload = build_payload(m, osint=osint, lens=lens)
+    if changes:
+        payload["changes"] = changes
     if screenshot:
         from . import shot
         payload["screenshot"] = shot.data_uri(*screenshot)

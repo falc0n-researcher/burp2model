@@ -36,6 +36,9 @@ DASH_CSS = r"""
 .svc{margin-top:14px;display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px 12px;align-items:baseline}
 .svc .sk{font:600 10px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
 .svc .sv{display:flex;flex-wrap:wrap;gap:4px 14px}
+.chgbar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;width:100%;text-align:left;margin-bottom:18px;padding:12px 16px;border:1px solid var(--line);border-left:4px solid var(--observed);border-radius:12px;background:var(--panel);font:13px var(--sans);color:var(--muted)}
+.chgbar b{color:var(--text);font-weight:700}.chgbar i{margin-left:auto;color:var(--signal);font-style:normal;font-weight:600}
+.chgbar:hover{border-color:var(--line2);border-left-color:var(--observed)}
 .m-overview{padding:26px 32px 60px}
 .ovh{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:28px;align-items:end;margin-bottom:26px}
 @media(max-width:1000px){.ovh{grid-template-columns:minmax(0,1fr)}}
@@ -362,6 +365,11 @@ function shotCard(){
   const hs=primaryFirst(),h=hs[0];
   return `<div class="shotcard"><div class="sbar"><i></i><i></i><i></i><span>${esc(h?`${(h.schemes||["https"])[0]}://${h.label}/`:D.app)}</span></div><button class="simg" data-shot aria-label="Enlarge the screenshot"><img src="${esc(D.screenshot)}" alt="Screenshot of ${esc(h?h.label:D.app)}"></button></div>`;
 }
+function changesRibbon(){
+  if(!hasChanges())return "";
+  const c=D.changes,s=c.summary,t=c.to||{},f=c.from||{};
+  return `<button class="chgbar" data-goto="changes"><b>Since build ${esc(f.id)}${f.label?` (${esc(f.label)})`:""}</b><span>${s.new_workflows} new workflow${s.new_workflows===1?"":"s"}</span><span>${s.changed} changed</span><span>${s.new} new</span><span>${s.gone} gone</span><i>See what moved →</i></button>`;
+}
 function glance(){
   const shot=shotCard(),a=infraCard(),b=stackCard();
   if(!shot&&!a&&!b)return "";
@@ -393,6 +401,7 @@ function vOverview(){
     <button class="${hot||weakCookies.length?"hot":""}" data-goto="priorities"><div class="n">${PRIO.length+weakCookies.length}</div><div class="k">To check</div></button>
     <button data-goto="unknowns"><div class="n">${unk}</div><div class="k">Open questions</div></button></div></div>
 
+  ${changesRibbon()}
   ${glance()}
 
   <div class="ovg"><div>

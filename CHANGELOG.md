@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **`burp2model diff APP [FROM] [TO]`** compares two builds kept in `graph.db` and groups the drift:
+  *new workflows* (a new page, the script it loads, the endpoints that script names and their
+  parameters are one line), *changed* fingerprints (a status 200 to 403, a server header nginx to
+  Cloudflare, a cookie flag, a version, a role that now reaches an endpoint), and what is *gone*.
+  The same build twice gives zero drift. `--json` for tooling.
+- **History.** Every build is kept (set `BURP2MODEL_KEEP_BUILDS=N` to cap it), `--label TEXT` names a
+  build, `burp2model builds APP` lists them, and each node and edge records its first and last build and
+  time (`node.first_seen`, `node.last_seen`, `node.first_build`, `node.last_build` in BQL). An older
+  `graph.db` is upgraded in place.
+- **Changes in the report.** When there is a previous build, the overview shows a "since build N" bar and
+  To check gets a Changes tab that opens the request behind each change.
+
 ## 1.0.2 — 2026-10-09
 
 A new report, a technology stack, and lower memory use on large exports.
