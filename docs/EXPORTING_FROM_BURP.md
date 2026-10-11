@@ -34,6 +34,10 @@ burp2model logs.csv -w app --role user --skip-tools Scanner
 
 The CSV needs `Method`, `Host`, `Request` and `Response` columns (base64 or raw HTTP). Use `--skip-tools` or `--only-tools` to filter by the `Tool` column. Rows split by a spreadsheet at 32,767 characters are rejoined; a response that stays cut off is flagged.
 
+## Straight from Burp
+
+Run `burp2model serve -w app`, load the extension from [`burp-extension/`](../burp-extension/), then right-click requests and choose **Send to burp2model**. To keep exporting by hand instead, save each export into one folder and run `burp2model watch FOLDER -w app`; every new file becomes a build.
+
 ## Without Burp
 
 `burp2model crawl https://your.app/ --yes` builds the model from a running app. See [CRAWLING.md](CRAWLING.md).

@@ -89,6 +89,7 @@ burp2model query shop help
 burp2model user.xml  -w shop --role user
 burp2model admin.xml -w shop --role admin
 burp2model cross-role shop --low user --high admin</pre></div>
+  <p>Keep exporting into one folder and run <code>burp2model watch FOLDER -w shop</code>: each new export becomes a build, and <code>burp2model diff shop</code> shows what changed between builds. To skip the export step, the <a href="https://github.com/falc0n-researcher/burp2model/tree/main/burp-extension">Burp extension</a> sends selected requests to <code>burp2model serve</code> on localhost.</p>
   <p>No Burp? <code>burp2model crawl URL --yes -w shop</code> crawls a running app and builds the same model. It sends live requests, so use it only on apps you are authorized to test. <code>--read-only</code> blocks anything but GET, HEAD and OPTIONS.</p>
   <p>Output of <code>query shop "code vs runtime"</code> on the bundled sample:</p>
   <div class="code"><pre>APIs: 10 endpoints
