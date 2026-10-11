@@ -160,3 +160,45 @@ def test_keep_builds_env_caps_history(run, monkeypatch):
     conn = store.open_db(db)
     assert [b["id"] for b in store.list_builds(conn)] == [2]
     conn.close()
+
+
+# -------------------------------------------------------------------- watch ---
+
+def test_watch_turns_each_new_export_into_a_build_and_prints_the_change(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("BURP2MODEL_FP_KEY", "ci")
+    monkeypatch.setenv("BURP2MODEL_OFFLINE", "1")
+    folder = tmp_path / "exports"
+    folder.mkdir()
+    (folder / "monday.xml").write_text(open(export(tmp_path, v1(), name="a.xml")).read())
+    out = str(tmp_path / "out")
+    args = ["watch", str(folder), "-w", "shop", "--out", out, "--once"]
+    assert main(args) == 0
+    (folder / "tuesday.xml").write_text(open(export(tmp_path, v2(), name="b.xml")).read())
+    capsys.readouterr()
+    assert main(args) == 0
+    text = capsys.readouterr().out
+    assert "NEW WORKFLOWS" in text and "statuses 200 → 403" in text
+    conn = store.open_db(os.path.join(out, "shop", "graph.db"))
+    assert [b["label"] for b in store.list_builds(conn)] == ["monday", "tuesday"]
+    conn.close()
+    # nothing new: no further build
+    assert main(args) == 0
+    conn = store.open_db(os.path.join(out, "shop", "graph.db"))
+    assert len(store.list_builds(conn)) == 2
+    conn.close()
+
+
+def test_watch_can_ignore_what_is_already_in_the_folder(tmp_path, monkeypatch):
+    monkeypatch.setenv("BURP2MODEL_FP_KEY", "ci")
+    monkeypatch.setenv("BURP2MODEL_OFFLINE", "1")
+    folder = tmp_path / "exports"
+    folder.mkdir()
+    (folder / "old.xml").write_text(open(export(tmp_path, v1(), name="a.xml")).read())
+    out = str(tmp_path / "out")
+    assert main(["watch", str(folder), "-w", "shop", "--out", out, "--once", "--skip-existing"]) == 0
+    assert not os.path.exists(os.path.join(out, "shop", "graph.db"))
+
+
+def test_watch_needs_a_real_folder(tmp_path, capsys):
+    assert main(["watch", str(tmp_path / "nope"), "-w", "shop", "--once"]) == 2
+    assert "not a folder" in capsys.readouterr().err
