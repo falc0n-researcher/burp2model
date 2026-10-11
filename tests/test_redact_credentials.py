@@ -95,3 +95,18 @@ def test_session_and_nonce_style_names_are_credentials():
     for name in ("PHPSESSID", "ASP.NET_SessionId", "_wpnonce", "__VIEWSTATE", "XSRF-TOKEN", "csrf"):
         out = redact_named(f"{name}=abcdefgh12345678")
         assert "abcdefgh12345678" not in out, name
+
+
+def test_html_attributes_named_for_a_secret_are_masked():
+    from burp2model.redact import redact_named
+    page = ('<script defer src="/a.js" data-context-token="v1.eyJwcm9qZWN0X2lkIjoiYWJjIn0" data-commit-sha="e40b7596">'
+            '</script><meta name="csrf-token" content="Zm9vYmFyYmF6cXV4"><meta name="viewport" content="width=device-width">')
+    out = redact_named(page)
+    assert "eyJwcm9q" not in out and "Zm9vYmFy" not in out
+    assert 'data-commit-sha="e40b7596"' in out and 'content="width=device-width"' in out
+
+
+def test_a_millisecond_timestamp_is_not_a_card_number():
+    from burp2model.redact import redact_value_patterns
+    assert redact_value_patterns("t=1760208000008")[0] == "t=1760208000008"      # luhn-valid by chance
+    assert "REDACTED:card" in redact_value_patterns("pan 4111 1111 1111 1111")[0]

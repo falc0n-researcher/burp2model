@@ -59,7 +59,10 @@ def _normalize(raw: str) -> tuple[str | None, str] | None:
         raw = "https:" + raw
     host = None
     if raw.lower().startswith(("http://", "https://")):
-        parts = urllib.parse.urlsplit(raw)
+        try:
+            parts = urllib.parse.urlsplit(raw)
+        except ValueError:                   # `https://[{x}]/…` in minified code is not a URL
+            return None
         host = (parts.hostname or "").lower() or None
         path = parts.path or "/"
     else:
@@ -166,8 +169,11 @@ def _resolve_asset(raw: str, script_host: str, script_path: str):
     raw = raw.strip()
     if not raw or raw.startswith(("data:", "blob:", "{param}")) or "{param}" in raw:
         return None
-    parts = urllib.parse.urlsplit(raw if "://" in raw or raw.startswith("//") else
-                                  urllib.parse.urljoin("https://x" + script_path, raw))
+    try:
+        parts = urllib.parse.urlsplit(raw if "://" in raw or raw.startswith("//") else
+                                      urllib.parse.urljoin("https://x" + script_path, raw))
+    except ValueError:
+        return None
     if "://" in raw or raw.startswith("//"):
         host = (parts.hostname or "").lower() or script_host
         path = parts.path
