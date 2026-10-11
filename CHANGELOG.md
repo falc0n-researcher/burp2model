@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Lower memory on large exports: the report is written in pieces, so a 40 MB export peaks near 440 MB instead of 860 MB. The report is byte-identical.
+- Much lower memory on large exports: a 40 MB export now peaks near 135 MB instead of 860 MB. The export is parsed straight to disk, request and response text is kept compressed in memory, and model.json, the report and the build snapshot are written piece by piece. Every output file is byte-identical to before.
 - `reaches-privileged` also shows the shortest path from the host to each endpoint.
 
 ## 1.0.4 — 2026-10-11

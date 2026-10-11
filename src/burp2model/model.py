@@ -20,12 +20,13 @@ first-party: www., api., cdn. of the same site. Pass `scope` to set it.
 
 from __future__ import annotations
 
+import json
 import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 
 from .domains import registrable_domain  # noqa: F401  (re-exported)
-from .parse import Exchange
+from .parse import Exchange, ev_pack, ev_unpack
 
 API_HINT = re.compile(r"/(api|v\d+|graphql|rest|gql)(/|$)", re.I)
 PRIV_RE = re.compile(
@@ -66,6 +67,58 @@ class Unknown:
     next_step: str
 
 
+class EvidenceLog:
+    """The request log behind every citation. Each entry keeps its small fields as a dict and its request and
+    response panes compressed; reading an entry gives the same full dict as before."""
+
+    def __init__(self) -> None:
+        self._rows: list[tuple[dict, bytes]] = []
+
+    @classmethod
+    def from_entries(cls, entries) -> "EvidenceLog":
+        log = cls()
+        for e in entries:
+            meta = {k: v for k, v in e.items() if k not in ("request", "response")}
+            has = "request" in e or "response" in e
+            log._rows.append((meta, ev_pack({"request": e.get("request"), "response": e.get("response")}) if has else b""))
+        return log
+
+    def append(self, entry: dict) -> None:
+        self.extend([entry])
+
+    def extend(self, entries) -> None:
+        self._rows.extend(EvidenceLog.from_entries(entries)._rows)
+
+    def append_packed(self, meta: dict, z: bytes) -> None:
+        self._rows.append((meta, z))
+
+    def _full(self, row: tuple[dict, bytes]) -> dict:
+        meta, z = row
+        if not z:
+            return dict(meta)
+        d = ev_unpack(z)
+        return {**meta, "request": d.get("request"), "response": d.get("response")}
+
+    def __len__(self) -> int:
+        return len(self._rows)
+
+    def __iter__(self):
+        for row in self._rows:
+            yield self._full(row)
+
+    def __getitem__(self, i):
+        if isinstance(i, slice):
+            return [self._full(r) for r in self._rows[i]]
+        return self._full(self._rows[i])
+
+    def __bool__(self) -> bool:
+        return bool(self._rows)
+
+    def meta(self):
+        """Each entry's small fields (id, method, host, path, status, role ...) without unpacking the panes."""
+        return (row[0] for row in self._rows)
+
+
 class Model:
     def __init__(self, name: str):
         self.name = name
@@ -77,7 +130,7 @@ class Model:
         self.scope: list[str] = []
         self.stats: dict = {}
         self.stack: list[dict] = []
-        self.evidence_log: list[dict] = []
+        self.evidence_log = EvidenceLog()
         self._edge_index: dict[tuple, Edge] = {}
         self._secret_index: dict[tuple, dict] = {}
 
@@ -348,10 +401,7 @@ def build(exchanges: list[Exchange], name: str, seed_host: str | None = None,
             "host": ex.host, "path": ex.path_template, "status": ex.status,
             "mime": ex.mime, "role": role,
         }
-        if ex.ev:
-            ev_entry["request"] = ex.ev.get("request")
-            ev_entry["response"] = ex.ev.get("response")
-        m.evidence_log.append(ev_entry)
+        m.evidence_log.append_packed(ev_entry, ex.ev_z)
         for s in ex.secrets:
             _add_secret(m, s.as_dict(), i)
         if is_probe(ex):                 # a scanner's payload: evidence yes, a node in the app's map no
@@ -773,7 +823,7 @@ def cross_role(m: Model, low: str, high: str) -> dict:
     shared_same_success      both roles got a 2xx — compare response content.
     """
     high_only, low_priv, shared = [], [], []
-    ev_role = {e["id"]: e.get("role") for e in m.evidence_log}
+    ev_role = {e["id"]: e.get("role") for e in m.evidence_log.meta()}
 
     def evs(node, prefer_role):
         # cite the preferred role's requests when we have them, so a
@@ -820,9 +870,10 @@ def cross_role(m: Model, low: str, high: str) -> dict:
 MODEL_SCHEMA_VERSION = 1
 
 
-def to_dict(m: Model) -> dict:
+def to_dict(m: Model, evidence: bool = True) -> dict:
+    """The model as plain data. `evidence=False` leaves the request log out (dump_model streams it)."""
     from . import __version__
-    return {
+    d = {
         "tool": "burp2model",
         "version": __version__,
         "schema": MODEL_SCHEMA_VERSION,
@@ -835,9 +886,37 @@ def to_dict(m: Model) -> dict:
         "unknowns": [asdict(u) for u in m.unknowns],
         "roles": sorted(m.roles),
         "secrets": m.secrets,
-        "evidence": m.evidence_log,
+        "evidence": list(m.evidence_log) if evidence else [],
         "stack": m.stack,
     }
+    return d
+
+
+def dump_model(m: Model, indent: int | None = None, ensure_ascii: bool = True):
+    """Yield the text of json.dumps(to_dict(m), indent=indent) piece by piece. The request log, by far the
+    largest part, is unpacked and written one entry at a time instead of existing as one huge list."""
+    kw = {"indent": indent, "ensure_ascii": ensure_ascii}
+    pad = " " * indent if indent else ""
+    d = to_dict(m, evidence=False)
+    keys = list(d)
+    yield "{\n" if indent else "{"
+    for n, k in enumerate(keys):
+        yield (pad if indent else "") + json.dumps(k, ensure_ascii=ensure_ascii) + ": "
+        if k != "evidence":
+            yield json.dumps(d[k], **kw).replace("\n", "\n" + pad)
+        elif not len(m.evidence_log):
+            yield "[]"
+        else:
+            yield "[\n" if indent else "["
+            for i, e in enumerate(m.evidence_log):
+                if i:
+                    yield ",\n" if indent else ", "
+                txt = json.dumps(e, **kw)
+                yield (pad * 2 + txt.replace("\n", "\n" + pad * 2)) if indent else txt
+            yield ("\n" + pad + "]") if indent else "]"
+        if n < len(keys) - 1:
+            yield ",\n" if indent else ", "
+    yield "\n}" if indent else "}"
 
 
 def from_dict(data: dict) -> Model:
@@ -868,6 +947,6 @@ def from_dict(data: dict) -> Model:
             m._secret_index[(s["kind"], s["hmac_12"])] = s
     m.scope = data.get("scope", [])
     m.stats = data.get("stats", {})
-    m.evidence_log = data.get("evidence", [])
+    m.evidence_log = EvidenceLog.from_entries(data.get("evidence", []))
     m.stack = data.get("stack", [])
     return m

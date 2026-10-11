@@ -23,13 +23,14 @@ are kept, so recon accumulates and drift can be diffed over time.
 from __future__ import annotations
 
 import gzip
+import io
 import json
 import os
 import re
 import sqlite3
 from datetime import datetime, timezone
 
-from .model import Model, to_dict
+from .model import Model, dump_model
 
 DB_SCHEMA_VERSION = 2
 DB_NAME = "graph.db"
@@ -209,7 +210,11 @@ def _write_graph(conn: sqlite3.Connection, m: Model) -> None:
 
 def _snapshot(conn: sqlite3.Connection, m: Model, osint_run: int | None, label: str | None = None) -> int:
     """Append this build's model to the history; returns its build id."""
-    blob = gzip.compress(json.dumps(to_dict(m)).encode("utf-8"), mtime=0)
+    raw = io.BytesIO()
+    with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=9, mtime=0) as gz:
+        for piece in dump_model(m):                 # piece by piece: the request log never exists as one string
+            gz.write(piece.encode("utf-8"))
+    blob = raw.getvalue()
     cur = conn.execute("INSERT INTO builds(built_at,nodes,edges,exchanges,osint_run,model_gz,label) "
                        "VALUES (?,?,?,?,?,?,?)",
                        (_now(), len(m.nodes), len(m.edges), len(m.evidence_log), osint_run, blob,
