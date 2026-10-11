@@ -33,6 +33,9 @@ public final class Analysis {
             List<Signal> sig = new ArrayList<>();
             String path = String.valueOf(e.attrs.getOrDefault("path", ""));
             boolean privileged = Builder.PRIV_RE.matcher(path).find();
+            if (!privileged && Builder.TELEMETRY_RE.matcher(path).find()) {
+                continue;                                  // a beacon is traffic, not a lead
+            }
             long requests = ((Number) e.attrs.getOrDefault("requests", 0L)).longValue();
             List<Object> creds = (List<Object>) e.attrs.getOrDefault("credentials", List.of());
             List<Object> statuses = (List<Object>) e.attrs.getOrDefault("statuses", List.of());

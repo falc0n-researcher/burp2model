@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **HAR input.** `burp2model session.har -w app` builds from a HAR file (browser DevTools, Hetty, mitmproxy, ZAP, Charles), through the same masking as a Burp export. `watch` picks up `*.har` too.
+- **Redaction covers more shapes.** Found with two real exports: a secret next to its name now gets masked in multipart form parts, XML elements, quoted assignments in scripts and config (`const apiKey = "..."`, `{token:'...'}`), YAML lines, JSON arrays of secrets, JSON inside a percent-encoded form field, and values named `cookie`, `credential` or `bearer`. `tests/test_redaction_realistic.py` plants each shape and fails if the value survives; ordinary text is left alone.
+- **Beacons are not leads.** Analytics and telemetry calls (`/collect`, `/track`, `/beacon`, `/pixel` ...) no longer show in To check, and go last in what an AI is handed. They stay in the surface and the requests.
+- Added `SECURITY.md`, `CONTRIBUTING.md`, issue and pull request templates.
+
 ## 1.1.0 — 2026-10-12
 
 - Fix: one malformed bracketed URL in a script (`https://[{x}]/...`) made the whole response unreadable, so a page and its code were silently dropped from the model. Such strings are now skipped on their own.

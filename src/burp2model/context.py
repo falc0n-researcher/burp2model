@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 
-from .model import PRIV_RE, Model
+from .model import PRIV_RE, TELEMETRY_RE, Model
 
 SOURCE = "Source: Knowledge Graph · Model call: none"
 
@@ -350,7 +350,9 @@ CONTEXT_RULES = [
 def _priority(n) -> tuple:
     a = n.attrs
     path = a.get("path", "")
-    if a.get("api_state") == "STATIC_ONLY":
+    if TELEMETRY_RE.search(path) and not PRIV_RE.search(path):
+        rank = 6                                    # analytics beacons go last, whatever else is true of them
+    elif a.get("api_state") == "STATIC_ONLY":
         rank = 0
     elif PRIV_RE.search(path):
         rank = 1

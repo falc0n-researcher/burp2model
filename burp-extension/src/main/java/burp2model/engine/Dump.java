@@ -13,7 +13,8 @@ public final class Dump {
     private Dump() {}
 
     public static void main(String[] a) throws Exception {
-        List<Exchange> ex = BurpXml.read(new File(a[0]), null);
+        File file = new File(a[0]);
+        List<Exchange> ex = Har.looksLike(file) ? Har.read(file, null) : BurpXml.read(file, null);
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("items", (long) ex.size());
         Model m = Builder.build(ex, a.length > 2 ? a[2] : "app", null, null, stats);

@@ -49,7 +49,7 @@ public final class Redact {
         "password", "passwd", "pwd", "passcode", "secret", "token", "apikey", "api_key", "access_key", "refresh_token",
         "id_token", "client_secret", "private_key", "session", "sid", "csrf", "auth", "signature", "sig", "code", "otp",
         "pin", "ssn", "cvv", "cvc", "assertion", "answer", "passphrase", "totp", "mfa", "sessid", "nonce", "xsrf",
-        "viewstate", "eventvalidation", "verification"};
+        "viewstate", "eventvalidation", "verification", "cookie", "credential", "bearer"};
     private static final Set<String> CREDENTIAL_GROUP = Set.of("current", "new", "repeat", "confirm", "old", "retype",
             "verify", "again", "newpass", "oldpass", "confirmation");
 
@@ -331,6 +331,14 @@ public final class Redact {
     private static final Pattern INPUT_TAG = Pattern.compile("<input\\b[^>]*>", Pattern.CASE_INSENSITIVE);
     private static final Pattern ATTR_NAME = Pattern.compile("\\bname\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", Pattern.CASE_INSENSITIVE);
     private static final Pattern ATTR_VALUE = Pattern.compile("(\\bvalue\\s*=\\s*)(?:\"[^\"]*\"|'[^']*'|[^\\s>]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MULTIPART = Pattern.compile(
+            "(\\bname\\s*=\\s*\"([^\"\\r\\n]{1,64})\"[^\\r\\n]*(?:\\r?\\n[A-Za-z][A-Za-z\\-]*:[^\\r\\n]*)*\\r?\\n\\r?\\n)([^\\r\\n]+)");
+    private static final Pattern XML_EL = Pattern.compile("<([A-Za-z_][\\w.\\-:]{0,63})(\\s[^<>]*)?>([^<>]{1,500})</\\1>");
+    private static final Pattern ASSIGN = Pattern.compile("([\"']?)([A-Za-z_$][\\w$.\\-]{0,63})\\1(\\s*[:=]\\s*)([\"'])((?:(?!\\4)[^\\\\\\r\\n]|\\\\.){4,500})\\4");
+    private static final Pattern YAML = Pattern.compile("(?m)^([ \\t]*)([A-Za-z_][\\w.\\-]{0,63})([ \\t]*:[ \\t]*)([^\\s\"'#<>{}\\[\\],][^\\r\\n#]{5,200})$");
+    private static final Pattern JSON_LIST = Pattern.compile("\"((?:[^\"\\\\]|\\\\.){1,64})\"(\\s*:\\s*)\\[([^\\]]{0,2000})\\]");
+    private static final Pattern ENC_JSON = Pattern.compile("(%22([A-Za-z0-9_.\\-]{1,64})%22%3[Aa]%22)((?:(?!%22).){1,500})(%22)");
+    private static final Pattern STRING_LIT = Pattern.compile("\"(?:[^\"\\\\]|\\\\.)*\"");
     private static final Pattern TAG = Pattern.compile("<[A-Za-z][^<>]{0,2000}>");
     private static final Pattern ATTR_PAIR = Pattern.compile("([A-Za-z_:][\\w:.\\-]{0,63})(\\s*=\\s*)(\"[^\"]*\"|'[^']*')");
     private static final Pattern HEADER_LINE = Pattern.compile(
@@ -429,6 +437,39 @@ public final class Redact {
             }
             return m.group();
         });
+        // other places a secret sits next to its name (see redact.py)
+        java.util.function.Predicate<String> live = v -> !v.isEmpty() && !v.contains(REDACTED) && !isErrorConstant(v);
+        if (text.contains("%22")) {
+            text = sub(ENC_JSON, text, m -> sens.test(m.group(2)) && live.test(m.group(3)) ? m.group(1) + REDACTED + m.group(4) : m.group());
+        }
+        if (text.toLowerCase().contains("form-data")) {
+            text = sub(MULTIPART, text, m -> sens.test(m.group(2)) && live.test(m.group(3)) ? m.group(1) + REDACTED : m.group());
+        }
+        if (text.contains("</")) {
+            text = sub(XML_EL, text, m -> {
+                if (sens.test(m.group(1)) && live.test(m.group(3).strip())) {
+                    return "<" + m.group(1) + (m.group(2) == null ? "" : m.group(2)) + ">" + REDACTED + "</" + m.group(1) + ">";
+                }
+                return m.group();
+            });
+        }
+        if (text.indexOf('"') >= 0 || text.indexOf('\'') >= 0) {
+            text = sub(ASSIGN, text, m -> {
+                if (sens.test(m.group(2)) && live.test(m.group(5))) {
+                    return m.group(1) + m.group(2) + m.group(1) + m.group(3) + m.group(4) + REDACTED + m.group(4);
+                }
+                return m.group();
+            });
+            text = sub(JSON_LIST, text, m -> {
+                if (sens.test(m.group(1)) && !m.group(3).contains("REDACTED")) {
+                    return "\"" + m.group(1) + "\"" + m.group(2) + "[" + STRING_LIT.matcher(m.group(3)).replaceAll(Matcher.quoteReplacement("\"" + REDACTED + "\"")) + "]";
+                }
+                return m.group();
+            });
+        }
+        if (text.indexOf(':') >= 0) {
+            text = sub(YAML, text, m -> sens.test(m.group(2)) && live.test(m.group(4).strip()) ? m.group(1) + m.group(2) + m.group(3) + REDACTED : m.group());
+        }
         return text;
     }
 

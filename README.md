@@ -10,7 +10,7 @@ to your own AI instead of raw traffic.
 
 [![PyPI](https://img.shields.io/badge/pip-burp2model-e85002?style=for-the-badge)](https://pypi.org/project/burp2model/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a424e?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-332_passing-0fa79a?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/tests-379_passing-0fa79a?style=for-the-badge)](tests/)
 [![Secrets masked](https://img.shields.io/badge/secrets-masked_before_write-0e8fd6?style=for-the-badge)](#boundaries)
 [![Docs](https://img.shields.io/badge/docs-github_pages-7a5cff?style=for-the-badge)](https://falc0n-researcher.github.io/burp2model/)
 
@@ -44,7 +44,7 @@ Prefer to stay in Burp? The [extension](burp-extension/) builds the same model i
 
 ```bash
 # In Burp: Proxy → HTTP history → select all → right-click → Save items → history.xml
-# (a Logger++ CSV export works too)
+# (a Logger++ CSV or a HAR file from a browser, Hetty, mitmproxy or ZAP works too)
 burp2model history.xml --webapp shop
 
 # Ask it questions, deterministically, with no language model involved
@@ -85,7 +85,7 @@ Output goes to `burp2model-out/shop/`:
 
 | Command | Purpose |
 | --- | --- |
-| `build` (default) | Build the model from a Burp XML or Logger++ CSV export |
+| `build` (default) | Build the model from a Burp XML, Logger++ CSV or HAR export |
 | `crawl` | Build the model from a running app in a real browser, no Burp needed |
 | `query` | Ask the model a factual question, no AI |
 | `q` | Query `graph.db` with BQL |

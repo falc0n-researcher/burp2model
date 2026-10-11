@@ -443,6 +443,9 @@ def parse_items(path: str, role: str | None = None, stats: dict | None = None,
     if path.lower().endswith(".csv"):
         yield from _parse_logger_csv(path, role, stats, skip_tools, only_tools)
         return
+    if path.lower().endswith(".har") or _looks_like_har(path):
+        yield from _parse_har(path, role, stats)
+        return
     _check_no_entities(path)
     source = os.path.basename(path)
     idx = 1                  # evidence ids start at 1
@@ -563,6 +566,112 @@ def _parse_logger_csv(path, role, stats, skip_tools, only_tools):
             if not row.get("_spilled") and _CELL_LIMIT <= len(row.get("Response") or "") < 32768:
                 SubElement(item, "truncated").text = "1"
             ex = _parse_item(item, idx, role)
+        except Exception:
+            ex = None
+        if ex is None:
+            stats["skipped"] += 1
+            continue
+        ex.source, ex.item = source, item_no
+        idx += 1
+        stats["parsed"] += 1
+        yield ex
+
+
+# ------------------------------------------------------------------------ HAR --
+
+# a HAR holds decoded bodies, so the encodings that described the wire bytes no longer apply
+_HAR_DROP = {"content-encoding", "transfer-encoding", "content-length"}
+
+
+def _looks_like_har(path: str) -> bool:
+    if not path.lower().endswith(".json"):
+        return False
+    try:
+        with open(path, "rb") as f:
+            head = f.read(4096).lstrip()
+    except OSError:
+        return False
+    return head.startswith(b"{") and b'"log"' in head
+
+
+def _har_headers(headers) -> list[tuple[str, str]]:
+    out = []
+    for h in headers or []:
+        name = str((h or {}).get("name", "")).strip()
+        if name and not name.startswith(":"):                       # HTTP/2 pseudo-headers
+            out.append((name, str((h or {}).get("value", ""))))
+    return out
+
+
+def _har_item(entry: dict):
+    """One HAR entry as the <item> element the rest of the parser reads."""
+    from xml.etree.ElementTree import Element, SubElement
+    rq, rs = entry.get("request") or {}, entry.get("response") or {}
+    url = str(rq.get("url") or "")
+    u = urllib.parse.urlsplit(url)
+    host = (u.hostname or "").lower()
+    scheme = (u.scheme or "https").lower()
+    port = u.port or (443 if scheme == "https" else 80)
+    path = (u.path or "/") + ("?" + u.query if u.query else "")
+    status = int(rs.get("status") or 0)
+    if not host or not status:
+        return None                                                   # a request that never got a response
+    method = str(rq.get("method") or "GET").upper()
+    ver = str(rq.get("httpVersion") or "HTTP/1.1")
+    ver = ver if ver.upper().startswith("HTTP/") and "." in ver else "HTTP/1.1"
+
+    rq_headers = _har_headers(rq.get("headers"))
+    if not any(k.lower() == "host" for k, _ in rq_headers):
+        rq_headers.insert(0, ("Host", u.netloc.split("@")[-1] or host))
+    body = (rq.get("postData") or {})
+    body_text = body.get("text")
+    if body_text is None and body.get("params"):
+        body_text = urllib.parse.urlencode([(p.get("name", ""), p.get("value", "")) for p in body["params"]])
+    raw_rq = f"{method} {path} {ver}\r\n".encode("latin-1", "replace")
+    raw_rq += "".join(f"{k}: {v}\r\n" for k, v in rq_headers if k.lower() not in _HAR_DROP or k.lower() == "content-length").encode("latin-1", "replace")
+    raw_rq += b"\r\n" + (body_text or "").encode("utf-8", "replace")
+
+    content = rs.get("content") or {}
+    rs_headers = [(k, v) for k, v in _har_headers(rs.get("headers")) if k.lower() not in _HAR_DROP]
+    text = content.get("text")
+    if text is None:
+        rs_body = b""
+    elif content.get("encoding") == "base64":
+        try:
+            rs_body = base64.b64decode(text)
+        except Exception:
+            rs_body = b""
+    else:
+        rs_body = str(text).encode("utf-8", "replace")
+    raw_rs = f"HTTP/1.1 {status} {rs.get('statusText') or ''}\r\n".encode("latin-1", "replace")
+    raw_rs += "".join(f"{k}: {v}\r\n" for k, v in rs_headers).encode("latin-1", "replace") + b"\r\n" + rs_body
+
+    item = Element("item")
+    for tag, val in (("method", method), ("host", host), ("port", str(port)), ("protocol", scheme), ("path", path),
+                     ("status", str(status)), ("mimetype", str(content.get("mimeType") or ""))):
+        SubElement(item, tag).text = val
+    SubElement(item, "request", {"base64": "true"}).text = base64.b64encode(raw_rq).decode()
+    SubElement(item, "response", {"base64": "true"}).text = base64.b64encode(raw_rs).decode()
+    return item
+
+
+def _parse_har(path, role, stats):
+    """A HAR file (browser DevTools, Hetty, mitmproxy, ZAP, Charles ...), read as if it were a Burp export."""
+    source = os.path.basename(path)
+    with open(path, encoding="utf-8", errors="replace") as f:
+        try:
+            doc = json.load(f)
+        except ValueError as e:
+            raise ValueError(f"not a HAR file (not valid JSON: {e})")
+    entries = (doc.get("log") or {}).get("entries") if isinstance(doc, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("not a HAR file (no log.entries)")
+    idx = 1
+    for item_no, entry in enumerate(entries):
+        stats["items"] += 1
+        try:
+            item = _har_item(entry) if isinstance(entry, dict) else None
+            ex = _parse_item(item, idx, role) if item is not None else None
         except Exception:
             ex = None
         if ex is None:

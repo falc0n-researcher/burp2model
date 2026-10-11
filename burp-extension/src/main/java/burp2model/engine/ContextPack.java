@@ -26,6 +26,9 @@ public final class ContextPack {
 
     private static int priority(Model.Node n) {
         String path = String.valueOf(n.attrs.getOrDefault("path", ""));
+        if (Builder.TELEMETRY_RE.matcher(path).find() && !Builder.PRIV_RE.matcher(path).find()) {
+            return 6;
+        }
         if ("STATIC_ONLY".equals(n.attrs.get("api_state"))) {
             return 0;
         }
