@@ -2,62 +2,77 @@ package burp2model.ui;
 
 import burp2model.engine.Model;
 import java.awt.BorderLayout;
-import java.awt.GridLayout;
+import java.awt.Component;
+import java.awt.Font;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
-import javax.swing.border.TitledBorder;
 
-/** The redacted request and response behind a node, edge or query row. Evidence ids on the left, text on the right. */
+/** The redacted request and response behind a node, edge or query row: evidence ids at the left, the two messages beside them. */
 final class EvidenceViewer extends JPanel {
-    private final DefaultListModel<String> list = new DefaultListModel<>();
-    private final JList<String> ids = new JList<>(list);
-    private final JTextArea req = area();
-    private final JTextArea resp = area();
+    private final DefaultListModel<Integer> list = new DefaultListModel<>();
+    private final JList<Integer> ids = new JList<>(list);
+    private final HttpPane req = new HttpPane("Request");
+    private final HttpPane resp = new HttpPane("Response");
     private final JLabel title = new JLabel(" ");
     private Model model;
     private final List<Integer> current = new ArrayList<>();
 
     EvidenceViewer() {
         super(new BorderLayout());
-        ids.setVisibleRowCount(6);
+        ids.setFont(Theme.mono(12f));
+        ids.setCellRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> l, Object v, int i, boolean sel, boolean focus) {
+                JLabel c = (JLabel) super.getListCellRendererComponent(l, v, i, sel, focus);
+                int id = (Integer) v;
+                Map<String, Object> ev = find(id);
+                String label = "ev_" + id;
+                if (ev != null) {
+                    label += "  " + ev.get("method") + " " + (ev.get("status") == null ? "" : ev.get("status"));
+                }
+                c.setText(label);
+                c.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+                return c;
+            }
+        });
         ids.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 show(ids.getSelectedIndex());
             }
         });
-        JPanel panes = new JPanel(new GridLayout(1, 2, 6, 0));
-        panes.add(wrap(req, "Request (values masked)"));
-        panes.add(wrap(resp, "Response (values masked)"));
+        title.setFont(Theme.font(12f, Font.BOLD));
+        title.setBorder(BorderFactory.createEmptyBorder(6, 10, 4, 10));
+        JSplitPane panes = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, req, resp);
+        panes.addComponentListener(new java.awt.event.ComponentAdapter() {
+            private boolean done;
+
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                if (!done && panes.getWidth() > 50) {
+                    done = true;
+                    panes.setDividerLocation(0.5);
+                }
+            }
+        });
+        panes.setResizeWeight(0.5);
+        panes.setBorder(null);
         JScrollPane idScroll = new JScrollPane(ids);
-        idScroll.setBorder(new TitledBorder("Evidence"));
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, idScroll, panes);
-        split.setResizeWeight(0.0);
-        split.setDividerLocation(120);
+        idScroll.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.line()));
+        idScroll.setPreferredSize(new java.awt.Dimension(150, 100));
+        JPanel body = new JPanel(new BorderLayout());
+        body.add(idScroll, BorderLayout.WEST);
+        body.add(panes, BorderLayout.CENTER);
         add(title, BorderLayout.NORTH);
-        add(split, BorderLayout.CENTER);
-    }
-
-    private static JTextArea area() {
-        JTextArea a = new JTextArea();
-        a.setEditable(false);
-        a.setFont(Tables.mono());
-        a.setLineWrap(true);
-        a.setWrapStyleWord(false);
-        return a;
-    }
-
-    private static JScrollPane wrap(JTextArea a, String name) {
-        JScrollPane s = new JScrollPane(a);
-        s.setBorder(new TitledBorder(name));
-        return s;
+        add(body, BorderLayout.CENTER);
     }
 
     void setModel(Model m) {
@@ -68,8 +83,8 @@ final class EvidenceViewer extends JPanel {
     void clear() {
         list.clear();
         current.clear();
-        req.setText("");
-        resp.setText("");
+        req.clear("Select something above to see the request behind it.");
+        resp.clear("");
         title.setText(" ");
     }
 
@@ -77,53 +92,55 @@ final class EvidenceViewer extends JPanel {
     void show(List<Integer> evidence, String heading) {
         current.clear();
         list.clear();
-        for (int i : evidence) {
+        // real requests first; the page or script that merely names the thing comes after
+        List<Integer> ordered = new ArrayList<>(evidence);
+        ordered.sort(java.util.Comparator.comparingInt(this::codeRank));
+        for (int i : ordered) {
             current.add(i);
-            list.addElement("ev_" + i);
+            list.addElement(i);
         }
-        title.setText(heading == null ? " " : heading);
+        title.setText(heading == null || heading.isBlank() ? " " : heading);
         if (!current.isEmpty()) {
             ids.setSelectedIndex(0);
         } else {
-            req.setText("");
-            resp.setText("No request is behind this: the code names it, but it was never captured.");
+            req.clear("Named in the code, never captured: there is no request or response to show.");
+            resp.clear("");
         }
+    }
+
+    private int codeRank(int id) {
+        Map<String, Object> ev = find(id);
+        String mime = ev == null ? "" : String.valueOf(ev.get("mime")).toLowerCase();
+        return mime.equals("script") || mime.equals("html") ? 1 : 0;
+    }
+
+    private Map<String, Object> find(int id) {
+        if (model == null) {
+            return null;
+        }
+        List<Map<String, Object>> log = model.evidenceLog;
+        int idx = id - 1;
+        if (idx >= 0 && idx < log.size() && ((Number) log.get(idx).get("id")).intValue() == id) {
+            return log.get(idx);
+        }
+        for (Map<String, Object> ev : log) {
+            if (((Number) ev.get("id")).intValue() == id) {
+                return ev;
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
     private void show(int idx) {
-        if (idx < 0 || idx >= current.size() || model == null) {
+        if (idx < 0 || idx >= current.size()) {
             return;
         }
-        int want = current.get(idx);
-        for (Map<String, Object> ev : model.evidenceLog) {
-            if (((Number) ev.get("id")).intValue() == want) {
-                req.setText(format((Map<String, Object>) ev.get("request")));
-                resp.setText(format((Map<String, Object>) ev.get("response")));
-                req.setCaretPosition(0);
-                resp.setCaretPosition(0);
-                return;
-            }
+        Map<String, Object> ev = find(current.get(idx));
+        if (ev == null) {
+            return;
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static String format(Map<String, Object> m) {
-        if (m == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(String.valueOf(m.getOrDefault("line", ""))).append('\n');
-        for (Object h : (List<Object>) m.getOrDefault("headers", List.of())) {
-            List<Object> kv = (List<Object>) h;
-            sb.append(kv.get(0)).append(": ").append(kv.get(1)).append('\n');
-        }
-        String body = String.valueOf(m.getOrDefault("body", ""));
-        if (!body.isEmpty()) {
-            sb.append('\n').append(body);
-        }
-        if (Boolean.TRUE.equals(m.get("truncated"))) {
-            sb.append("\n… (cut off)");
-        }
-        return sb.toString();
+        req.show((Map<String, Object>) ev.get("request"));
+        resp.show((Map<String, Object>) ev.get("response"));
     }
 }

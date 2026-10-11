@@ -2,6 +2,12 @@ package burp2model;
 
 import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.core.ToolType;
+import burp.api.montoya.http.handler.HttpHandler;
+import burp.api.montoya.http.handler.HttpRequestToBeSent;
+import burp.api.montoya.http.handler.HttpResponseReceived;
+import burp.api.montoya.http.handler.RequestToBeSentAction;
+import burp.api.montoya.http.handler.ResponseReceivedAction;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
@@ -23,6 +29,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * burp2model inside Burp: right-click requests, Send to burp2model, and the model builds right here with
@@ -34,6 +44,12 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
     private MainPanel panel;
     private Path home;
     private final Map<String, Session> sessions = new HashMap<>();
+    private final ConcurrentLinkedQueue<Parse.Raw> live = new ConcurrentLinkedQueue<>();
+    private volatile boolean auto;
+    private long autoCheckedAt;
+    private int sinceSnapshot;
+    private long lastSnapshot = System.currentTimeMillis();
+    private ScheduledExecutorService flusher;
 
     @Override
     public void initialize(MontoyaApi api) {
@@ -77,6 +93,14 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         api.userInterface().applyThemeToComponent(panel);
         api.userInterface().registerSuiteTab("burp2model", panel);
         api.userInterface().registerContextMenuItemsProvider(this);
+        api.http().registerHttpHandler(new Capture());
+        flusher = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(null, r, "burp2model-live", 64L * 1024 * 1024);
+            t.setDaemon(true);
+            return t;
+        });
+        flusher.scheduleWithFixedDelay(this::flushLive, 5, 5, TimeUnit.SECONDS);
+        api.extension().registerUnloadingHandler(() -> flusher.shutdownNow());
         api.logging().logToOutput("burp2model ready. Right-click requests and choose Send to burp2model; the model is in the burp2model tab.");
     }
 
@@ -94,6 +118,71 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             // not a POSIX file system
         }
         return k;
+    }
+
+    // ------------------------------------------------------------------ live capture
+
+    /** Whether the Settings checkbox is on; read from the stored setting at most every two seconds. */
+    private boolean autoOn() {
+        long now = System.currentTimeMillis();
+        if (now - autoCheckedAt > 2000) {
+            autoCheckedAt = now;
+            auto = "1".equals(prefs.getString("auto"));
+        }
+        return auto;
+    }
+
+    private static final java.util.regex.Pattern STATIC = java.util.regex.Pattern.compile(
+            "\\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|css|woff2?|ttf|otf|eot|map|mp4|webm|mp3|wav)$", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** Watches Proxy traffic; in-scope requests wait in a queue and are added to the model every few seconds. */
+    private final class Capture implements HttpHandler {
+        @Override
+        public RequestToBeSentAction handleHttpRequestToBeSent(HttpRequestToBeSent r) {
+            return RequestToBeSentAction.continueWith(r);
+        }
+
+        @Override
+        public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived r) {
+            try {
+                if (autoOn() && r.toolSource().isFromTool(ToolType.PROXY) && api.scope().isInScope(r.initiatingRequest().url())
+                        && !STATIC.matcher(r.initiatingRequest().path().split("\\?", 2)[0]).find() && live.size() < 5000) {
+                    HttpRequest rq = r.initiatingRequest();
+                    live.add(new Parse.Raw(rq.method(), rq.httpService().host(), rq.httpService().port(), rq.httpService().secure() ? "https" : "http",
+                            rq.path(), (int) r.statusCode(), "", rq.toByteArray().getBytes(), r.toByteArray().getBytes(), false));
+                }
+            } catch (Throwable ignored) {
+                // never let capture interfere with the traffic
+            }
+            return ResponseReceivedAction.continueWith(r);
+        }
+    }
+
+    private void flushLive() {
+        try {
+            Session s = panel == null ? null : panel.session();
+            if (s == null || live.isEmpty()) {
+                return;
+            }
+            List<Parse.Raw> raws = new ArrayList<>();
+            Parse.Raw r;
+            while ((r = live.poll()) != null && raws.size() < 500) {
+                raws.add(r);
+            }
+            s.scope = panel.scope();
+            boolean snap = sinceSnapshot + raws.size() >= 40 || System.currentTimeMillis() - lastSnapshot > 180_000;
+            Session.AddResult res = s.add(raws, panel.role(), "live capture", false, snap);
+            sinceSnapshot = snap ? 0 : sinceSnapshot + res.added();
+            if (snap) {
+                lastSnapshot = System.currentTimeMillis();
+            }
+            if (res.added() > 0) {
+                panel.refresh();
+                panel.say("burp2model live: +" + res.added() + " requests · " + s.requestCount() + " in the model");
+            }
+        } catch (Throwable t) {
+            api.logging().logToError("burp2model live capture: " + t);
+        }
     }
 
     // ------------------------------------------------------------------ menu

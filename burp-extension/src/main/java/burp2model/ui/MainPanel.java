@@ -1,14 +1,18 @@
 package burp2model.ui;
 
 import burp2model.engine.Analysis;
+import burp2model.engine.ContextPack;
 import burp2model.engine.Diff;
 import burp2model.engine.Json;
 import burp2model.engine.Model;
 import burp2model.engine.Query;
+import burp2model.engine.Recon;
 import burp2model.engine.Session;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -19,27 +23,30 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 
-/** The burp2model tab: overview, leads, surface, requests, query, changes, roles and settings. */
+/** The burp2model tab. */
 public final class MainPanel extends JPanel {
-    /** What the extension supplies: how to save settings and how to log. */
+    /** What the extension supplies: settings storage, logging and the saved models. */
     public interface Host {
         String get(String key, String def);
 
@@ -54,24 +61,38 @@ public final class MainPanel extends JPanel {
     private Session session;
     private final JLabel status = new JLabel(" ");
     private final JTabbedPane tabs = new JTabbedPane();
+    private final JLabel modelName = new JLabel(" ");
+    private final JPanel pills = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+    private final JTextField globalSearch = new JTextField(22);
 
-    // overview
-    private final JTextArea overview = new JTextArea();
+    private final Dashboard dashboard = new Dashboard();
 
-    // leads
-    private final DefaultTableModel leadsModel = Tables.model("Severity", "Endpoint", "Why", "Next step");
+    // to check
+    private final DefaultTableModel leadsModel = Tables.model("Severity", "Endpoint", "Why it matters", "Do next");
     private final JTable leadsTable = Tables.table(leadsModel);
+    private final Facts leadsFacts = new Facts();
     private final EvidenceViewer leadsViewer = new EvidenceViewer();
     private List<Analysis.Lead> leads = new ArrayList<>();
+    private final DefaultTableModel gapsModel = Tables.model("Value", "Type", "About", "Not known", "Smallest next step");
+    private final JTable gapsTable = Tables.table(gapsModel);
+    private final JTabbedPane checkTabs = new JTabbedPane();
+
+    // map
+    private final GraphPanel graph = new GraphPanel();
+    private final Facts graphFacts = new Facts();
+    private final EvidenceViewer graphViewer = new EvidenceViewer();
 
     // surface
-    private final JComboBox<String> typeBox = new JComboBox<>(new String[] {"endpoint", "route", "script", "third_party", "cookie", "auth", "parameter", "host", "tech", "operation", "role"});
-    private final JTextField surfaceFilter = new JTextField(24);
-    private final DefaultTableModel surfaceModel = Tables.model("Name", "State", "Statuses", "Roles", "Requests", "Where");
+    private final JComboBox<String> typeBox = new JComboBox<>(new String[] {"endpoint", "route", "script", "third_party", "cookie", "auth", "parameter",
+        "host", "tech", "operation", "role", "all"});
+    private final JTextField surfaceFilter = new JTextField(22);
+    private final DefaultTableModel surfaceModel = Tables.model("Type", "Name", "State", "Statuses", "Roles", "Requests", "Host");
     private final JTable surfaceTable = Tables.table(surfaceModel);
+    private final SiteTree siteTree = new SiteTree();
+    private final Facts surfaceFacts = new Facts();
     private final EvidenceViewer surfaceViewer = new EvidenceViewer();
-    private final JTextArea surfaceDetail = detail();
     private final List<Model.Node> surfaceRows = new ArrayList<>();
+    private final JPanel surfaceCards = new JPanel(new java.awt.CardLayout());
 
     // requests
     private final DefaultTableModel reqModel = Tables.model("#", "Method", "Host", "Path", "Status", "Role");
@@ -83,7 +104,7 @@ public final class MainPanel extends JPanel {
     private final JTextField queryField = new JTextField();
     private final DefaultTableModel queryModel = Tables.model();
     private final JTable queryTable = Tables.table(queryModel);
-    private final JTextArea queryText = detail();
+    private final JTextArea queryText = textArea();
     private final JLabel queryNote = new JLabel(" ");
     private final EvidenceViewer queryViewer = new EvidenceViewer();
     private final List<String> queryHistory = new ArrayList<>();
@@ -94,18 +115,28 @@ public final class MainPanel extends JPanel {
     // changes
     private final DefaultTableModel buildsModel = Tables.model("#", "When (UTC)", "Label", "Nodes", "Edges", "Requests");
     private final JTable buildsTable = Tables.table(buildsModel);
-    private final JTextArea diffText = detail();
+    private final DiffView diffView = new DiffView();
 
     // roles
     private final JComboBox<String> lowBox = new JComboBox<>();
     private final JComboBox<String> highBox = new JComboBox<>();
-    private final JTextArea rolesText = detail();
+    private final DefaultTableModel rolesModel = Tables.model("Kind", "Endpoint", "Statuses", "Unknown", "Next");
+    private final JTable rolesTable = Tables.table(rolesModel);
+    private final JLabel rolesNote = new JLabel(" ");
+    private final EvidenceViewer rolesViewer = new EvidenceViewer();
+    private final List<List<Integer>> rolesEvidence = new ArrayList<>();
+
+    // recon
+    private final JComboBox<String> reconHost = new JComboBox<>();
+    private final JTextArea reconText = textArea();
+    private final JLabel reconStatus = new JLabel(" ");
 
     // settings
     private final JTextField nameField = new JTextField(16);
     private final JTextField roleField = new JTextField(14);
     private final JTextField scopeField = new JTextField(30);
     private final JCheckBox replaceRole = new JCheckBox("Replace this role's earlier requests when sending");
+    private final JCheckBox autoCapture = new JCheckBox("Capture proxied traffic automatically (only hosts in Burp's target scope)");
 
     public MainPanel(Host host) {
         super(new BorderLayout());
@@ -115,31 +146,47 @@ public final class MainPanel extends JPanel {
         } catch (Exception e) {
             host.log("burp2model: could not open the saved model (" + e.getMessage() + ")");
         }
-        overview.setEditable(false);
-        overview.setFont(Tables.mono());
-        overview.setLineWrap(true);
-        overview.setWrapStyleWord(true);
-        overview.setMargin(new Insets(10, 12, 10, 12));
-        tabs.addTab("Overview", new JScrollPane(overview));
-        tabs.addTab("To check", leadsTab());
+        add(header(), BorderLayout.NORTH);
+        tabs.addTab("Overview", dashboard);
+        tabs.addTab("To check", checkTab());
+        tabs.addTab("Map", mapTab());
         tabs.addTab("Surface", surfaceTab());
         tabs.addTab("Requests", requestsTab());
         tabs.addTab("Query", queryTab());
         tabs.addTab("Changes", changesTab());
         tabs.addTab("Roles", rolesTab());
+        tabs.addTab("Recon", reconTab());
         tabs.addTab("Settings", settingsTab());
+        tabs.setFont(Theme.font(12f, Font.PLAIN));
         add(tabs, BorderLayout.CENTER);
-        status.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+        status.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
+        status.setFont(Theme.font(11f, Font.PLAIN));
+        status.setForeground(Theme.muted());
         add(status, BorderLayout.SOUTH);
+        dashboard.onLead(l -> {
+            tabs.setSelectedIndex(1);
+            checkTabs.setSelectedIndex(0);
+            int idx = leads.indexOf(l);
+            if (idx >= 0) {
+                int v = leadsTable.convertRowIndexToView(idx);
+                leadsTable.setRowSelectionInterval(v, v);
+                leadsTable.scrollRectToVisible(leadsTable.getCellRect(v, 0, true));
+            }
+        });
+        Facts[] all = {leadsFacts, graphFacts, surfaceFacts};
+        for (Facts f : all) {
+            f.onNode(this::goToNode);
+        }
         refresh();
     }
 
-    private static JTextArea detail() {
+    private static JTextArea textArea() {
         JTextArea a = new JTextArea();
         a.setEditable(false);
-        a.setFont(Tables.mono());
+        a.setFont(Theme.mono(12f));
         a.setLineWrap(true);
         a.setWrapStyleWord(true);
+        a.setMargin(new Insets(10, 14, 10, 14));
         return a;
     }
 
@@ -149,7 +196,6 @@ public final class MainPanel extends JPanel {
 
     // ------------------------------------------------------------------ public
 
-    /** Called after a send: reload every view from the session. */
     public void refresh() {
         SwingUtilities.invokeLater(this::refreshNow);
     }
@@ -181,73 +227,168 @@ public final class MainPanel extends JPanel {
         return out;
     }
 
+    /** Run a query as if it were typed in the Query tab. */
+    public void ask(String text) {
+        queryField.setText(text);
+        runQuery(text);
+    }
+
     private void refreshNow() {
         Model m = model();
-        leadsViewer.setModel(m);
-        surfaceViewer.setModel(m);
-        reqViewer.setModel(m);
-        queryViewer.setModel(m);
-        overview.setText(overviewText(m));
-        overview.setCaretPosition(0);
+        for (EvidenceViewer v : new EvidenceViewer[] {leadsViewer, graphViewer, surfaceViewer, reqViewer, queryViewer, rolesViewer}) {
+            v.setModel(m);
+        }
+        leads = m == null ? new ArrayList<>() : Analysis.leads(m);
+        dashboard.update(m, leads);
         fillLeads(m);
+        fillGaps(m);
+        graph.setModel(m);
+        siteTree.setModel(m);
         fillSurface();
         fillRequests(m);
         fillBuilds();
         fillRoles(m);
+        fillRecon(m);
         nameField.setText(host.get("app", "burp"));
         roleField.setText(host.get("role", ""));
         scopeField.setText(host.get("scope", ""));
         replaceRole.setSelected("1".equals(host.get("replace", "0")));
+        autoCapture.setSelected("1".equals(host.get("auto", "0")));
+        headerPills(m);
         status.setText(m == null ? "No requests yet. Right-click requests in Burp and choose Send to burp2model."
-                : m.name + ": " + m.nodes.size() + " nodes · " + m.edges.size() + " edges · " + m.evidenceLog.size() + " requests · build "
-                + session.builds().size());
+                : m.nodes.size() + " nodes · " + m.edges.size() + " edges · " + m.evidenceLog.size() + " requests · build " + session.builds().size()
+                + " · stored in " + session.dir());
     }
 
-    // ------------------------------------------------------------------ overview
+    // ------------------------------------------------------------------ header
 
-    @SuppressWarnings("unchecked")
-    private String overviewText(Model m) {
-        if (m == null) {
-            return "burp2model\n\n"
-                    + "Right-click requests in Proxy history or Site map and choose \"Send to burp2model\".\n"
-                    + "The model builds here, inside Burp: no files to export and no other program to run.\n\n"
-                    + "Every claim cites the request that shows it. Values (cookies, tokens, keys, personal data) are masked\n"
-                    + "before anything is stored. This is a model builder, not a scanner.";
-        }
-        Map<String, Object> c = m.counts();
-        Map<String, Object> st = (Map<String, Object>) c.get("api_state");
-        StringBuilder h = new StringBuilder();
-        h.append(m.name).append("\n\n");
-        h.append(c.get("endpoints")).append(" API endpoints on ").append(c.get("routes")).append(" pages, from ").append(m.evidenceLog.size())
-                .append(" requests.   Scope: ").append(String.join(", ", m.scope)).append("\n\n");
-        h.append("Code vs runtime:  ").append(st.getOrDefault("BOTH", 0L)).append(" in both · ").append(st.getOrDefault("RUNTIME_ONLY", 0L))
-                .append(" traffic only · ").append(st.getOrDefault("STATIC_ONLY", 0L)).append(" named in code, never called\n\n");
-        if (!m.stack.isEmpty()) {
-            Map<String, List<String>> byCat = new TreeMap<>();
-            for (Map<String, Object> t : m.stack) {
-                String v = String.valueOf(t.get("version"));
-                byCat.computeIfAbsent(String.valueOf(t.get("category")), k -> new ArrayList<>()).add(t.get("name") + (v.isEmpty() ? "" : " " + v));
+    private Component header() {
+        JPanel bar = new JPanel(new BorderLayout(14, 0)) {
+            @Override
+            protected void paintComponent(java.awt.Graphics g0) {
+                java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+                g.setColor(Theme.surface());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                g.setColor(Theme.line());
+                g.fillRect(0, getHeight() - 1, getWidth(), 1);
+                g.setColor(Theme.ACCENT);
+                g.fillRect(0, 0, 4, getHeight());
+                g.dispose();
             }
-            h.append("Technology stack (hints from headers, cookies, pages and hosts):\n");
-            byCat.forEach((k, v) -> h.append("  ").append(k).append(": ").append(String.join(", ", v)).append('\n'));
-            h.append('\n');
+        };
+        bar.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 12));
+        JLabel logo = new JLabel("burp2model");
+        logo.setFont(Theme.font(16f, Font.BOLD));
+        modelName.setFont(Theme.mono(12f));
+        modelName.setForeground(Theme.muted());
+        pills.setOpaque(false);
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        left.setOpaque(false);
+        left.add(logo);
+        left.add(modelName);
+        left.add(pills);
+        globalSearch.putClientProperty("JTextField.placeholderText", "Search endpoints, hosts, params…");
+        globalSearch.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.line()), BorderFactory.createEmptyBorder(4, 8, 4, 8)));
+        globalSearch.setToolTipText("Search the whole surface (Enter)");
+        globalSearch.addActionListener(e -> {
+            typeBox.setSelectedItem("all");
+            surfaceFilter.setText(globalSearch.getText());
+            showSurfaceList(true);
+            tabs.setSelectedIndex(3);
+        });
+        JButton ai = new JButton("Copy for AI  ▾");
+        ai.setFocusable(false);
+        JPopupMenu menu = new JPopupMenu();
+        String[][] opts = {{"methodology", "Hunting methodology", "a recon and hunting plan for this app"}, {"whole", "Whole model", "everything an AI needs, with the rules"},
+            {"endpoints", "Endpoints only", "the API surface with parameters and evidence"}, {"open", "Open questions only", "what to test next"}};
+        for (String[] o : opts) {
+            JMenuItem mi = new JMenuItem("<html><b>" + o[1] + "</b><br><small>" + o[2] + "</small></html>");
+            mi.addActionListener(e -> copyForAi(o[0]));
+            menu.add(mi);
         }
-        List<Analysis.Lead> top = Analysis.leads(m);
-        h.append("Check these first (").append(top.size()).append(" leads: hypotheses to verify, never findings)\n");
-        int n = 1;
-        for (Analysis.Lead l : top.subList(0, Math.min(6, top.size()))) {
-            h.append("  ").append(n++).append(". ").append(l.endpoint().label).append("  —  ").append(l.signals().get(0).title()).append('\n');
-        }
-        h.append("\nOpen questions: ").append(c.get("unknowns")).append("   Third parties: ").append(c.get("third_parties"))
-                .append("   Cookies: ").append(c.get("cookies")).append("   Masked secrets: ").append(c.get("secrets")).append("\n\n");
-        h.append("Browse the surface in Surface, read the requests behind every claim in Requests, ask questions in Query,\n"
-                + "and see what changed between sends in Changes.");
-        return h.toString();
+        ai.addActionListener(e -> menu.show(ai, 0, ai.getHeight()));
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        right.setOpaque(false);
+        right.add(Widgets.muted("Search"));
+        right.add(globalSearch);
+        right.add(ai);
+        bar.add(left, BorderLayout.WEST);
+        bar.add(right, BorderLayout.EAST);
+        return bar;
     }
 
-    // ------------------------------------------------------------------ leads
+    private void copyForAi(String scope) {
+        Model m = model();
+        if (m == null) {
+            say("Nothing to copy yet. Send some requests first.");
+            return;
+        }
+        Tables.copy(ContextPack.forAi(m, scope));
+        say("Copied the " + scope + " package for your own AI (about " + ContextPack.tokens(m) / 1000 + "k tokens). Values are masked; every claim cites a request.");
+    }
 
-    private Component leadsTab() {
+    private void headerPills(Model m) {
+        pills.removeAll();
+        modelName.setText(session == null ? "" : session.name);
+        if (m != null) {
+            Map<String, Object> c = m.counts();
+            pills.add(new Widgets.Chip(c.get("endpoints") + " endpoints", Theme.BLUE));
+            pills.add(new Widgets.Chip(leads.size() + " to check", Theme.ACCENT));
+            pills.add(new Widgets.Chip(m.evidenceLog.size() + " requests", Theme.GRAY));
+        }
+        pills.revalidate();
+        pills.repaint();
+    }
+
+    // ------------------------------------------------------------------ layout helpers
+
+    /** Master list over a detail row: facts at the right, the request behind it below. */
+    /** Put a split's divider at this share the first time it has a size. */
+    private static <T extends JSplitPane> T divide(T sp, double share) {
+        sp.addComponentListener(new java.awt.event.ComponentAdapter() {
+            private boolean done;
+
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                if (!done && sp.getWidth() > 50 && sp.getHeight() > 50) {
+                    done = true;
+                    sp.setDividerLocation(share);
+                }
+            }
+        });
+        return sp;
+    }
+
+    private static JSplitPane masterDetail(Component master, Facts facts, EvidenceViewer viewer, double weight) {
+        JSplitPane top = divide(new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, master, facts), 0.72);
+        top.setResizeWeight(0.72);
+        top.setBorder(null);
+        top.setDividerSize(5);
+        JSplitPane sp = divide(new JSplitPane(JSplitPane.VERTICAL_SPLIT, top, viewer), weight);
+        sp.setResizeWeight(weight);
+        sp.setBorder(null);
+        sp.setDividerSize(5);
+        return sp;
+    }
+
+    private static JPanel toolbar() {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        p.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.line()));
+        return p;
+    }
+
+    private static JScrollPane scroll(Component c) {
+        JScrollPane s = new JScrollPane(c);
+        s.setBorder(null);
+        if (c instanceof JTable t) {
+            s.setColumnHeaderView(t.getTableHeader());          // set now, not when the pane is first shown
+        }
+        return s;
+    }
+
+    // ------------------------------------------------------------------ to check
+
+    private Component checkTab() {
         leadsTable.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting()) {
                 return;
@@ -255,35 +396,85 @@ public final class MainPanel extends JPanel {
             int i = Tables.selected(leadsTable);
             if (i >= 0 && i < leads.size()) {
                 Analysis.Lead l = leads.get(i);
+                leadsFacts.showLead(l);
                 leadsViewer.show(l.endpoint().evidence, l.endpoint().label);
             }
         });
-        Tables.widths(leadsTable, 70, 260, 520, 300);
-        JSplitPane sp = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(leadsTable), leadsViewer);
-        sp.setResizeWeight(0.45);
-        return sp;
+        Tables.render(leadsTable, "Severity", Renderers.severity());
+        Tables.render(leadsTable, "Endpoint", Renderers.path());
+        Tables.widths(leadsTable, 90, 340, 360, 360);
+        checkTabs.addTab("Leads", masterDetail(scroll(leadsTable), leadsFacts, leadsViewer, 0.5));
+        Tables.render(gapsTable, "Value", Renderers.ids());
+        Tables.render(gapsTable, "About", Renderers.path());
+        Tables.widths(gapsTable, 60, 230, 300, 320, 360);
+        JPanel gaps = new JPanel(new BorderLayout());
+        JLabel note = Widgets.muted("Open questions ranked by how much resolving each improves the picture. Absence is a gap in observation, never a statement about the target.");
+        note.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        gaps.add(note, BorderLayout.NORTH);
+        gaps.add(scroll(gapsTable), BorderLayout.CENTER);
+        checkTabs.addTab("Open questions", gaps);
+        return checkTabs;
     }
 
     private void fillLeads(Model m) {
-        leads = m == null ? new ArrayList<>() : Analysis.leads(m);
         List<Object[]> rows = new ArrayList<>();
         for (Analysis.Lead l : leads) {
             Analysis.Signal s = l.signals().get(0);
             String sev = l.sev().equals("hot") ? "High" : l.sev().equals("warn") ? "Medium" : "Note";
-            rows.add(new Object[] {sev, l.endpoint().label, s.title() + (l.signals().size() > 1 ? " (+" + (l.signals().size() - 1) + " more)" : ""), s.next()});
+            rows.add(new Object[] {sev, l.endpoint().label, s.title() + (l.signals().size() > 1 ? "  (+" + (l.signals().size() - 1) + " more)" : ""), s.next()});
         }
         Tables.fill(leadsModel, rows);
         leadsViewer.clear();
+        leadsFacts.clear("Select a lead to see why it matters.");
+    }
+
+    private void fillGaps(Model m) {
+        List<Object[]> rows = new ArrayList<>();
+        if (m != null) {
+            for (Map<String, Object> g : Analysis.gaps(m)) {
+                rows.add(new Object[] {String.valueOf(g.get("leverage")), g.get("type"), g.get("entity"), g.get("unknown"), g.get("next")});
+            }
+        }
+        Tables.fill(gapsModel, rows);
+    }
+
+    // ------------------------------------------------------------------ map
+
+    private Component mapTab() {
+        graph.onSelect(n -> {
+            graphFacts.show(n, model());
+            graphViewer.show(n.evidence, n.label);
+        });
+        JSplitPane top = divide(new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, graph, graphFacts), 0.74);
+        top.setResizeWeight(0.74);
+        top.setBorder(null);
+        top.setDividerSize(5);
+        JSplitPane sp = divide(new JSplitPane(JSplitPane.VERTICAL_SPLIT, top, graphViewer), 0.68);
+        sp.setResizeWeight(0.68);
+        sp.setBorder(null);
+        sp.setDividerSize(5);
+        return sp;
     }
 
     // ------------------------------------------------------------------ surface
 
     private Component surfaceTab() {
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel top = toolbar();
         top.add(new JLabel("Show"));
         top.add(typeBox);
         top.add(new JLabel("Filter"));
         top.add(surfaceFilter);
+        JToggleButton list = new JToggleButton("List", true);
+        JToggleButton tree = new JToggleButton("Site map");
+        ButtonGroup bg = new ButtonGroup();
+        bg.add(list);
+        bg.add(tree);
+        list.setFocusable(false);
+        tree.setFocusable(false);
+        list.addActionListener(e -> showSurfaceList(true));
+        tree.addActionListener(e -> showSurfaceList(false));
+        top.add(list);
+        top.add(tree);
         typeBox.addActionListener(e -> fillSurface());
         surfaceFilter.getDocument().addDocumentListener(new SimpleDoc(() -> Tables.filter(surfaceTable, surfaceFilter.getText())));
         surfaceTable.getSelectionModel().addListSelectionListener(e -> {
@@ -294,19 +485,34 @@ public final class MainPanel extends JPanel {
             if (i >= 0 && i < surfaceRows.size()) {
                 Model.Node n = surfaceRows.get(i);
                 surfaceViewer.show(n.evidence, n.label);
-                surfaceDetail.setText(nodeDetail(n));
-                surfaceDetail.setCaretPosition(0);
+                surfaceFacts.show(n, model());
             }
         });
-        Tables.widths(surfaceTable, 420, 110, 90, 100, 80, 220);
-        JSplitPane lower = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, surfaceViewer, new JScrollPane(surfaceDetail));
-        lower.setResizeWeight(0.75);
-        JSplitPane sp = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(surfaceTable), lower);
-        sp.setResizeWeight(0.5);
+        siteTree.onSelect(nodes -> {
+            if (nodes.size() == 1) {
+                surfaceFacts.show(nodes.get(0), model());
+                surfaceViewer.show(nodes.get(0).evidence, nodes.get(0).label);
+            } else if (!nodes.isEmpty()) {
+                java.util.Set<Integer> ev = new java.util.TreeSet<>();
+                nodes.forEach(n -> ev.addAll(n.evidence));
+                surfaceFacts.showText(nodes.size() + " things under this path", "Pick one to see its facts. The requests behind all of them are listed below.");
+                surfaceViewer.show(new ArrayList<>(ev).subList(0, Math.min(300, ev.size())), nodes.size() + " things");
+            }
+        });
+        Tables.render(surfaceTable, "Type", Renderers.type());
+        Tables.render(surfaceTable, "Name", Renderers.path());
+        Tables.render(surfaceTable, "State", Renderers.state());
+        Tables.widths(surfaceTable, 100, 420, 120, 90, 90, 80, 200);
+        surfaceCards.add(scroll(surfaceTable), "list");
+        surfaceCards.add(siteTree, "tree");
         JPanel p = new JPanel(new BorderLayout());
         p.add(top, BorderLayout.NORTH);
-        p.add(sp, BorderLayout.CENTER);
+        p.add(masterDetail(surfaceCards, surfaceFacts, surfaceViewer, 0.5), BorderLayout.CENTER);
         return p;
+    }
+
+    private void showSurfaceList(boolean list) {
+        ((java.awt.CardLayout) surfaceCards.getLayout()).show(surfaceCards, list ? "list" : "tree");
     }
 
     private void fillSurface() {
@@ -317,17 +523,18 @@ public final class MainPanel extends JPanel {
             String type = (String) typeBox.getSelectedItem();
             List<Model.Node> ns = new ArrayList<>();
             for (Model.Node n : m.nodes.values()) {
-                if (n.type.equals(type)) {
+                if ("all".equals(type) ? !n.type.equals("parameter") || surfaceFilter.getText().length() > 1 : n.type.equals(type)) {
                     ns.add(n);
                 }
             }
-            ns.sort(java.util.Comparator.comparing(n -> n.label));
+            java.util.List<String> order = java.util.List.of("host", "route", "endpoint", "script", "third_party", "cookie", "auth", "role", "operation", "tech", "parameter");
+            ns.sort(java.util.Comparator.comparingInt((Model.Node n) -> order.indexOf(n.type)).thenComparing(n -> n.label));
             for (Model.Node n : ns) {
                 surfaceRows.add(n);
                 Object st = n.attrs.get("api_state");
                 Object statuses = n.attrs.get("statuses");
                 Object reqs = n.attrs.get("requests");
-                rows.add(new Object[] {n.label, st == null ? "" : st, statuses == null ? "" : String.valueOf(statuses).replace("[", "").replace("]", ""),
+                rows.add(new Object[] {n.type, n.label, st == null ? "" : st, statuses == null ? "" : String.valueOf(statuses).replace("[", "").replace("]", ""),
                         String.join(",", n.roles), reqs == null ? String.valueOf(n.evidence.size()) : String.valueOf(reqs),
                         n.attrs.get("host") == null ? "" : String.valueOf(n.attrs.get("host"))});
             }
@@ -335,39 +542,37 @@ public final class MainPanel extends JPanel {
         Tables.fill(surfaceModel, rows);
         Tables.filter(surfaceTable, surfaceFilter.getText());
         surfaceViewer.clear();
-        surfaceDetail.setText("");
+        surfaceFacts.clear("Select a row, or switch to Site map to browse by path.");
     }
 
-    @SuppressWarnings("unchecked")
-    private String nodeDetail(Model.Node n) {
+    /** Jump to a node from another tab (a connection link in a facts card). */
+    private void goToNode(String id) {
         Model m = model();
-        StringBuilder sb = new StringBuilder(n.type).append("  ").append(n.label).append('\n').append("id: ").append(n.id).append('\n');
-        for (Map.Entry<String, Object> a : n.attrs.entrySet()) {
-            sb.append(a.getKey()).append(": ").append(a.getValue() instanceof Map || a.getValue() instanceof List ? Json.write(a.getValue()) : a.getValue()).append('\n');
+        if (m == null || !m.nodes.containsKey(id)) {
+            return;
         }
-        if (!n.roles.isEmpty()) {
-            sb.append("roles: ").append(String.join(", ", n.roles)).append('\n');
-        }
-        if (m != null) {
-            sb.append("\nconnections:\n");
-            int shown = 0;
-            for (Model.Edge e : m.edges) {
-                if ((e.src.equals(n.id) || e.dst.equals(n.id)) && shown++ < 40) {
-                    Model.Node o = m.nodes.get(e.src.equals(n.id) ? e.dst : e.src);
-                    sb.append(e.src.equals(n.id) ? "  → " : "  ← ").append(e.type).append(" (").append(e.state.toLowerCase()).append(") ")
-                            .append(o == null ? "?" : o.label).append('\n');
-                }
+        Model.Node n = m.nodes.get(id);
+        typeBox.setSelectedItem(n.type);
+        surfaceFilter.setText("");
+        showSurfaceList(true);
+        tabs.setSelectedIndex(3);
+        for (int i = 0; i < surfaceRows.size(); i++) {
+            if (surfaceRows.get(i).id.equals(id)) {
+                int v = surfaceTable.convertRowIndexToView(i);
+                surfaceTable.setRowSelectionInterval(v, v);
+                surfaceTable.scrollRectToVisible(surfaceTable.getCellRect(v, 0, true));
+                break;
             }
         }
-        return sb.toString();
     }
 
     // ------------------------------------------------------------------ requests
 
     private Component requestsTab() {
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel top = toolbar();
         top.add(new JLabel("Filter"));
         top.add(reqFilter);
+        top.add(Widgets.muted("method, host, path, status or role"));
         reqFilter.getDocument().addDocumentListener(new SimpleDoc(() -> Tables.filter(reqTable, reqFilter.getText())));
         reqTable.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting()) {
@@ -379,9 +584,14 @@ public final class MainPanel extends JPanel {
                 reqViewer.show(List.of(id), "ev_" + id);
             }
         });
-        Tables.widths(reqTable, 50, 70, 220, 420, 60, 80);
-        JSplitPane sp = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(reqTable), reqViewer);
+        Tables.render(reqTable, "Method", Renderers.method());
+        Tables.render(reqTable, "Status", Renderers.status());
+        Tables.render(reqTable, "Path", Renderers.path());
+        Tables.widths(reqTable, 50, 90, 220, 480, 80, 90);
+        JSplitPane sp = divide(new JSplitPane(JSplitPane.VERTICAL_SPLIT, scroll(reqTable), reqViewer), 0.45);
         sp.setResizeWeight(0.45);
+        sp.setBorder(null);
+        sp.setDividerSize(5);
         JPanel p = new JPanel(new BorderLayout());
         p.add(top, BorderLayout.NORTH);
         p.add(sp, BorderLayout.CENTER);
@@ -406,18 +616,29 @@ public final class MainPanel extends JPanel {
     // ------------------------------------------------------------------ query
 
     private Component queryTab() {
-        JPanel top = new JPanel(new BorderLayout(6, 0));
-        top.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+        JPanel top = new JPanel(new BorderLayout(8, 0));
+        top.setBorder(BorderFactory.createEmptyBorder(8, 10, 4, 10));
+        queryField.setFont(Theme.mono(13f));
+        queryField.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.line()), BorderFactory.createEmptyBorder(5, 8, 5, 8)));
         JButton run = new JButton("Run");
+        run.setFont(Theme.font(12f, Font.BOLD));
         JButton help = new JButton("Help");
+        JButton copy = new JButton("Copy results");
+        JButton csv = new JButton("Save CSV…");
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        buttons.add(run);
-        buttons.add(help);
-        top.add(new JLabel("Query"), BorderLayout.WEST);
+        for (JButton b : new JButton[] {run, help, copy, csv}) {
+            b.setFocusable(false);
+            buttons.add(b);
+        }
         top.add(queryField, BorderLayout.CENTER);
         top.add(buttons, BorderLayout.EAST);
         run.addActionListener(e -> runQuery(queryField.getText()));
         help.addActionListener(e -> runQuery("help"));
+        copy.addActionListener(e -> {
+            Tables.copy(resultTsv());
+            say("Copied " + queryModel.getRowCount() + " rows.");
+        });
+        csv.addActionListener(e -> saveCsv());
         queryField.addActionListener(e -> runQuery(queryField.getText()));
         queryField.addKeyListener(new KeyAdapter() {
             @Override
@@ -430,22 +651,23 @@ public final class MainPanel extends JPanel {
             }
         });
         JPanel examples = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+        examples.add(Widgets.muted("Try"));
         for (String ex : new String[] {"list-apis", "reconcile", "static-only", "req.method:POST AND resp.code.gte:400", "node.type:endpoint AND node.state:STATIC_ONLY",
-            "privileged", "auth-surface", "secrets", "unknowns", "third-parties", "stats"}) {
-            JButton b = new JButton(ex.length() > 28 ? ex.substring(0, 26) + "…" : ex);
+            "privileged", "auth-surface", "secrets", "unknowns", "third-parties", "changed-since previous", "stats"}) {
+            JButton b = new JButton(ex.length() > 30 ? ex.substring(0, 28) + "…" : ex);
             b.setToolTipText(ex);
-            b.setMargin(new Insets(1, 6, 1, 6));
-            b.addActionListener(e -> {
-                queryField.setText(ex);
-                runQuery(ex);
-            });
+            b.setFont(Theme.font(11f, Font.PLAIN));
+            b.setMargin(new Insets(1, 7, 1, 7));
+            b.setFocusable(false);
+            b.addActionListener(e -> ask(ex));
             examples.add(b);
         }
         JPanel head = new JPanel(new BorderLayout());
         head.add(top, BorderLayout.NORTH);
         head.add(examples, BorderLayout.CENTER);
+        queryNote.setBorder(BorderFactory.createEmptyBorder(2, 12, 6, 12));
+        queryNote.setFont(Theme.font(11f, Font.PLAIN));
         head.add(queryNote, BorderLayout.SOUTH);
-        queryNote.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
 
         queryTable.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting() || lastResult == null) {
@@ -453,19 +675,58 @@ public final class MainPanel extends JPanel {
             }
             int i = Tables.selected(queryTable);
             if (i >= 0 && i < lastResult.rows().size()) {
-                Map<String, Object> row = lastResult.rows().get(i);
-                List<Integer> evs = evidenceOf(row);
+                List<Integer> evs = evidenceOf(lastResult.rows().get(i));
                 queryViewer.show(evs, evs.isEmpty() ? "" : "ev_" + evs.get(0));
             }
         });
-        queryOut.addTab("Table", new JScrollPane(queryTable));
-        queryOut.addTab("Text", new JScrollPane(queryText));
-        JSplitPane sp = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryOut, queryViewer);
+        queryOut.addTab("Table", scroll(queryTable));
+        queryOut.addTab("Text", scroll(queryText));
+        JSplitPane sp = divide(new JSplitPane(JSplitPane.VERTICAL_SPLIT, queryOut, queryViewer), 0.5);
         sp.setResizeWeight(0.55);
+        sp.setBorder(null);
+        sp.setDividerSize(5);
         JPanel p = new JPanel(new BorderLayout());
         p.add(head, BorderLayout.NORTH);
         p.add(sp, BorderLayout.CENTER);
         return p;
+    }
+
+    private String resultTsv() {
+        StringBuilder sb = new StringBuilder();
+        for (int c = 0; c < queryModel.getColumnCount(); c++) {
+            sb.append(c > 0 ? "\t" : "").append(queryModel.getColumnName(c));
+        }
+        for (int r = 0; r < queryModel.getRowCount(); r++) {
+            sb.append('\n');
+            for (int c = 0; c < queryModel.getColumnCount(); c++) {
+                sb.append(c > 0 ? "\t" : "").append(queryModel.getValueAt(r, c));
+            }
+        }
+        return sb.toString();
+    }
+
+    private void saveCsv() {
+        if (queryModel.getRowCount() == 0) {
+            return;
+        }
+        JFileChooser fc = new JFileChooser();
+        fc.setSelectedFile(new java.io.File("burp2model-query.csv"));
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            StringBuilder sb = new StringBuilder();
+            for (String line : resultTsv().split("\n")) {
+                List<String> cells = new ArrayList<>();
+                for (String c : line.split("\t", -1)) {
+                    cells.add("\"" + c.replace("\"", "\"\"") + "\"");
+                }
+                sb.append(String.join(",", cells)).append('\n');
+            }
+            try {
+                Files.writeString(fc.getSelectedFile().toPath(), sb.toString(), StandardCharsets.UTF_8);
+                say("Saved " + fc.getSelectedFile());
+            } catch (Exception ex) {
+                say("could not save: " + ex.getMessage());
+            }
+        }
     }
 
     private static List<Integer> evidenceOf(Map<String, Object> row) {
@@ -483,15 +744,10 @@ public final class MainPanel extends JPanel {
         return out;
     }
 
-    /** Run a query as if it were typed in the Query tab. */
-    public void ask(String text) {
-        queryField.setText(text);
-        runQuery(text);
-    }
-
     private void runQuery(String text) {
         Model m = model();
         if (m == null) {
+            queryNote.setForeground(Theme.muted());
             queryNote.setText("Nothing to query yet. Send some requests first.");
             return;
         }
@@ -519,19 +775,16 @@ public final class MainPanel extends JPanel {
         try {
             Query.Result r = q.run(text);
             lastResult = r;
-            queryNote.setText(r.note().contains("\n") ? "see Text" : r.note());
+            queryNote.setForeground(Theme.muted());
+            queryNote.setText(r.kind().equals("text") ? "text answer" : r.note());
             queryText.setText(r.kind().equals("text") ? r.note() : "");
             queryText.setCaretPosition(0);
-            if (r.kind().equals("text")) {
-                queryModel.setRowCount(0);
-                queryModel.setColumnCount(0);
-                queryOut.setSelectedIndex(1);
-            } else {
-                queryModel.setColumnCount(0);
+            queryModel.setRowCount(0);
+            queryModel.setColumnCount(0);
+            if (!r.kind().equals("text")) {
                 for (String c : r.columns()) {
                     queryModel.addColumn(c);
                 }
-                queryModel.setRowCount(0);
                 for (Map<String, Object> row : r.rows()) {
                     Object[] cells = new Object[r.columns().size()];
                     for (int i = 0; i < cells.length; i++) {
@@ -540,10 +793,22 @@ public final class MainPanel extends JPanel {
                     }
                     queryModel.addRow(cells);
                 }
-                queryOut.setSelectedIndex(0);
+                for (String col : new String[] {"method"}) {
+                    Tables.render(queryTable, col, Renderers.method());
+                }
+                Tables.render(queryTable, "status", Renderers.status());
+                Tables.render(queryTable, "state", Renderers.state());
+                Tables.render(queryTable, "type", Renderers.type());
+                Tables.render(queryTable, "ev", Renderers.ids());
+                Tables.render(queryTable, "evidence", Renderers.ids());
+                for (String col : new String[] {"label", "path", "endpoint", "from", "to", "src", "dst", "url"}) {
+                    Tables.render(queryTable, col, Renderers.path());
+                }
             }
+            queryOut.setSelectedIndex(r.kind().equals("text") ? 1 : 0);
             queryViewer.clear();
         } catch (Query.QueryError e) {
+            queryNote.setForeground(Theme.RED);
             queryNote.setText("error: " + e.getMessage());
             lastResult = null;
         }
@@ -580,11 +845,14 @@ public final class MainPanel extends JPanel {
     // ------------------------------------------------------------------ changes
 
     private Component changesTab() {
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel top = toolbar();
         JButton prev = new JButton("What changed since the previous build");
-        JButton sel = new JButton("Compare selected build with latest");
+        JButton sel = new JButton("Compare the selected build with the latest");
+        prev.setFocusable(false);
+        sel.setFocusable(false);
         top.add(prev);
         top.add(sel);
+        top.add(Widgets.muted("Every send is a build. Drift is a change in the surface to understand, never a finding."));
         prev.addActionListener(e -> diffBuilds(session == null ? 0 : session.builds().size() - 1, session == null ? 0 : session.builds().size()));
         sel.addActionListener(e -> {
             int i = Tables.selected(buildsTable);
@@ -592,9 +860,12 @@ public final class MainPanel extends JPanel {
                 diffBuilds((Integer) buildsModel.getValueAt(i, 0), session.builds().size());
             }
         });
-        Tables.widths(buildsTable, 40, 170, 200, 70, 70, 80);
-        JSplitPane sp = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(buildsTable), new JScrollPane(diffText));
-        sp.setResizeWeight(0.25);
+        Tables.widths(buildsTable, 40, 170, 220, 70, 70, 80);
+        buildsTable.setPreferredScrollableViewportSize(new java.awt.Dimension(400, 120));
+        JSplitPane sp = divide(new JSplitPane(JSplitPane.VERTICAL_SPLIT, scroll(buildsTable), diffView), 0.2);
+        sp.setResizeWeight(0.18);
+        sp.setBorder(null);
+        sp.setDividerSize(5);
         JPanel p = new JPanel(new BorderLayout());
         p.add(top, BorderLayout.NORTH);
         p.add(sp, BorderLayout.CENTER);
@@ -603,14 +874,13 @@ public final class MainPanel extends JPanel {
 
     private void diffBuilds(int older, int newer) {
         if (session == null || older < 1 || newer < 2 || older >= newer) {
-            diffText.setText("Send more requests first: a comparison needs two builds.");
+            diffView.show("Send more requests first: a comparison needs two builds.");
             return;
         }
         try {
-            diffText.setText(Diff.formatText(session.diff(older, newer)));
-            diffText.setCaretPosition(0);
+            diffView.show(Diff.formatText(session.diff(older, newer)));
         } catch (Exception e) {
-            diffText.setText("could not compare: " + e.getMessage());
+            diffView.show("could not compare: " + e.getMessage());
         }
     }
 
@@ -625,54 +895,74 @@ public final class MainPanel extends JPanel {
         if (session.builds().size() >= 2) {
             diffBuilds(session.builds().size() - 1, session.builds().size());
         } else {
-            diffText.setText(session.builds().isEmpty() ? "" : "One build so far. Send more requests and this shows what changed.");
+            diffView.show(session.builds().isEmpty() ? "" : "One build so far. Send more requests and this shows what changed.");
         }
     }
 
     // ------------------------------------------------------------------ roles
 
-    @SuppressWarnings("unchecked")
     private Component rolesTab() {
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel top = toolbar();
         top.add(new JLabel("Lower-privilege role"));
         top.add(lowBox);
         top.add(new JLabel("Higher-privilege role"));
         top.add(highBox);
         JButton go = new JButton("Compare");
+        go.setFocusable(false);
         top.add(go);
-        go.addActionListener(e -> {
-            Model m = model();
-            if (m == null || lowBox.getSelectedItem() == null || highBox.getSelectedItem() == null) {
-                rolesText.setText("Send requests under at least two roles first (set a role in Settings before each send).");
+        go.addActionListener(e -> compareRoles());
+        rolesTable.getSelectionModel().addListSelectionListener(e -> {
+            if (e.getValueIsAdjusting()) {
                 return;
             }
-            Map<String, Object> r = Analysis.crossRole(m, (String) lowBox.getSelectedItem(), (String) highBox.getSelectedItem());
-            StringBuilder sb = new StringBuilder();
-            section(sb, "'" + r.get("low") + "' reached privileged-looking endpoints", (List<Object>) r.get("low_reached_privileged"));
-            section(sb, "'" + r.get("high") + "' reached, '" + r.get("low") + "' never tried", (List<Object>) r.get("high_only"));
-            section(sb, "both roles got 2xx", (List<Object>) r.get("shared_same_success"));
-            sb.append("\nEach is a hypothesis, not a finding.");
-            rolesText.setText(sb.toString());
-            rolesText.setCaretPosition(0);
+            int i = Tables.selected(rolesTable);
+            if (i >= 0 && i < rolesEvidence.size()) {
+                rolesViewer.show(rolesEvidence.get(i), String.valueOf(rolesModel.getValueAt(i, 1)));
+            }
         });
+        Tables.render(rolesTable, "Endpoint", Renderers.path());
+        Tables.widths(rolesTable, 200, 340, 160, 300, 340);
+        rolesNote.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
+        rolesNote.setForeground(Theme.muted());
+        JPanel head = new JPanel(new BorderLayout());
+        head.add(top, BorderLayout.NORTH);
+        head.add(rolesNote, BorderLayout.SOUTH);
+        JSplitPane sp = divide(new JSplitPane(JSplitPane.VERTICAL_SPLIT, scroll(rolesTable), rolesViewer), 0.45);
+        sp.setResizeWeight(0.45);
+        sp.setBorder(null);
+        sp.setDividerSize(5);
         JPanel p = new JPanel(new BorderLayout());
-        p.add(top, BorderLayout.NORTH);
-        p.add(new JScrollPane(rolesText), BorderLayout.CENTER);
+        p.add(head, BorderLayout.NORTH);
+        p.add(sp, BorderLayout.CENTER);
         return p;
     }
 
     @SuppressWarnings("unchecked")
-    private static void section(StringBuilder sb, String title, List<Object> items) {
-        sb.append(title).append(" (").append(items.size()).append(")\n");
-        for (Object o : items) {
-            Map<String, Object> e = (Map<String, Object>) o;
-            sb.append("  ").append(e.get("endpoint")).append("   ");
-            for (Object ev : (List<Object>) e.get("evidence")) {
-                sb.append("ev_").append(ev).append(' ');
-            }
-            sb.append("  ").append(e.get("statuses")).append("\n      unknown: ").append(e.get("unknown")).append(" · next: ").append(e.get("next")).append('\n');
+    private void compareRoles() {
+        Model m = model();
+        rolesModel.setRowCount(0);
+        rolesEvidence.clear();
+        if (m == null || lowBox.getSelectedItem() == null || highBox.getSelectedItem() == null || m.roles.size() < 2) {
+            rolesNote.setText("Send requests under at least two roles first: set a role in Settings before each send.");
+            return;
         }
-        sb.append('\n');
+        Map<String, Object> r = Analysis.crossRole(m, (String) lowBox.getSelectedItem(), (String) highBox.getSelectedItem());
+        String[][] sections = {{"low_reached_privileged", "Low role reached a privileged-looking path"}, {"high_only", "Only the high role reached it"},
+            {"shared_same_success", "Both roles got 2xx"}};
+        int n = 0;
+        for (String[] s : sections) {
+            for (Object o : (List<Object>) r.get(s[0])) {
+                Map<String, Object> e = (Map<String, Object>) o;
+                rolesModel.addRow(new Object[] {s[1], e.get("endpoint"), String.valueOf(e.get("statuses")), e.get("unknown"), e.get("next")});
+                List<Integer> ev = new ArrayList<>();
+                for (Object x : (List<Object>) e.get("evidence")) {
+                    ev.add(((Number) x).intValue());
+                }
+                rolesEvidence.add(ev);
+                n++;
+            }
+        }
+        rolesNote.setText(n + " things to compare. Each is a hypothesis to verify, not a finding.");
     }
 
     private void fillRoles(Model m) {
@@ -695,15 +985,85 @@ public final class MainPanel extends JPanel {
             }
         }
         if (m == null || m.roles.size() < 2) {
-            rolesText.setText("Comparing roles needs requests sent under two roles.\nSet a role in Settings (for example user), send that account's requests, "
-                    + "change the role (for example admin), and send the other account's.");
+            rolesNote.setText("Comparing roles needs requests sent under two roles. Set a role in Settings (for example user), send that account's requests, "
+                    + "change it (for example admin), and send the other account's.");
+        } else {
+            compareRoles();
         }
+    }
+
+    // ------------------------------------------------------------------ recon
+
+    private Component reconTab() {
+        JPanel top = toolbar();
+        top.add(new JLabel("Host"));
+        reconHost.setEditable(true);
+        reconHost.setPreferredSize(new java.awt.Dimension(280, 26));
+        top.add(reconHost);
+        JButton run = new JButton("Run light recon…");
+        run.setFocusable(false);
+        top.add(run);
+        top.add(reconStatus);
+        run.addActionListener(e -> runRecon());
+        reconText.setText("Light, passive recon on one host: DNS, the TLS certificate, the front page's headers, robots.txt and security.txt, and mail policy.\n\n"
+                + "It sends a handful of ordinary requests to the host, so run it only on targets you are authorised to test. "
+                + "Nothing is run until you press the button.");
+        JPanel p = new JPanel(new BorderLayout());
+        p.add(top, BorderLayout.NORTH);
+        p.add(scroll(reconText), BorderLayout.CENTER);
+        return p;
+    }
+
+    private void fillRecon(Model m) {
+        Object cur = reconHost.getEditor().getItem();
+        reconHost.removeAllItems();
+        if (m != null) {
+            for (Model.Node n : m.nodes.values()) {
+                if (n.type.equals("host")) {
+                    reconHost.addItem(n.label);
+                }
+            }
+        }
+        if (cur != null && !String.valueOf(cur).isBlank()) {
+            reconHost.setSelectedItem(cur);
+        }
+    }
+
+    private void runRecon() {
+        String h = String.valueOf(reconHost.getEditor().getItem()).strip().toLowerCase();
+        if (h.isEmpty() || !h.matches("[a-z0-9.\\-]+")) {
+            reconStatus.setText("enter a host name");
+            return;
+        }
+        int ok = JOptionPane.showConfirmDialog(this, "Run light recon against " + h + "?\n\nThis sends a few ordinary requests (DNS, a TLS handshake, GETs for /, robots.txt,\n"
+                + "security.txt and sitemap.xml). Only do this for targets you are authorised to test.", "burp2model recon", JOptionPane.OK_CANCEL_OPTION);
+        if (ok != JOptionPane.OK_OPTION) {
+            return;
+        }
+        reconStatus.setText("running…");
+        new Thread(() -> {
+            try {
+                Map<String, Object> r = Recon.run(h, s -> SwingUtilities.invokeLater(() -> reconStatus.setText("running: " + s)));
+                String text = Recon.format(r);
+                if (session != null) {
+                    Files.writeString(session.dir().resolve("recon-" + h + ".json"), Json.pretty(r), StandardCharsets.UTF_8);
+                }
+                SwingUtilities.invokeLater(() -> {
+                    reconText.setText(text);
+                    reconText.setCaretPosition(0);
+                    reconStatus.setText("done");
+                });
+            } catch (Throwable t) {
+                SwingUtilities.invokeLater(() -> reconStatus.setText("failed: " + t.getMessage()));
+            }
+        }, "burp2model-recon").start();
     }
 
     // ------------------------------------------------------------------ settings
 
     private Component settingsTab() {
         JPanel p = new JPanel(new GridBagLayout());
+        p.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(6, 8, 6, 8);
         c.anchor = GridBagConstraints.WEST;
@@ -714,19 +1074,36 @@ public final class MainPanel extends JPanel {
         c.gridx = 1;
         c.gridy = row++;
         p.add(replaceRole, c);
+        c.gridx = 1;
+        c.gridy = row++;
+        p.add(autoCapture, c);
         JButton save = new JButton("Save settings");
         JButton export = new JButton("Export model.json…");
+        JButton summaryBtn = new JButton("Export summary (Markdown)…");
         JButton clear = new JButton("Clear this model");
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        btns.add(save);
-        btns.add(export);
-        btns.add(clear);
+        for (JButton b : new JButton[] {save, export, summaryBtn, clear}) {
+            b.setFocusable(false);
+            btns.add(b);
+        }
         c.gridx = 1;
         c.gridy = row++;
         p.add(btns, c);
-        JLabel where = new JLabel(" ");
+        JTextArea about = new JTextArea("""
+                burp2model builds an evidence-cited model of one web app from the requests you send it. Every line cites the request that shows it.
+                Cookies, tokens, keys and personal data are masked before anything is stored; only names and shapes are kept.
+                It is a model builder, never a scanner: leads are hypotheses to verify in an authorised session.
+
+                Models live in ~/.burp2model/models/<name>/.  Nothing is sent anywhere unless you run Recon or paste a package into your own AI.""");
+        about.setEditable(false);
+        about.setOpaque(false);
+        about.setFont(Theme.font(12f, Font.PLAIN));
+        about.setForeground(Theme.muted());
+        c.gridx = 0;
         c.gridy = row;
-        p.add(where, c);
+        c.gridwidth = 3;
+        c.insets = new Insets(22, 8, 6, 8);
+        p.add(about, c);
         save.addActionListener(e -> {
             String n = nameField.getText().strip();
             if (!n.matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")) {
@@ -738,6 +1115,7 @@ public final class MainPanel extends JPanel {
             host.set("role", roleField.getText().strip());
             host.set("scope", scopeField.getText().strip());
             host.set("replace", replaceRole.isSelected() ? "1" : "0");
+            host.set("auto", autoCapture.isSelected() ? "1" : "0");
             if (renamed) {
                 try {
                     session = host.session(n);
@@ -766,6 +1144,22 @@ public final class MainPanel extends JPanel {
                 }
             }
         });
+        summaryBtn.addActionListener(e -> {
+            Model m = model();
+            if (m == null) {
+                return;
+            }
+            JFileChooser fc = new JFileChooser();
+            fc.setSelectedFile(new java.io.File(m.name + "-summary.md"));
+            if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                try {
+                    Files.writeString(fc.getSelectedFile().toPath(), burp2model.engine.Markdown.summary(m), StandardCharsets.UTF_8);
+                    status.setText("exported " + fc.getSelectedFile());
+                } catch (Exception ex) {
+                    status.setText("could not export: " + ex.getMessage());
+                }
+            }
+        });
         clear.addActionListener(e -> {
             if (session != null && JOptionPane.showConfirmDialog(this, "Delete everything in the model '" + session.name + "'?", "burp2model",
                     JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
@@ -777,9 +1171,6 @@ public final class MainPanel extends JPanel {
                 refresh();
             }
         });
-        if (session != null) {
-            where.setText("Stored in " + session.dir());
-        }
         JPanel outer = new JPanel(new BorderLayout());
         outer.add(p, BorderLayout.NORTH);
         return outer;
@@ -792,8 +1183,7 @@ public final class MainPanel extends JPanel {
         c.gridx = 1;
         p.add(f, c);
         c.gridx = 2;
-        JLabel h = new JLabel(hint);
-        h.setEnabled(false);
+        JLabel h = Widgets.muted(hint);
         p.add(h, c);
         return row + 1;
     }
@@ -820,5 +1210,9 @@ public final class MainPanel extends JPanel {
         public void changedUpdate(javax.swing.event.DocumentEvent e) {
             r.run();
         }
+    }
+
+    static Color unused() {
+        return Color.BLACK;
     }
 }
