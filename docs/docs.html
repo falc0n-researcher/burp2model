@@ -72,7 +72,7 @@
   <p>Python 3.9 or newer.</p>
   <div class="code"><span class="label">shell</span><button class="copy" type="button" data-copy aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><pre>pip install burp2model
 burp2model --version</pre></div>
-  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (331 tests).</p>
+  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (332 tests).</p>
 </div>
 
 <div class="doc-section" id="quickstart">
@@ -89,7 +89,7 @@ burp2model query shop help
 burp2model user.xml  -w shop --role user
 burp2model admin.xml -w shop --role admin
 burp2model cross-role shop --low user --high admin</pre></div>
-  <p>Keep exporting into one folder and run <code>burp2model watch FOLDER -w shop</code>: each new export becomes a build, and <code>burp2model diff shop</code> shows what changed between builds. To skip the export step, the <a href="https://github.com/falc0n-researcher/burp2model/tree/main/burp-extension">Burp extension</a> sends selected requests to <code>burp2model serve</code> on localhost.</p>
+  <p>Keep exporting into one folder and run <code>burp2model watch FOLDER -w shop</code>: each new export becomes a build, and <code>burp2model diff shop</code> shows what changed between builds. To skip the export step, the <a href="https://github.com/falc0n-researcher/burp2model/tree/main/burp-extension">Burp extension</a> builds the model inside Burp from the requests you select.</p>
   <p>No Burp? <code>burp2model crawl URL --yes -w shop</code> crawls a running app and builds the same model. It sends live requests, so use it only on apps you are authorized to test. <code>--read-only</code> blocks anything but GET, HEAD and OPTIONS.</p>
   <p>Output of <code>query shop "code vs runtime"</code> on the bundled sample:</p>
   <div class="code"><pre>APIs: 10 endpoints

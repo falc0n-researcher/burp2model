@@ -19,6 +19,6 @@ java {
 
 tasks.jar {
     archiveBaseName.set("burp2model")
-    // a plain jar: the extension only uses the JDK and the API Burp provides
+    // everything is in the jar: the engine is plain Java and needs nothing but Burp
     from(sourceSets.main.get().output)
 }
