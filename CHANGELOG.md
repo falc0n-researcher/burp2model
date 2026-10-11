@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **`burp2model watch FOLDER -w APP`** rebuilds whenever a new Burp export (Save items XML or
+  Logger++ CSV) lands in a folder. Each export becomes a build labelled with its file name, and the
+  change from the previous build is printed. Works with Community Edition. `--interval`, `--once`,
+  `--skip-existing`, `--role`, `--scope`.
 - **`burp2model diff APP [FROM] [TO]`** compares two builds kept in `graph.db` and groups the drift:
   *new workflows* (a new page, the script it loads, the endpoints that script names and their
   parameters are one line), *changed* fingerprints (a status 200 to 403, a server header nginx to

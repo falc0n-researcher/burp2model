@@ -847,6 +847,84 @@ def _snapshot_of(conn, bid: int):
     return from_dict(snap), {"id": bid, "built_at": row["built_at"], "label": row["label"] or ""}
 
 
+def cmd_watch(args) -> int:
+    """Poll a folder: every settled new export is built, labelled with its file name, and diffed."""
+    import fnmatch
+    import time
+    folder = args.folder
+    if not os.path.isdir(folder):
+        print(f"watch: {folder} is not a folder", file=sys.stderr)
+        return 2
+    pats = [p.strip() for p in args.pattern.split(",") if p.strip()]
+    outdir = os.path.join(args.out, args.webapp)
+    state_path = os.path.join(outdir, "watch.json")
+    try:
+        with open(state_path, encoding="utf-8") as f:
+            done = json.load(f)
+    except (OSError, ValueError):
+        done = {}
+
+    def listing():
+        found = []
+        for fn in os.listdir(folder):
+            p = os.path.join(folder, fn)
+            if os.path.isfile(p) and any(fnmatch.fnmatch(fn.lower(), x.lower()) for x in pats):
+                st = os.stat(p)
+                found.append((st.st_mtime_ns, fn, st.st_size))
+        return sorted(found)
+
+    sig = lambda t: [t[0], t[2]]                    # noqa: E731
+    if args.skip_existing and not done:
+        done = {fn: sig((m, fn, sz)) for m, fn, sz in listing()}
+    sizes: dict[str, int] = {}
+    built = 0
+    print(f"watch: {folder}  ({', '.join(pats)}) → {args.webapp}"
+          + ("" if args.once else f"  every {args.interval:g}s, Ctrl-C to stop"), file=sys.stderr)
+    try:
+        while True:
+            for mtime, fn, size in listing():
+                if done.get(fn) == sig((mtime, fn, size)) or size == 0:
+                    continue
+                if not args.once and sizes.get(fn) != size:      # still being written: look again next time
+                    sizes[fn] = size
+                    continue
+                label = os.path.splitext(fn)[0]
+                argv = ["build", os.path.join(folder, fn), "-w", args.webapp, "--out", args.out, "--label", label]
+                for flag, val in (("--role", args.role), ("--skip-tools", args.skip_tools)):
+                    if val:
+                        argv += [flag, val]
+                for sc in args.scope or []:
+                    argv += ["--scope", sc]
+                if args.osint:
+                    argv.append("--osint")
+                print(f"\nwatch: new export {fn}", file=sys.stderr)
+                if main(argv) != 0:
+                    print(f"watch: could not build from {fn}; will try again if it changes", file=sys.stderr)
+                    done[fn] = sig((mtime, fn, size))
+                    continue
+                done[fn] = sig((mtime, fn, size))
+                built += 1
+                os.makedirs(outdir, exist_ok=True)
+                with open(state_path, "w", encoding="utf-8") as f:
+                    json.dump(done, f, indent=1, sort_keys=True)
+                conn = store.open_db(os.path.join(outdir, store.DB_NAME))
+                try:
+                    n = len(store.list_builds(conn))
+                finally:
+                    conn.close()
+                if n > 1:
+                    print("", file=sys.stderr)
+                    main(["diff", args.webapp, "--out", args.out])
+            if args.once:
+                break
+            time.sleep(max(0.2, args.interval))
+    except KeyboardInterrupt:
+        print("\nwatch: stopped", file=sys.stderr)
+    if args.once and not built:
+        print("watch: nothing new to build", file=sys.stderr)
+    return 0
+
+
 def cmd_builds(args) -> int:
     dbp = _db_path(args)
     if dbp is None:
@@ -1238,6 +1316,22 @@ def main(argv=None) -> int:
     df.add_argument("--out", default="burp2model-out", help="output directory used at build time")
     df.set_defaults(func=cmd_diff)
 
+    wa = sub.add_parser("watch", help="watch a folder of Burp exports: each new export becomes a build, "
+                                      "and the change from the last one is printed")
+    wa.add_argument("folder", help="folder Burp exports (Save items XML or Logger++ CSV) are saved into")
+    wa.add_argument("--webapp", "-w", required=True, type=_name("webapp"), help="name for the model")
+    wa.add_argument("--interval", type=float, default=5.0, metavar="SEC", help="seconds between checks (default: 5)")
+    wa.add_argument("--once", action="store_true", help="process what is there and exit instead of watching")
+    wa.add_argument("--skip-existing", action="store_true",
+                    help="only react to exports that appear after this starts")
+    wa.add_argument("--pattern", default="*.xml,*.csv", help="file patterns to pick up (default: *.xml,*.csv)")
+    wa.add_argument("--role", help="tag each export with this role (merges with other roles' inputs)")
+    wa.add_argument("--scope", action="append", help="in-scope host (repeatable), as for build")
+    wa.add_argument("--skip-tools", metavar="TOOLS", help="Logger++ CSV: drop rows from these Burp tools")
+    wa.add_argument("--osint", action="store_true", help="also run light external recon on each build")
+    wa.add_argument("--out", default="burp2model-out", help="output directory (default: burp2model-out)")
+    wa.set_defaults(func=cmd_watch)
+
     bl = sub.add_parser("builds", help="list the builds kept in graph.db, to pick two to diff")
     bl.add_argument("webapp", type=_name("webapp"), help="model name used at build time")
     bl.add_argument("--out", default="burp2model-out", help="output directory used at build time")
@@ -1273,13 +1367,13 @@ def main(argv=None) -> int:
 
     argv = list(sys.argv[1:] if argv is None else argv)
     known = {"build", "crawl", "query", "q", "cross-role", "osint", "graph", "methodology",
-             "gaps", "changes", "diff", "builds", "falsify", "animate", "-h", "--help", "--version"}
+             "gaps", "changes", "diff", "builds", "watch", "falsify", "animate", "-h", "--help", "--version"}
     # bare `burp2model file.xml ...` → treat as build, but only when the first
     # word is a real file; a typo'd subcommand gets a clear error instead
     if argv and argv[0] not in known and not argv[0].startswith("-"):
         if not os.path.exists(argv[0]):
             print(f"burp2model: {argv[0]!r} is not a command or an existing file.\n"
-                  f"commands: build, crawl, query, q, cross-role, osint, graph, gaps, changes, diff, builds, "
+                  f"commands: build, crawl, query, q, cross-role, osint, graph, gaps, changes, diff, builds, watch, "
                   f"falsify, methodology, animate "
                   f"(or `burp2model <export.xml>` to build)", file=sys.stderr)
             return 2
