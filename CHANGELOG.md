@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.3 — 2026-10-11
 
 - **`burp2model watch FOLDER -w APP`** rebuilds whenever a new Burp export (Save items XML or
   Logger++ CSV) lands in a folder. Each export becomes a build labelled with its file name, and the
