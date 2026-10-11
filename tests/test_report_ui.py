@@ -201,6 +201,9 @@ def test_changes_tab_shows_what_moved_since_the_previous_build(tmp_path_factory)
         assert p.js("document.querySelectorAll('[data-chg]').length") >= 3
         assert "workflow" in p.js("document.querySelector('[data-chg]').textContent")
         assert p.js("!document.querySelector('#spbot').hidden")
+        p.js("location.hash='#inventory'", wait=0.6)
+        p.js("[...document.querySelectorAll('#invbody .tr')].find(r=>r.textContent.includes('/api')).click()", wait=0.4)
+        assert "build" in p.js("(document.querySelector('.seenchip')||{textContent:''}).textContent")
         assert p.errors == []
     finally:
         p.close()

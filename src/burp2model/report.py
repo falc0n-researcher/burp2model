@@ -286,6 +286,20 @@ def build_payload(m: Model, osint: dict | None = None, lens: str = "attention") 
     }
 
 
+def _seen(conn, endpoints: list) -> dict:
+    """When each endpoint first and last appeared across the builds kept in graph.db (only with 2+ builds)."""
+    from . import store
+    builds = store.list_builds(conn)
+    if len(builds) < 2:
+        return {}
+    seen = {}
+    for e in endpoints:
+        h = store.history(conn, "node", e["id"])
+        if h:
+            seen[e["id"]] = [h["first_build"], h["last_build"]]
+    return {"seen": seen, "builds": [[b["id"], b["built_at"][:10], b["label"]] for b in builds]}
+
+
 def write_html_report(m: Model, path: str, osint: dict | None = None,
                       lens: str = "attention", db_path: str | None = None,
                       screenshot: tuple[str, bytes] | None = None,
@@ -302,6 +316,7 @@ def write_html_report(m: Model, path: str, osint: dict | None = None,
         conn = store.open_db(db_path)
         try:
             payload["bql"] = store.export_for_report(conn)
+            payload.update(_seen(conn, payload["endpoints"]))
         finally:
             conn.close()
     html = (_TEMPLATE.replace("__BQLJS__", BQL_JS)
