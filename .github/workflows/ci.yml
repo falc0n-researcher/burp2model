@@ -16,6 +16,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
       - run: pip install -e ".[dev]"
       - run: pytest -q
         env:
@@ -81,3 +85,24 @@ jobs:
           /tmp/clean/bin/burp2model --version
           /tmp/clean/bin/burp2model samples/burp-history-sample.xml -w shop --out wheel-out
           /tmp/clean/bin/burp2model query shop "code vs runtime" --out wheel-out | grep "Model call: none"
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Build the Burp extension
+        run: |
+          curl -sLo montoya.jar https://repo1.maven.org/maven2/net/portswigger/burp/extensions/montoya-api/2025.5/montoya-api-2025.5.jar
+          mkdir -p classes burp-extension/build/libs
+          javac --release 17 -Xlint:all -cp montoya.jar -d classes $(find burp-extension/src -name '*.java')
+          jar --create --file burp-extension/build/libs/burp2model.jar -C classes . -C burp-extension/src/main/resources .
+      - name: The tab and the engine work end to end
+        run: java -Djava.awt.headless=true -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.Smoke samples/burp-history-sample.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: burp2model.jar
+          path: burp-extension/build/libs/burp2model.jar

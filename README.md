@@ -85,7 +85,6 @@ Output goes to `burp2model-out/shop/`:
 | `q` | Query `graph.db` with BQL |
 | `graph` | Reason over the graph, or export GraphML / Cypher / JSON |
 | `cross-role` | Compare what two roles reached |
-| `serve` | Listen on localhost for the [Burp extension](burp-extension/): right-click requests in Burp, get the report |
 | `watch` | Watch a folder of Burp exports: each new export becomes a build and prints what changed |
 | `diff`, `builds` | What changed between two builds, grouped into workflows, changed fingerprints and gone things |
 | `gaps`, `changes`, `falsify`, `methodology` | Analyst commands over the model |
