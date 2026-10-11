@@ -18,7 +18,6 @@ module, so no raw secret ever reaches the model or the report.
 from __future__ import annotations
 
 import base64
-import gzip
 import json
 import os
 import re

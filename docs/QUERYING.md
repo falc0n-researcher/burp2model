@@ -83,4 +83,6 @@ CHANGED
 
 A new page, the script it loads, the endpoint that script names and its parameters are one line, not a dozen. The same build twice gives no drift. In BQL, `node.first_build` and `node.last_build` (also `first_seen`, `last_seen`) say when a thing first and last appeared. Set `BURP2MODEL_KEEP_BUILDS=N` to keep only the newest N builds.
 
+To build as you go, save each Burp export into one folder and run `burp2model watch FOLDER -w shop`. Every new export becomes a build named after its file, and the change from the last build prints. Works with Burp Community.
+
 All results are hypotheses to verify in an authorized session. The same five analyst roles are packaged in [`skills/`](../skills/). A sample report is in [`examples/juiceshop/report.html`](examples/juiceshop/report.html).
