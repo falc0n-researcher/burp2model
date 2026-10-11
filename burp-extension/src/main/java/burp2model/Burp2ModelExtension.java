@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 /**
  * A thin bridge: right-click requests in Burp, "Send to burp2model", and the selection goes to a local
  * burp2model process, which builds the model. The extension starts that process itself when it is not
- * running, so there is nothing to set up. No modeling happens here.
+ * running, and the engine ships inside the jar, so there is nothing to install or set up. No modeling happens here.
  */
 public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvider {
     private MontoyaApi api;
@@ -107,18 +107,24 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
 
     // ------------------------------------------------------------ the local process
 
-    /** True once a burp2model receiver answers on the port; starts one if none does. */
+    /** True once a burp2model receiver answers on the port; starts the bundled engine if none does. */
     private synchronized boolean ensureServer(String port) {
         if (healthy(port)) {
             return true;
         }
         String app = orDefault(prefs.getString("app"), "burp");
-        String cmd = orDefault(prefs.getString("command"), "burp2model");
-        String line = cmd + " serve -w " + app + " --port " + port;
-        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
-        String shell = orDefault(System.getenv("SHELL"), "/bin/sh");
-        // a login shell, so a Burp started from the dock still finds the user's PATH
-        List<String> argv = windows ? List.of("cmd", "/c", line) : List.of(shell, "-lc", line);
+        List<String> argv = new ArrayList<>();
+        String custom = orDefault(prefs.getString("command"), "");
+        if (!custom.isBlank()) {
+            argv.addAll(List.of(custom.trim().split("\\s+")));
+        } else {
+            String bundled = extractEngine();
+            argv.add(bundled != null ? bundled : "burp2model");
+        }
+        // models live in the user's home, not wherever Burp happened to be launched from
+        String out = java.nio.file.Path.of(System.getProperty("user.home"), "burp2model-out").toString();
+        argv.addAll(List.of("serve", "-w", app, "--port", port, "--out", out));
+        String line = String.join(" ", argv);
         try {
             server = new ProcessBuilder(argv).redirectErrorStream(true)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
@@ -126,9 +132,9 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             api.logging().raiseErrorEvent("burp2model: could not start `" + line + "` (" + ex.getMessage() + ")");
             return false;
         }
-        for (int i = 0; i < 40; i++) {
+        for (int i = 0; i < 60; i++) {
             if (healthy(port)) {
-                api.logging().logToOutput("burp2model: started `" + line + "`.");
+                api.logging().logToOutput("burp2model: engine started.");
                 return true;
             }
             if (!server.isAlive()) {
@@ -141,9 +147,40 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
                 return false;
             }
         }
-        api.logging().raiseErrorEvent("burp2model: `" + line + "` did not come up. Install it with `pip install burp2model`"
-                + " or set its full path in the burp2model tab.");
+        api.logging().raiseErrorEvent("burp2model: `" + line + "` did not come up.");
         return false;
+    }
+
+    /** The engine travels inside this jar, one self-contained program per platform: nothing to install. */
+    private String extractEngine() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        String arch = System.getProperty("os.arch", "").toLowerCase();
+        String plat = (os.contains("win") ? "windows" : os.contains("mac") ? "macos" : "linux")
+                + "-" + (arch.contains("aarch64") || arch.contains("arm") ? "arm64" : "x64");
+        String exe = os.contains("win") ? "burp2model.exe" : "burp2model";
+        String res = "/engine/" + plat + "/" + exe;
+        try (java.io.InputStream in = Burp2ModelExtension.class.getResourceAsStream(res)) {
+            if (in == null) {
+                api.logging().raiseErrorEvent("burp2model: this jar has no engine for " + plat
+                        + ". Install `pip install burp2model` and put its full path in the burp2model tab.");
+                return null;
+            }
+            byte[] bytes = in.readAllBytes();
+            java.nio.file.Path dir = java.nio.file.Path.of(System.getProperty("user.home"), ".burp2model", "engine");
+            java.nio.file.Files.createDirectories(dir);
+            java.nio.file.Path target = dir.resolve(exe);
+            // replaced whenever the bundled engine differs from the copy on disk (an update of the jar)
+            if (!java.nio.file.Files.exists(target) || !java.util.Arrays.equals(java.nio.file.Files.readAllBytes(target), bytes)) {
+                java.nio.file.Path tmp = dir.resolve(exe + ".new");
+                java.nio.file.Files.write(tmp, bytes);
+                tmp.toFile().setExecutable(true);
+                java.nio.file.Files.move(tmp, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            return target.toString();
+        } catch (Exception ex) {
+            api.logging().raiseErrorEvent("burp2model: could not unpack the engine (" + ex.getMessage() + ")");
+            return null;
+        }
     }
 
     private boolean healthy(String port) {
@@ -220,7 +257,7 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         JPanel p = new JPanel(new GridBagLayout());
         JTextField port = new JTextField(orDefault(prefs.getString("port"), "8765"), 8);
         JTextField app = new JTextField(orDefault(prefs.getString("app"), "burp"), 14);
-        JTextField command = new JTextField(orDefault(prefs.getString("command"), "burp2model"), 30);
+        JTextField command = new JTextField(orDefault(prefs.getString("command"), ""), 30);
         JTextField role = new JTextField(orDefault(prefs.getString("role"), ""), 14);
         JButton save = new JButton("Save");
         save.addActionListener(e -> {
@@ -233,7 +270,7 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(6, 8, 6, 8);
         c.anchor = GridBagConstraints.WEST;
-        String[] names = {"Model name", "Port", "burp2model command (full path if not on PATH)", "Role (optional, e.g. admin)"};
+        String[] names = {"Model name", "Port", "Engine command (leave empty to use the bundled one)", "Role (optional, e.g. admin)"};
         Component[] fields = {app, port, command, role};
         for (int i = 0; i < names.length; i++) {
             c.gridx = 0;

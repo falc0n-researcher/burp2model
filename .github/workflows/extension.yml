@@ -1,0 +1,59 @@
+name: extension
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  engine:
+    strategy:
+      matrix:
+        include:
+          - {os: macos-14, plat: macos-arm64, exe: burp2model}
+          - {os: macos-13, plat: macos-x64, exe: burp2model}
+          - {os: ubuntu-latest, plat: linux-x64, exe: burp2model}
+          - {os: windows-latest, plat: windows-x64, exe: burp2model.exe}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install . pyinstaller
+      - run: |
+          printf 'import sys\nfrom burp2model.cli import main\nsys.exit(main())\n' > entry.py
+          pyinstaller --onefile --name burp2model --collect-data burp2model --noconfirm entry.py
+        shell: bash
+      - run: dist/${{ matrix.exe }} --version
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-${{ matrix.plat }}
+          path: dist/${{ matrix.exe }}
+
+  jar:
+    needs: engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: "17"}
+      - uses: actions/download-artifact@v4
+        with: {path: engines}
+      - name: Put each engine where the extension looks for it
+        run: |
+          for d in engines/engine-*; do
+            plat="${d#engines/engine-}"
+            mkdir -p "burp-extension/src/main/resources/engine/$plat"
+            cp "$d"/* "burp-extension/src/main/resources/engine/$plat/"
+          done
+      - name: Build
+        run: |
+          curl -sLo montoya.jar https://repo1.maven.org/maven2/net/portswigger/burp/extensions/montoya-api/2025.5/montoya-api-2025.5.jar
+          mkdir -p classes burp-extension/build/libs
+          javac --release 17 -cp montoya.jar -d classes burp-extension/src/main/java/burp2model/*.java
+          jar --create --file burp-extension/build/libs/burp2model.jar -C classes . -C burp-extension/src/main/resources .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: burp2model.jar
+          path: burp-extension/build/libs/burp2model.jar

@@ -36,7 +36,7 @@ The CSV needs `Method`, `Host`, `Request` and `Response` columns (base64 or raw 
 
 ## Straight from Burp
 
-Load the extension from [`burp-extension/`](../burp-extension/), then right-click requests and choose **Send to burp2model**. It starts burp2model by itself. To keep exporting by hand instead, save each export into one folder and run `burp2model watch FOLDER -w app`; every new file becomes a build.
+Load the extension from [`burp-extension/`](../burp-extension/), then right-click requests and choose **Send to burp2model**. The jar carries its own engine, so there is nothing else to install. To keep exporting by hand instead, save each export into one folder and run `burp2model watch FOLDER -w app`; every new file becomes a build.
 
 ## Without Burp
 

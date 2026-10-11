@@ -6,7 +6,7 @@
 - Fix: a value in an HTML attribute named for a secret (`data-context-token="..."`, `<meta name="csrf-token">`) is masked in the stored request and response.
 - A 13-digit millisecond timestamp that happens to pass the card checksum is no longer masked as a card.
 - In the report, a large pile of code-only endpoints no longer outranks the endpoints that were actually called.
-- **Burp extension (first version, [`burp-extension/`](burp-extension/)).** Right-click requests in Burp, choose *Send to burp2model*, and the model report opens. It starts `burp2model serve` itself, so there is no token and nothing to configure. The receiver listens on `127.0.0.1` only, rejects other host names and requests without the extension's header, and caps the body size. The Java source has not been compiled or run against a live Burp yet.
+- **Burp extension (first version, [`burp-extension/`](burp-extension/)).** Right-click requests in Burp, choose *Send to burp2model*, and the model report opens. The jar carries its own engine (no Python, no token, nothing to configure) and starts it itself. The receiver listens on `127.0.0.1` only, rejects other host names and requests without the extension's header, and caps the body size. The Java source has not been compiled or run against a live Burp yet.
 - Much lower memory on large exports: a 40 MB export now peaks near 135 MB instead of 860 MB. The export is parsed straight to disk, request and response text is kept compressed in memory, and model.json, the report and the build snapshot are written piece by piece. Every output file is byte-identical to before.
 - `reaches-privileged` also shows the shortest path from the host to each endpoint.
 

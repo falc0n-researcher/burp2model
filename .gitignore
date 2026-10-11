@@ -35,3 +35,6 @@ uv.lock
 # Burp extension build
 .gradle/
 burp-extension/build/
+
+# engine binaries are built, not committed
+burp-extension/src/main/resources/engine/
