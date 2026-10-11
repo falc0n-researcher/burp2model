@@ -153,4 +153,55 @@ public final class Analysis {
         r.put("shared_same_success", shared);
         return r;
     }
+
+    private static final Map<String, Integer> GAP_WEIGHT = Map.of("AUTHENTICATED_STATE_NOT_OBSERVED", 5, "API_PURPOSE_UNKNOWN", 4,
+            "ROLE_NOT_TAGGED", 4, "AUTHORIZATION_UNKNOWN", 3, "ENDPOINT_ONLY_ERRORED", 2, "SCRIPT_PARTIALLY_SCANNED", 2, "CAPTURE_ITEMS_SKIPPED", 1);
+
+    /** The model's unknowns ranked by how much resolving each improves the picture, each with the smallest next step. */
+    public static List<Map<String, Object>> gaps(Model m) {
+        java.util.Set<String> priv = new java.util.HashSet<>();
+        for (Model.Node n : m.nodes.values()) {
+            if (n.type.equals("endpoint") && Builder.PRIV_RE.matcher(String.valueOf(n.attrs.getOrDefault("path", ""))).find()) {
+                priv.add(n.label);
+            }
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Model.Unknown u : m.unknowns) {
+            Model.Node en = m.nodes.get(u.entity());
+            String ent = en != null ? en.label : u.entity().substring(u.entity().lastIndexOf(':') + 1);
+            int w = GAP_WEIGHT.getOrDefault(u.type(), 1) + (priv.contains(ent) ? 1 : 0);
+            Map<String, Object> g = new LinkedHashMap<>();
+            g.put("leverage", (long) w);
+            g.put("type", u.type());
+            g.put("entity", ent);
+            g.put("unknown", u.weDontKnow());
+            g.put("we_know", u.weKnow());
+            g.put("next", u.nextStep());
+            out.add(g);
+        }
+        out.sort(Comparator.comparingLong((Map<String, Object> g) -> -((Long) g.get("leverage"))).thenComparing(g -> (String) g.get("type"))
+                .thenComparing(g -> (String) g.get("entity")));
+        return out;
+    }
+
+    /** The most connected nodes: the load-bearing parts of the app. */
+    public static List<Map<String, Object>> hubs(Model m, int top) {
+        Map<String, Integer> deg = new java.util.HashMap<>();
+        for (Model.Edge e : m.edges) {
+            deg.merge(e.src, 1, Integer::sum);
+            deg.merge(e.dst, 1, Integer::sum);
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        deg.entrySet().stream().filter(e -> m.nodes.containsKey(e.getKey()) && !m.nodes.get(e.getKey()).type.equals("host"))
+                .sorted((a, b) -> b.getValue() - a.getValue()).limit(top).forEach(e -> {
+                    Model.Node n = m.nodes.get(e.getKey());
+                    Map<String, Object> h = new LinkedHashMap<>();
+                    h.put("degree", (long) e.getValue());
+                    h.put("type", n.type);
+                    h.put("label", n.label);
+                    h.put("id", n.id);
+                    out.add(h);
+                });
+        return out;
+    }
 }

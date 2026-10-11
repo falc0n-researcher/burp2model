@@ -558,6 +558,7 @@ public final class Parse {
         ex.port = r.port();
         ex.path = redPath;
         ex.pathTemplate = ptemplate;
+        ex.rawTemplate = ptemplate;
         ex.status = status;
         ex.mime = mime;
         ex.queryParams = queryR.value();
@@ -568,6 +569,7 @@ public final class Parse {
         ex.item = itemNo;
         ex.refererHost = referer.host();
         ex.refererPath = referer.path();
+        ex.rawRefererPath = referer.path();
         ex.cookieNames = cookieNames;
         ex.setCookies = setCookies;
         ex.credentials = credentials;

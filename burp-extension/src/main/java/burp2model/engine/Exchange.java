@@ -14,6 +14,9 @@ public final class Exchange {
     public int port;
     public String path;            // redacted path including redacted query
     public String pathTemplate;    // /api/users/{id}
+    /** What the path looked like before slug folding; every rebuild starts from it, so folding never compounds. */
+    public String rawTemplate;
+    public String rawRefererPath;
     public Integer status;
     public String mime = "";
     public List<Redact.Pair> queryParams = new ArrayList<>();
@@ -50,6 +53,8 @@ public final class Exchange {
         m.put("port", (long) port);
         m.put("path", path);
         m.put("path_template", pathTemplate);
+        m.put("raw_template", rawTemplate);
+        m.put("raw_referer_path", rawRefererPath);
         m.put("status", status == null ? null : (Object) (long) status);
         m.put("mime", mime);
         m.put("role", role);
@@ -105,6 +110,8 @@ public final class Exchange {
         e.port = ((Number) r.get("port")).intValue();
         e.path = (String) r.get("path");
         e.pathTemplate = (String) r.get("path_template");
+        e.rawTemplate = (String) r.getOrDefault("raw_template", e.pathTemplate);
+        e.rawRefererPath = (String) r.getOrDefault("raw_referer_path", r.get("referer_path"));
         e.status = r.get("status") == null ? null : ((Number) r.get("status")).intValue();
         e.mime = (String) r.getOrDefault("mime", "");
         e.role = (String) r.get("role");

@@ -89,6 +89,11 @@ public final class Session {
 
     /** Parse and add requests (the same request seen again is not added twice), then rebuild and keep the build. */
     public synchronized AddResult add(List<Parse.Raw> raws, String role, String label, boolean replaceRole) throws IOException {
+        return add(raws, role, label, replaceRole, true);
+    }
+
+    /** `snapshot` false keeps the new requests in the working model without recording a build (live capture). */
+    public synchronized AddResult add(List<Parse.Raw> raws, String role, String label, boolean replaceRole, boolean snapshot) throws IOException {
         if (replaceRole && role != null) {
             exchanges.removeIf(e -> role.equals(e.role));
             seen.removeIf(s -> s.endsWith("@" + role));
@@ -116,7 +121,10 @@ public final class Session {
             exchanges.add(ex);
             added++;
         }
-        BuildInfo b = rebuild(label, skipped);
+        if (added == 0 && replaceRole == false && !snapshot) {
+            return new AddResult(0, dup, skipped, null);
+        }
+        BuildInfo b = rebuild(label, skipped, snapshot);
         return new AddResult(added, dup, skipped, b);
     }
 
@@ -136,10 +144,15 @@ public final class Session {
         Files.deleteIfExists(dir.resolve("seen.txt"));
     }
 
-    private BuildInfo rebuild(String label, int skipped) throws IOException {
-        // evidence ids are 1-based and stable across the exchanges kept so far
+    private BuildInfo rebuild(String label, int skipped, boolean snapshot) throws IOException {
+        // evidence ids are 1-based and stable across the exchanges kept so far; folding starts from the raw paths each time
         for (int i = 0; i < exchanges.size(); i++) {
-            exchanges.get(i).index = i + 1;
+            Exchange e = exchanges.get(i);
+            e.index = i + 1;
+            if (e.rawTemplate != null) {
+                e.pathTemplate = e.rawTemplate;
+                e.refererPath = e.rawRefererPath;
+            }
         }
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("items", (long) exchanges.size() + skipped);
@@ -147,6 +160,10 @@ public final class Session {
         stats.put("skipped", (long) skipped);
         List<Exchange> copy = new ArrayList<>(exchanges);
         model = Builder.build(copy, name, null, scope.isEmpty() ? null : scope, stats);
+        if (!snapshot) {
+            saveInputs();
+            return null;
+        }
         int id = builds.size() + 1;
         BuildInfo info = new BuildInfo(id, Instant.now().toString().substring(0, 19) + "Z",
                 label == null || label.isBlank() ? "build " + id : label, model.nodes.size(), model.edges.size(), model.evidenceLog.size());
@@ -192,14 +209,18 @@ public final class Session {
 
     // ----------------------------------------------------------------- disk
 
-    private void save(BuildInfo info) throws IOException {
-        writeGz(dir.resolve("builds").resolve(info.id() + ".json.gz"), Json.write(model.toMap()));
+    private void saveInputs() throws IOException {
         StringBuilder in = new StringBuilder();
         for (Exchange e : exchanges) {
             in.append(Json.write(e.toMap())).append('\n');
         }
         writeGz(dir.resolve("inputs.jsonl.gz"), in.toString());
         Files.writeString(dir.resolve("seen.txt"), String.join("\n", seen), StandardCharsets.UTF_8);
+    }
+
+    private void save(BuildInfo info) throws IOException {
+        writeGz(dir.resolve("builds").resolve(info.id() + ".json.gz"), Json.write(model.toMap()));
+        saveInputs();
         List<Object> list = new ArrayList<>();
         for (BuildInfo b : builds) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -255,7 +276,10 @@ public final class Session {
                     }
                 }
             }
-            if (!builds.isEmpty()) {
+            if (!exchanges.isEmpty()) {
+                // the working model may hold live-captured requests newer than the last build: rebuild it from the inputs
+                rebuild(null, 0, false);
+            } else if (!builds.isEmpty()) {
                 model = buildModel(builds.get(builds.size() - 1).id());
             }
         } catch (RuntimeException e) {
