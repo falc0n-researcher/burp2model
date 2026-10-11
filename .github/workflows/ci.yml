@@ -102,6 +102,8 @@ jobs:
           jar --create --file burp-extension/build/libs/burp2model.jar -C classes . -C burp-extension/src/main/resources .
       - name: The tab and the engine work end to end
         run: java -Djava.awt.headless=true -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.Smoke samples/burp-history-sample.xml
+      - name: The map is stable
+        run: java -Djava.awt.headless=true -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.ui.MapStability samples/juiceshop-user.xml
       - uses: actions/upload-artifact@v4
         with:
           name: burp2model.jar

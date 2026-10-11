@@ -34,7 +34,7 @@ final class EvidenceViewer extends JPanel {
             public Component getListCellRendererComponent(JList<?> l, Object v, int i, boolean sel, boolean focus) {
                 JLabel c = (JLabel) super.getListCellRendererComponent(l, v, i, sel, focus);
                 int id = (Integer) v;
-                Map<String, Object> ev = find(id);
+                Map<String, Object> ev = meta(id);
                 String label = "ev_" + id;
                 if (ev != null) {
                     label += "  " + ev.get("method") + " " + (ev.get("status") == null ? "" : ev.get("status"));
@@ -109,26 +109,22 @@ final class EvidenceViewer extends JPanel {
     }
 
     private int codeRank(int id) {
-        Map<String, Object> ev = find(id);
+        Map<String, Object> ev = meta(id);
         String mime = ev == null ? "" : String.valueOf(ev.get("mime")).toLowerCase();
         return mime.equals("script") || mime.equals("html") ? 1 : 0;
     }
 
     private Map<String, Object> find(int id) {
+        return model == null ? null : model.evidenceLog.byId(id);
+    }
+
+    /** The small fields only: enough to label a list row without unpacking its request and response. */
+    private Map<String, Object> meta(int id) {
         if (model == null) {
             return null;
         }
-        List<Map<String, Object>> log = model.evidenceLog;
-        int idx = id - 1;
-        if (idx >= 0 && idx < log.size() && ((Number) log.get(idx).get("id")).intValue() == id) {
-            return log.get(idx);
-        }
-        for (Map<String, Object> ev : log) {
-            if (((Number) ev.get("id")).intValue() == id) {
-                return ev;
-            }
-        }
-        return null;
+        int i = model.evidenceLog.indexOfId(id);
+        return i < 0 ? null : model.evidenceLog.meta(i);
     }
 
     @SuppressWarnings("unchecked")

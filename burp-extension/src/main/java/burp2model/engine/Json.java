@@ -9,6 +9,30 @@ import java.util.Map;
 public final class Json {
     private Json() {}
 
+    /** A value that writes its own JSON (a large log that is kept compressed, for instance). */
+    public interface Writable {
+        void writeTo(StringBuilder sb, int indent, int depth);
+    }
+
+    static void writeIterable(StringBuilder sb, Iterable<?> it, int indent, int depth) {
+        boolean first = true;
+        sb.append('[');
+        boolean any = false;
+        for (Object o : it) {
+            any = true;
+            if (!first) {
+                sb.append(',');
+            }
+            first = false;
+            nl(sb, indent, depth + 1);
+            write(sb, o, indent, depth + 1);
+        }
+        if (any) {
+            nl(sb, indent, depth);
+        }
+        sb.append(']');
+    }
+
     public static String write(Object v) {
         StringBuilder sb = new StringBuilder();
         write(sb, v, -1, 0);
@@ -25,6 +49,8 @@ public final class Json {
     private static void write(StringBuilder sb, Object v, int indent, int depth) {
         if (v == null) {
             sb.append("null");
+        } else if (v instanceof Writable w) {
+            w.writeTo(sb, indent, depth);
         } else if (v instanceof String s) {
             quote(sb, s);
         } else if (v instanceof Boolean || v instanceof Integer || v instanceof Long) {

@@ -222,7 +222,7 @@ public final class ContextPack {
                 "note", lens.equals("all") ? "model order" : "endpoints are ordered by the lens, so capping drops the least interesting ones first"));
         Map<String, Object> evidence = new LinkedHashMap<>();
         Map<Integer, Map<String, Object>> byId = new java.util.HashMap<>();
-        for (Map<String, Object> e : m.evidenceLog) {
+        for (Map<String, Object> e : m.evidenceLog.metas()) {
             byId.put(((Number) e.get("id")).intValue(), e);
         }
         for (int i : cited) {

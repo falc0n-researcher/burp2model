@@ -142,7 +142,7 @@ final class Dashboard extends JPanel {
         Widgets.Card card = new Widgets.Card(12);
         card.add(Widgets.heading("Responses"), BorderLayout.NORTH);
         long[] by = new long[6];
-        for (Map<String, Object> ev : m.evidenceLog) {
+        for (Map<String, Object> ev : m.evidenceLog.metas()) {
             Object s = ev.get("status");
             by[s instanceof Number n ? Math.min(5, n.intValue() / 100) : 0]++;
         }

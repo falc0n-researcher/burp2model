@@ -90,7 +90,7 @@ public final class Analysis {
     @SuppressWarnings("unchecked")
     public static Map<String, Object> crossRole(Model m, String low, String high) {
         Map<Integer, String> evRole = new LinkedHashMap<>();
-        for (Map<String, Object> e : m.evidenceLog) {
+        for (Map<String, Object> e : m.evidenceLog.metas()) {
             evRole.put(((Number) e.get("id")).intValue(), (String) e.get("role"));
         }
         List<Map<String, Object>> highOnly = new ArrayList<>();

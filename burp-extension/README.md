@@ -18,7 +18,7 @@ Or turn on **Capture proxied traffic automatically** in Settings: in-scope Proxy
 | --- | --- |
 | Overview | Counts, code vs runtime, response mix, technology stack, cookie and credential facts, the first leads |
 | To check | Ranked leads with the reason and the request behind each, and the open questions ranked by value |
-| Map | The model as a network: zoom, drag, search, focus on a node's neighbours; solid lines were seen in traffic, dashed ones found in code |
+| Map | The model as a map you can read: a network layout or a left-to-right flow, both stable (the same model always draws the same way, and new requests keep what was placed). Zoom, drag, search, hover for details, click to see a node's neighbours, double-click to focus, right-click for more; solid lines were seen in traffic, dashed ones found in code |
 | Surface | Endpoints, pages, scripts, third parties, cookies, credentials and more, as a list or a site map by path, with each thing's facts and connections |
 | Requests | Every captured request, with its masked request and response, coloured and pretty-printed |
 | Query | Plain questions and BQL filters and verbs, offline; every row cites evidence; copy or save results |
@@ -29,9 +29,11 @@ Or turn on **Capture proxied traffic automatically** in Settings: in-scope Proxy
 
 **Copy for AI** (top right) puts a rules-first package on the clipboard for your own model: a hunting methodology, the whole model, the endpoints, or the open questions. Structure, not bytes: every id it cites resolves in its evidence table.
 
-![The map](assets/map-dark.png)
+![The map, network layout with a node selected](assets/map-network.png)
 
-It follows Burp's light and dark themes.
+![The map, flow layout](assets/map-flow.png)
+
+It follows Burp's light and dark themes. Large sessions stay fast: requests are parsed on several threads, the same script loaded twice is scanned once, and the saved requests and responses are kept compressed (20,000 requests build in about four seconds in under 400 MB).
 
 ## Query
 

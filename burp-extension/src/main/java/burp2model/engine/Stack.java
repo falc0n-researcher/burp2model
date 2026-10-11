@@ -58,25 +58,73 @@ public final class Stack {
         return "";
     }
 
-    /** Technologies one response shows. Deterministic, deduplicated. */
-    public static List<Hit> detect(Map<String, String> headers, List<String> cookieNames, String body, String path,
-                                   boolean isMarkup) {
-        Map<String, String[]> found = new LinkedHashMap<>();   // "name\0cat" -> {how, version}
+    private static void add(Map<String, String[]> found, String name, String cat, String how, String ver) {
+        String k = name + "\0" + cat;
+        String[] cur = found.get(k);
+        if (cur == null || (!ver.isEmpty() && cur[1].isEmpty())) {
+            found.put(k, new String[] {how, !ver.isEmpty() ? ver : (cur != null ? cur[1] : "")});
+        }
+    }
 
-        java.util.function.Consumer<String[]> add = a -> {
-            String k = a[0] + "\0" + a[1];
-            String[] cur = found.get(k);
-            if (cur == null || (!a[3].isEmpty() && cur[1].isEmpty())) {
-                found.put(k, new String[] {a[2], !a[3].isEmpty() ? a[3] : (cur != null ? cur[1] : "")});
+    private static List<Hit> toHits(Map<String, String[]> found) {
+        List<Hit> out = new ArrayList<>();
+        for (Map.Entry<String, String[]> e : found.entrySet()) {
+            String[] k = e.getKey().split("\0", 2);
+            out.add(new Hit(k[0], k[1], e.getValue()[0], e.getValue()[1]));
+        }
+        return out;
+    }
+
+    /** What the markup or script text itself shows (the part that depends only on the body, so it can be cached by content). */
+    public static List<Hit> bodyHits(String body) {
+        Map<String, String[]> found = new LinkedHashMap<>();
+        if (body == null || body.isEmpty()) {
+            return List.of();
+        }
+        String text = body.length() > SCAN_CAP ? body.substring(0, SCAN_CAP) : body;
+        for (Sign s : BODY) {
+            Matcher m = s.rx().matcher(text);
+            if (m.find()) {
+                add(found, s.name(), s.category(), "page", ver(m));
             }
-        };
+        }
+        Matcher g = GENERATOR.matcher(text);
+        if (g.find()) {
+            String gen = g.group(1).strip();
+            if (gen.length() > 60) {
+                gen = gen.substring(0, 60);
+            }
+            Matcher nm = GEN_NAME.matcher(gen);
+            String name = gen;
+            String v = "";
+            if (nm.find()) {
+                name = nm.group(1).strip();
+                v = nm.group(2) == null ? "" : nm.group(2);
+            }
+            if (name.toLowerCase().startsWith("wordpress")) {
+                name = "WordPress";
+            }
+            add(found, name, "CMS & platform", "meta generator", v);
+        }
+        if (RECAPTCHA.matcher(text).find()) {
+            add(found, "reCAPTCHA", "Services", "page", "");
+        }
+        return toHits(found);
+    }
 
+    /** Technologies one response shows. Deterministic, deduplicated. */
+    public static List<Hit> detect(Map<String, String> headers, List<String> cookieNames, String body, String path, boolean isMarkup) {
+        return detect(headers, cookieNames, isMarkup ? bodyHits(body) : List.of(), path);
+    }
+
+    public static List<Hit> detect(Map<String, String> headers, List<String> cookieNames, List<Hit> bodyHits, String path) {
+        Map<String, String[]> found = new LinkedHashMap<>();
         for (HeadSign h : HEAD) {
             String v = headers.get(h.header());
             if (v != null && !v.isEmpty()) {
                 Matcher m = h.rx().matcher(v);
                 if (m.find()) {
-                    add.accept(new String[] {h.name(), h.category(), "header:" + h.header(), ver(m)});
+                    add(found, h.name(), h.category(), "header:" + h.header(), ver(m));
                 }
             }
         }
@@ -84,51 +132,20 @@ public final class Stack {
             for (String ck : cookieNames) {
                 for (Sign s : COOK) {
                     if (s.rx().matcher(ck).find()) {
-                        add.accept(new String[] {s.name(), s.category(), "cookie", ""});
+                        add(found, s.name(), s.category(), "cookie", "");
                     }
                 }
             }
         }
         for (Sign s : PATH) {
             if (s.rx().matcher(path == null ? "" : path).find()) {
-                add.accept(new String[] {s.name(), s.category(), "path", ""});
+                add(found, s.name(), s.category(), "path", "");
             }
         }
-        if (isMarkup && body != null && !body.isEmpty()) {
-            String text = body.length() > SCAN_CAP ? body.substring(0, SCAN_CAP) : body;
-            for (Sign s : BODY) {
-                Matcher m = s.rx().matcher(text);
-                if (m.find()) {
-                    add.accept(new String[] {s.name(), s.category(), "page", ver(m)});
-                }
-            }
-            Matcher g = GENERATOR.matcher(text);
-            if (g.find()) {
-                String gen = g.group(1).strip();
-                if (gen.length() > 60) {
-                    gen = gen.substring(0, 60);
-                }
-                Matcher nm = GEN_NAME.matcher(gen);
-                String name = gen;
-                String v = "";
-                if (nm.find()) {
-                    name = nm.group(1).strip();
-                    v = nm.group(2) == null ? "" : nm.group(2);
-                }
-                if (name.toLowerCase().startsWith("wordpress")) {
-                    name = "WordPress";
-                }
-                add.accept(new String[] {name, "CMS & platform", "meta generator", v});
-            }
-            if (RECAPTCHA.matcher(text).find()) {
-                add.accept(new String[] {"reCAPTCHA", "Services", "page", ""});
-            }
+        for (Hit h : bodyHits) {
+            add(found, h.name(), h.category(), h.how(), h.version());
         }
-        List<Hit> out = new ArrayList<>();
-        for (Map.Entry<String, String[]> e : found.entrySet()) {
-            String[] k = e.getKey().split("\0", 2);
-            out.add(new Hit(k[0], k[1], e.getValue()[0], e.getValue()[1]));
-        }
+        List<Hit> out = toHits(found);
         out.sort(Comparator.comparing(Hit::name).thenComparing(Hit::category).thenComparing(Hit::how).thenComparing(Hit::version));
         return out;
     }
