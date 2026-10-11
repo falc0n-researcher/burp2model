@@ -591,8 +591,10 @@ def _reaches_privileged(conn, role: str) -> Result:
         sbr = next((v for k, v in sbr.items() if k.lower() == role.lower()), [])
         ev = [f"ev_{x[0]}" for x in conn.execute(
             "SELECT ev_id FROM node_evidence WHERE node_id=? ORDER BY ev_id LIMIT 3", (r["id"],))]
-        rows.append({"endpoint": r["label"], "statuses": sbr, "evidence": ev})
-    return Result("table", ["endpoint", "statuses", "evidence"], rows,
+        p = _paths(conn, r["id"], None, limit=1)
+        via = " → ".join([_label(conn, p[0][0]["from"])] + [_label(conn, h["to"]) for h in p[0]]) if p else ""
+        rows.append({"endpoint": r["label"], "statuses": sbr, "via": via, "evidence": ev})
+    return Result("table", ["endpoint", "statuses", "via", "evidence"], rows,
                   f"{len(rows)} privileged-looking endpoint(s) reached as {role}; "
                   "check each response was meant for that role", len(rows))
 

@@ -222,5 +222,6 @@ def test_killer_query_verbs(tmp_path, monkeypatch):
     with pytest.raises(bql.BQLError):
         bql.run_query(conn, "changed-since 2")
     rp = bql.run_query(conn, "reaches-privileged user")
-    assert rp.kind == "table" and rp.columns[0] == "endpoint"
+    assert rp.kind == "table" and rp.columns[:3] == ["endpoint", "statuses", "via"]
+    assert all("→" in r["via"] for r in rp.rows if r["via"])
     conn.close()
