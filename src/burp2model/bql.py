@@ -31,6 +31,10 @@ Graph verbs — the structure, walked in the database:
     upstream <node> [depth N] everything that leads into it
     neighbors <node> [depth N]
     path <a> to <b>           shortest route between two nodes
+    provenance <node>         every request that evidenced it
+    static-only               endpoints named in code that traffic never proved
+    changed-since <build>     what moved since a build (number, label or `first`)
+    reaches-privileged <role> privileged-looking endpoints that role reached
     osint [section]           stored external recon (dns, tls, subdomains, ...)
     unknowns | stats | schema | help
     sql <SELECT ...>          a read-only SELECT against the tables
@@ -529,6 +533,70 @@ def _osint_result(conn, section: str | None) -> Result:
                   f"OSINT run #{row['id']} · {row['host']} · {row['generated_at']}", len(rows))
 
 
+def _provenance(conn, nid: str) -> Result:
+    rows = [{"ev": f"ev_{r['id']}", "role": r["role"] or "", "method": r["method"],
+             "url": f"{r['host']}{r['path']}", "status": r["status"], "source": r["source"]}
+            for r in conn.execute(
+                "SELECT x.* FROM node_evidence ne JOIN exchanges x ON x.id=ne.ev_id "
+                "WHERE ne.node_id=? ORDER BY x.id", (nid,))]
+    return Result("table", ["ev", "role", "method", "url", "status", "source"], rows,
+                  f"{len(rows)} request(s) behind {_label(conn, nid)}", len(rows))
+
+
+def _static_only(conn) -> Result:
+    rows = []
+    for r in conn.execute("SELECT id, label, attrs FROM nodes WHERE type='endpoint' ORDER BY label"):
+        if json.loads(r["attrs"] or "{}").get("api_state") != "STATIC_ONLY":
+            continue
+        by = [x[0] for x in conn.execute(
+            "SELECT n.label FROM edges e JOIN nodes n ON n.id=e.src WHERE e.dst=? AND e.type='REFERENCES' "
+            "ORDER BY n.label", (r["id"],))]
+        ev = [f"ev_{x[0]}" for x in conn.execute(
+            "SELECT ev_id FROM node_evidence WHERE node_id=? ORDER BY ev_id", (r["id"],))]
+        rows.append({"endpoint": r["label"], "named_in": by, "evidence": ev})
+    return Result("table", ["endpoint", "named_in", "evidence"], rows,
+                  f"{len(rows)} endpoint(s) in code, never seen in traffic", len(rows))
+
+
+def _changed_since(conn, ref: str) -> Result:
+    from . import diff as diffmod
+    from .model import from_dict
+    try:
+        old = store.resolve_build(conn, _unquote(ref))
+        new = store.resolve_build(conn, "latest")
+    except ValueError as e:
+        raise BQLError(str(e))
+    if old == new:
+        raise BQLError(f"build #{old} is the latest; nothing to compare yet")
+    snaps = []
+    for bid in (old, new):
+        snap = store.load_build(conn, bid)
+        row = conn.execute("SELECT built_at, label FROM builds WHERE id=?", (bid,)).fetchone()
+        snaps.append((from_dict(snap), {"id": bid, "built_at": row["built_at"], "label": row["label"] or ""}))
+    d = diffmod.diff_models(snaps[0][0], snaps[1][0], snaps[0][1], snaps[1][1],
+                            hist=lambda k, key: store.history(conn, k, key))
+    return Result("text", note=diffmod.format_text(d))
+
+
+def _reaches_privileged(conn, role: str) -> Result:
+    from .model import PRIV_RE
+    rows = []
+    for r in conn.execute("SELECT id, label, attrs, roles FROM nodes WHERE type='endpoint' ORDER BY label"):
+        a = json.loads(r["attrs"] or "{}")
+        if role.lower() not in [x.lower() for x in json.loads(r["roles"] or "[]")]:
+            continue
+        if not PRIV_RE.search(a.get("path", "") or ""):
+            continue
+        sbr = (a.get("status_by_role") or {})
+        sbr = next((v for k, v in sbr.items() if k.lower() == role.lower()), [])
+        ev = [f"ev_{x[0]}" for x in conn.execute(
+            "SELECT ev_id FROM node_evidence WHERE node_id=? ORDER BY ev_id LIMIT 3", (r["id"],))]
+        rows.append({"endpoint": r["label"], "statuses": sbr, "evidence": ev})
+    return Result("table", ["endpoint", "statuses", "evidence"], rows,
+                  f"{len(rows)} privileged-looking endpoint(s) reached as {role}; "
+                  "check each response was meant for that role", len(rows))
+
+
 def run_query(conn: sqlite3.Connection, text: str, limit: int = DEFAULT_LIMIT) -> Result:
     """Run one BQL statement. Raises BQLError on anything it cannot run."""
     text = (text or "").strip().rstrip(";").strip()
@@ -565,6 +633,18 @@ def run_query(conn: sqlite3.Connection, text: str, limit: int = DEFAULT_LIMIT) -
         cols = list(rows[0].keys()) if rows else []
         return Result("table", cols, [dict(r) for r in rows[:limit]],
                       f"{len(rows)} row(s)", len(rows))
+    if verb == "provenance":
+        if not rest:
+            raise BQLError("provenance needs a node")
+        return _provenance(conn, resolve(conn, _unquote(rest)))
+    if verb == "static-only":
+        return _static_only(conn)
+    if verb == "changed-since":
+        return _changed_since(conn, rest or "previous")
+    if verb == "reaches-privileged":
+        if not rest:
+            raise BQLError("reaches-privileged needs a role")
+        return _reaches_privileged(conn, _unquote(rest))
     if verb in ("reach", "blast", "upstream", "neighbors", "path"):
         if not rest:
             raise BQLError(f"{verb} needs a node")
