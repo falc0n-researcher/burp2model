@@ -31,3 +31,7 @@ burp2model-out/
 
 # uv side effects (project is setuptools-managed)
 uv.lock
+
+# Burp extension build
+.gradle/
+burp-extension/build/
