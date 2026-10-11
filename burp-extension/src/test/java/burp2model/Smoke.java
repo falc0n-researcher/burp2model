@@ -142,7 +142,14 @@ public final class Smoke {
         Thread.sleep(500);
         check(panel[0].session().model() != null, "the tab opens on the saved model");
         if (a.length > 1) {
+            var tf = MainPanel.class.getDeclaredField("tabs");
+            tf.setAccessible(true);
+            javax.swing.JTabbedPane tp = (javax.swing.JTabbedPane) tf.get(panel[0]);
             SwingUtilities.invokeAndWait(() -> {
+                for (int t = 0; t < tp.getTabCount(); t++) {
+                    tp.setSelectedIndex(t);
+                }
+                tp.setSelectedIndex(0);
                 panel[0].ask("req.method:POST");
                 select(panel[0], "leadsTable", 1);
                 select(panel[0], "reqTable", 5);

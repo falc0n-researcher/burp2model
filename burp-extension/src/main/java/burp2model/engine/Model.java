@@ -20,6 +20,19 @@ public final class Model {
         public final Map<String, Object> attrs = new LinkedHashMap<>();
         public final List<Integer> evidence = new ArrayList<>();
         public final List<String> roles = new ArrayList<>();
+        private java.util.Set<Integer> evSet;
+
+        /** Add an evidence id once; a set alongside the list keeps this fast for nodes with thousands of requests. */
+        boolean addEvidence(int idx) {
+            if (evSet == null) {
+                evSet = new java.util.HashSet<>(evidence);
+            }
+            if (!evSet.add(idx)) {
+                return false;
+            }
+            evidence.add(idx);
+            return true;
+        }
 
         Node(String id, String type, int layer, String label) {
             this.id = id;
@@ -57,6 +70,18 @@ public final class Model {
         public final String type;
         public final String state;
         public final List<Integer> evidence = new ArrayList<>();
+        private java.util.Set<Integer> evSet;
+
+        boolean addEvidence(int idx) {
+            if (evSet == null) {
+                evSet = new java.util.HashSet<>(evidence);
+            }
+            if (!evSet.add(idx)) {
+                return false;
+            }
+            evidence.add(idx);
+            return true;
+        }
 
         Edge(String src, String dst, String type, String state) {
             this.src = src;
@@ -97,7 +122,7 @@ public final class Model {
     public List<String> scope = new ArrayList<>();
     public Map<String, Object> stats = new LinkedHashMap<>();
     public List<Map<String, Object>> stack = new ArrayList<>();
-    public final List<Map<String, Object>> evidenceLog = new ArrayList<>();
+    public final EvidenceLog evidenceLog = new EvidenceLog();
     Map<String, Edge> edgeIndex = new LinkedHashMap<>();
     final Map<String, Map<String, Object>> secretIndex = new LinkedHashMap<>();
 
@@ -119,8 +144,8 @@ public final class Model {
 
     public void evidence(String nodeId, int idx) {
         Node n = nodes.get(nodeId);
-        if (n != null && !n.evidence.contains(idx)) {
-            n.evidence.add(idx);
+        if (n != null) {
+            n.addEvidence(idx);
         }
     }
 
@@ -132,8 +157,8 @@ public final class Model {
         String key = edgeKey(src, dst, type);
         Edge e = edgeIndex.get(key);
         if (e != null) {
-            if (idx != null && !e.evidence.contains(idx)) {
-                e.evidence.add(idx);
+            if (idx != null) {
+                e.addEvidence(idx);
             }
             return;
         }

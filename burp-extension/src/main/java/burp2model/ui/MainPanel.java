@@ -159,6 +159,7 @@ public final class MainPanel extends JPanel {
         tabs.addTab("Settings", settingsTab());
         tabs.setFont(Theme.font(12f, Font.PLAIN));
         add(tabs, BorderLayout.CENTER);
+        tabs.addChangeListener(e -> fillTab(tabs.getSelectedIndex()));
         status.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
         status.setFont(Theme.font(11f, Font.PLAIN));
         status.setForeground(Theme.muted());
@@ -233,31 +234,66 @@ public final class MainPanel extends JPanel {
         runQuery(text);
     }
 
+    /** Tabs whose contents are out of date; each is filled when it is first shown, so a send costs only what is on screen. */
+    private final java.util.Set<Integer> stale = new java.util.HashSet<>();
+    private Query queryEngine;
+    private Model queryEngineFor;
+
     private void refreshNow() {
         Model m = model();
-        for (EvidenceViewer v : new EvidenceViewer[] {leadsViewer, graphViewer, surfaceViewer, reqViewer, queryViewer, rolesViewer}) {
-            v.setModel(m);
-        }
         leads = m == null ? new ArrayList<>() : Analysis.leads(m);
         dashboard.update(m, leads);
-        fillLeads(m);
-        fillGaps(m);
-        graph.setModel(m);
-        siteTree.setModel(m);
-        fillSurface();
-        fillRequests(m);
-        fillBuilds();
-        fillRoles(m);
-        fillRecon(m);
+        headerPills(m);
         nameField.setText(host.get("app", "burp"));
         roleField.setText(host.get("role", ""));
         scopeField.setText(host.get("scope", ""));
         replaceRole.setSelected("1".equals(host.get("replace", "0")));
         autoCapture.setSelected("1".equals(host.get("auto", "0")));
-        headerPills(m);
+        for (int i = 1; i < tabs.getTabCount(); i++) {
+            stale.add(i);
+        }
+        queryEngine = null;
+        fillTab(tabs.getSelectedIndex());
         status.setText(m == null ? "No requests yet. Right-click requests in Burp and choose Send to burp2model."
                 : m.nodes.size() + " nodes · " + m.edges.size() + " edges · " + m.evidenceLog.size() + " requests · build " + session.builds().size()
                 + " · stored in " + session.dir());
+    }
+
+    /** Fill one tab from the current model, if it is out of date. */
+    private void fillTab(int idx) {
+        if (!stale.remove(idx)) {
+            return;
+        }
+        Model m = model();
+        switch (idx) {
+            case 1 -> {
+                leadsViewer.setModel(m);
+                fillLeads(m);
+                fillGaps(m);
+            }
+            case 2 -> {
+                graphViewer.setModel(m);
+                graph.setModel(m);
+            }
+            case 3 -> {
+                surfaceViewer.setModel(m);
+                siteTree.setModel(m);
+                fillSurface();
+            }
+            case 4 -> {
+                reqViewer.setModel(m);
+                fillRequests(m);
+            }
+            case 5 -> queryViewer.setModel(m);
+            case 6 -> fillBuilds();
+            case 7 -> {
+                rolesViewer.setModel(m);
+                fillRoles(m);
+            }
+            case 8 -> fillRecon(m);
+            default -> {
+            }
+        }
     }
 
     // ------------------------------------------------------------------ header
@@ -445,6 +481,7 @@ public final class MainPanel extends JPanel {
             graphFacts.show(n, model());
             graphViewer.show(n.evidence, n.label);
         });
+        graph.onOpen(n -> goToNode(n.id));
         JSplitPane top = divide(new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, graph, graphFacts), 0.74);
         top.setResizeWeight(0.74);
         top.setBorder(null);
@@ -598,18 +635,19 @@ public final class MainPanel extends JPanel {
         return p;
     }
 
-    @SuppressWarnings("unchecked")
     private void fillRequests(Model m) {
         reqModel.setRowCount(0);
         if (m == null) {
             return;
         }
-        for (Map<String, Object> ev : m.evidenceLog) {
-            Map<String, Object> rq = ev.get("request") instanceof Map<?, ?> r ? (Map<String, Object>) r : Map.of();
-            String[] parts = String.valueOf(rq.getOrDefault("line", "")).split(" ");
-            reqModel.addRow(new Object[] {((Number) ev.get("id")).intValue(), ev.get("method"), ev.get("host"), parts.length >= 2 ? parts[1] : ev.get("path"),
+        List<Object[]> rows = new ArrayList<>(m.evidenceLog.size());
+        for (int i = 0; i < m.evidenceLog.size(); i++) {
+            Map<String, Object> ev = m.evidenceLog.meta(i);
+            String p = m.evidenceLog.path(i);
+            rows.add(new Object[] {((Number) ev.get("id")).intValue(), ev.get("method"), ev.get("host"), p.isEmpty() ? ev.get("path") : p,
                     ev.get("status") == null ? "" : String.valueOf(ev.get("status")), ev.get("role") == null ? "" : ev.get("role")});
         }
+        Tables.fill(reqModel, rows);
         Tables.filter(reqTable, reqFilter.getText());
     }
 
@@ -758,7 +796,11 @@ public final class MainPanel extends JPanel {
             queryHistory.add(text);
         }
         historyPos = queryHistory.size();
-        Query q = new Query(m);
+        if (queryEngine == null || queryEngineFor != m) {
+            queryEngine = new Query(m);
+            queryEngineFor = m;
+        }
+        Query q = queryEngine;
         q.history = id -> session.historyOf(id);
         q.changedSince = ref -> {
             try {

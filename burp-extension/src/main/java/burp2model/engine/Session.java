@@ -34,6 +34,10 @@ public final class Session {
     /** node id -> {first build, last build}. */
     private final Map<String, int[]> nodeHistory = new LinkedHashMap<>();
     private Model model;
+    /** Exchanges and keys not yet appended to disk; a role replacement rewrites the whole file instead. */
+    private final List<Exchange> pendingNew = new ArrayList<>();
+    private final List<String> pendingKeys = new ArrayList<>();
+    private boolean fullRewrite;
 
     public Session(Path home, String name) throws IOException {
         this.name = name;
@@ -97,35 +101,82 @@ public final class Session {
         if (replaceRole && role != null) {
             exchanges.removeIf(e -> role.equals(e.role));
             seen.removeIf(s -> s.endsWith("@" + role));
+            fullRewrite = true;
         }
-        int added = 0;
+        final String roleKey = role == null ? "" : role;
+        int n = raws.size();
+        String[] keys = new String[n];
+        parallel(n, 32, i -> keys[i] = digest(raws.get(i), roleKey) + "@" + roleKey);
+        List<Integer> todo = new ArrayList<>();
         int dup = 0;
-        int skipped = 0;
-        for (Parse.Raw r : raws) {
-            String key = digest(r, role == null ? "" : role) + "@" + (role == null ? "" : role);
-            if (!seen.add(key)) {
+        for (int i = 0; i < n; i++) {
+            if (seen.add(keys[i])) {
+                todo.add(i);
+            } else {
                 dup++;
-                continue;
             }
-            Exchange ex;
-            try {
-                ex = Parse.item(exchanges.size() + 1, r, role, "burp", exchanges.size());
-            } catch (RuntimeException e) {
-                ex = null;
-            }
-            if (ex == null) {
-                skipped++;
-                seen.remove(key);
-                continue;
-            }
-            exchanges.add(ex);
-            added++;
         }
-        if (added == 0 && replaceRole == false && !snapshot) {
+        Exchange[] parsed = new Exchange[todo.size()];
+        final int base = exchanges.size();
+        parallel(todo.size(), 16, k -> {
+            try {
+                parsed[k] = Parse.item(0, raws.get(todo.get(k)), role, "burp", base + k);
+            } catch (RuntimeException e) {
+                parsed[k] = null;
+            }
+        });
+        int added = 0;
+        int skipped = 0;
+        List<Exchange> fresh = new ArrayList<>();
+        List<String> freshKeys = new ArrayList<>();
+        for (int k = 0; k < parsed.length; k++) {
+            if (parsed[k] == null) {
+                skipped++;
+                seen.remove(keys[todo.get(k)]);
+            } else {
+                parsed[k].item = base + added;
+                exchanges.add(parsed[k]);
+                fresh.add(parsed[k]);
+                freshKeys.add(keys[todo.get(k)]);
+                added++;
+            }
+        }
+        if (added == 0 && !fullRewrite && !snapshot) {
             return new AddResult(0, dup, skipped, null);
         }
+        pendingNew.addAll(fresh);
+        pendingKeys.addAll(freshKeys);
         BuildInfo b = rebuild(label, skipped, snapshot);
         return new AddResult(added, dup, skipped, b);
+    }
+
+    private static volatile java.util.concurrent.ForkJoinPool pool;
+
+    /** Run body(i) for 0..n-1, on several threads when there is enough work to be worth it. */
+    private static void parallel(int n, int threshold, java.util.function.IntConsumer body) {
+        if (n < threshold) {
+            for (int i = 0; i < n; i++) {
+                body.accept(i);
+            }
+            return;
+        }
+        if (pool == null) {
+            synchronized (Session.class) {
+                if (pool == null) {
+                    pool = new java.util.concurrent.ForkJoinPool(Math.max(2, Runtime.getRuntime().availableProcessors() - 1),
+                            p -> {
+                                var t = java.util.concurrent.ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(p);
+                                t.setDaemon(true);
+                                return t;
+                            }, null, false);
+                }
+            }
+        }
+        try {
+            pool.submit(() -> java.util.stream.IntStream.range(0, n).parallel().forEach(body)).get();
+        } catch (InterruptedException | java.util.concurrent.ExecutionException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public synchronized void clear() throws IOException {
@@ -142,6 +193,10 @@ public final class Session {
         }
         Files.deleteIfExists(dir.resolve("inputs.jsonl.gz"));
         Files.deleteIfExists(dir.resolve("seen.txt"));
+        pendingNew.clear();
+        pendingKeys.clear();
+        fullRewrite = false;
+        Parse.clearCache();
     }
 
     private BuildInfo rebuild(String label, int skipped, boolean snapshot) throws IOException {
@@ -209,13 +264,31 @@ public final class Session {
 
     // ----------------------------------------------------------------- disk
 
+    /** Write what is new since the last save: appended as one more gzip member, so a save costs the new requests, not all of them. */
     private void saveInputs() throws IOException {
-        StringBuilder in = new StringBuilder();
-        for (Exchange e : exchanges) {
-            in.append(Json.write(e.toMap())).append('\n');
+        Path inputs = dir.resolve("inputs.jsonl.gz");
+        Path seenFile = dir.resolve("seen.txt");
+        if (fullRewrite || !Files.exists(inputs)) {
+            StringBuilder in = new StringBuilder();
+            for (Exchange e : exchanges) {
+                in.append(Json.write(e.toMap())).append('\n');
+            }
+            writeGz(inputs, in.toString());
+            Files.writeString(seenFile, String.join("\n", seen), StandardCharsets.UTF_8);
+            fullRewrite = false;
+        } else if (!pendingNew.isEmpty()) {
+            StringBuilder in = new StringBuilder();
+            for (Exchange e : pendingNew) {
+                in.append(Json.write(e.toMap())).append('\n');
+            }
+            try (GZIPOutputStream out = new GZIPOutputStream(Files.newOutputStream(inputs, java.nio.file.StandardOpenOption.APPEND))) {
+                out.write(in.toString().getBytes(StandardCharsets.UTF_8));
+            }
+            Files.writeString(seenFile, String.join("\n", pendingKeys) + "\n", StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
         }
-        writeGz(dir.resolve("inputs.jsonl.gz"), in.toString());
-        Files.writeString(dir.resolve("seen.txt"), String.join("\n", seen), StandardCharsets.UTF_8);
+        pendingNew.clear();
+        pendingKeys.clear();
     }
 
     private void save(BuildInfo info) throws IOException {

@@ -259,15 +259,12 @@ public final class Extract {
         return new HostPath(host, Redact.templatePath(path));
     }
 
-    public static Set<Asset> scriptAssets(String body, String host, String path, String headerMap) {
-        Set<Asset> out = new HashSet<>();
+    /** The source-map and worker references named in a script's text (kind, raw). Independent of where the script lives, so cacheable by content. */
+    public static List<String[]> scriptAssetRefs(String body) {
         List<String[]> refs = new ArrayList<>();
         Matcher sm = SOURCEMAP.matcher(body == null ? "" : body);
         while (sm.find()) {
             refs.add(new String[] {"sourcemap", sm.group(1)});
-        }
-        if (headerMap != null) {
-            refs.add(new String[] {"sourcemap", headerMap});
         }
         for (int i = 0; i < WORKER_RES.length; i++) {
             Matcher wm = WORKER_RES[i].matcher(body == null ? "" : body);
@@ -275,6 +272,19 @@ public final class Extract {
                 refs.add(new String[] {WORKER_KINDS[i], wm.group(2)});
             }
         }
+        return refs;
+    }
+
+    public static Set<Asset> scriptAssets(String body, String host, String path, String headerMap) {
+        List<String[]> refs = new ArrayList<>(scriptAssetRefs(body));
+        if (headerMap != null) {
+            refs.add(0, new String[] {"sourcemap", headerMap});
+        }
+        return resolveAssets(refs, host, path);
+    }
+
+    public static Set<Asset> resolveAssets(List<String[]> refs, String host, String path) {
+        Set<Asset> out = new HashSet<>();
         for (String[] r : refs) {
             HostPath hp = resolveAsset(r[1], host, path);
             if (hp != null) {

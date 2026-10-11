@@ -126,7 +126,10 @@ public final class Builder {
     }
 
     public static boolean isProbe(Exchange ex) {
-        return PROBE_METHODS.contains(ex.method) || PROBE_PATH.matcher(ex.path == null ? "" : ex.path).find();
+        if (ex.probe == null) {
+            ex.probe = PROBE_METHODS.contains(ex.method) || PROBE_PATH.matcher(ex.path == null ? "" : ex.path).find();
+        }
+        return ex.probe;
     }
 
     // ------------------------------------------------------ slug collapsing
@@ -410,11 +413,7 @@ public final class Builder {
             ev.put("status", ex.status == null ? null : (Object) (long) ex.status);
             ev.put("mime", ex.mime);
             ev.put("role", role);
-            if (!ex.ev.isEmpty()) {
-                ev.put("request", ex.ev.get("request"));
-                ev.put("response", ex.ev.get("response"));
-            }
-            m.evidenceLog.add(ev);
+            m.evidenceLog.add(ev, ex.evZ, ex.reqPath);
             for (Redact.Fingerprint s : ex.secrets) {
                 addSecret(m, s.asMap(), i);
             }

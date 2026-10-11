@@ -402,6 +402,56 @@ public final class Parse {
         return new String(b, StandardCharsets.UTF_8);
     }
 
+    // ---- body analysis, cached by content: the same bundle loaded again costs a hash, not another scan
+
+    private record BodyScan(String full, List<Redact.Fingerprint> prints, List<Extract.Ref> refs, List<String[]> assetRefs, List<Stack.Hit> hits, String evText) {}
+
+    private static final java.util.concurrent.ConcurrentHashMap<String, BodyScan> SCANS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.atomic.AtomicLong SCAN_CHARS = new java.util.concurrent.atomic.AtomicLong();
+    private static final long SCAN_CACHE_CHARS = 48L * 1024 * 1024;
+
+    private static String contentKey(byte[] b, boolean js) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+            md.update((byte) (js ? 1 : 0));
+            md.update(b);
+            StringBuilder sb = new StringBuilder(b.length + ":");
+            for (byte x : md.digest()) {
+                sb.append(String.format("%02x", x));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static BodyScan scanBody(byte[] bytes, boolean js) {
+        String key = bytes.length > 2048 ? contentKey(bytes, js) : null;
+        if (key != null) {
+            BodyScan hit = SCANS.get(key);
+            if (hit != null) {
+                return hit;
+            }
+        }
+        Redact.Redacted<String> red = Redact.redactBody(utf8(bytes));
+        String full = red.value();
+        Set<Extract.Ref> refs = js ? Extract.jsRefs(full) : Extract.htmlRefs(full);
+        List<Extract.Ref> sorted = new ArrayList<>(refs);
+        BodyScan scan = new BodyScan(full, red.prints(), sorted, js ? Extract.scriptAssetRefs(full) : List.of(), Stack.bodyHits(full),
+                Redact.redactNamed(trunc(trunc(full, js ? CODE_KEEP : BODY_KEEP), js ? CODE_KEEP : BODY_KEEP)));
+        if (key != null && SCAN_CHARS.get() < SCAN_CACHE_CHARS) {
+            SCAN_CHARS.addAndGet(full.length());
+            SCANS.put(key, scan);
+        }
+        return scan;
+    }
+
+    /** Drop the cached scans (when a session is cleared, so memory does not linger). */
+    public static void clearCache() {
+        SCANS.clear();
+        SCAN_CHARS.set(0);
+    }
+
     // ---- the item
 
     public static Exchange item(int idx, Raw r, String role, String source, int itemNo) {
@@ -482,7 +532,8 @@ public final class Parse {
         boolean scanTruncated = (isJs || isHtml) && (!respDec.ok() || r.truncated());
         Set<Extract.Ref> jsRefs = new LinkedHashSet<>();
         Set<Extract.Asset> jsAssets = new LinkedHashSet<>();
-        String stackText = "";
+        List<Stack.Hit> bodyHits = List.of();
+        String evBodyText = null;
         String respBodyR;
         Redact.Redacted<String> s6;
         if (isJs || isHtml) {
@@ -491,22 +542,24 @@ public final class Parse {
                 scan = java.util.Arrays.copyOf(scan, Extract.MAX_SCAN_BYTES);
                 scanTruncated = true;
             }
-            s6 = Redact.redactBody(utf8(scan));
-            String full = s6.value();
-            jsRefs = isJs ? Extract.jsRefs(full) : Extract.htmlRefs(full);
+            BodyScan bs = scanBody(scan, isJs);
+            s6 = new Redact.Redacted<>(bs.full(), bs.prints());
+            String full = bs.full();
+            jsRefs = new LinkedHashSet<>(bs.refs());
             if (isJs) {
-                String hdrMap = null;
+                List<String[]> arefs = new ArrayList<>(bs.assetRefs());
                 for (Redact.Pair h : respHeaders) {
                     String n = h.name().toLowerCase();
                     if (n.equals("sourcemap") || n.equals("x-sourcemap")) {
-                        hdrMap = h.value();
+                        arefs.add(new String[] {"sourcemap", h.value()});
                         break;
                     }
                 }
-                jsAssets = Extract.scriptAssets(full, host, ptemplate, hdrMap);
+                jsAssets = Extract.resolveAssets(arefs, host, ptemplate);
             }
             respBodyR = trunc(full, isJs ? CODE_KEEP : BODY_KEEP);
-            stackText = full;
+            bodyHits = bs.hits();
+            evBodyText = bs.evText();
         } else {
             byte[] head = respBody.length > BODY_KEEP * 5 ? java.util.Arrays.copyOf(respBody, BODY_KEEP * 5) : respBody;
             s6 = Redact.redactBody(utf8(head));
@@ -522,7 +575,7 @@ public final class Parse {
         for (Redact.Pair h : respHeaders) {
             lowHeaders.put(h.name().toLowerCase(), h.value());
         }
-        List<Stack.Hit> stack = Stack.detect(lowHeaders, allCookies, stackText, redPath, isJs || isHtml);
+        List<Stack.Hit> stack = Stack.detect(lowHeaders, allCookies, bodyHits, redPath);
 
         secrets.addAll(rp.prints());
         secrets.addAll(reqHr.prints());
@@ -544,7 +597,7 @@ public final class Parse {
         String line = !respStart.isEmpty() ? respStart : (status != null ? "HTTP/1.1 " + status : "");
         respEv.put("line", line.strip());
         respEv.put("headers", headerList(respHr.value()));
-        respEv.put("body", Redact.redactNamed(trunc(respBodyR, evBody)));
+        respEv.put("body", evBodyText != null ? evBodyText : Redact.redactNamed(trunc(respBodyR, evBody)));
         respEv.put("truncated", len(respBodyR) > evBody || scanTruncated);
         Map<String, Object> ev = new LinkedHashMap<>();
         ev.put("request", reqEv);
@@ -585,7 +638,8 @@ public final class Parse {
         ex.scanTruncated = scanTruncated;
         ex.gqlOps = gql;
         ex.preflight = preflight;
-        ex.ev = ev;
+        ex.setEv(ev);
+        ex.reqPath = redPath;
         return ex;
     }
 

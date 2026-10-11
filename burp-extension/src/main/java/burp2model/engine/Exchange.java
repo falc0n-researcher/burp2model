@@ -17,6 +17,8 @@ public final class Exchange {
     /** What the path looked like before slug folding; every rebuild starts from it, so folding never compounds. */
     public String rawTemplate;
     public String rawRefererPath;
+    /** Whether this looks like a scanner's probe; worked out once. */
+    Boolean probe;
     public Integer status;
     public String mime = "";
     public List<Redact.Pair> queryParams = new ArrayList<>();
@@ -37,8 +39,18 @@ public final class Exchange {
     public boolean scanTruncated;
     public List<String> gqlOps = new ArrayList<>();
     public boolean preflight;
-    /** The redacted request and response panes: {request:{line,headers,body,truncated}, response:{...}}. */
-    public Map<String, Object> ev = new LinkedHashMap<>();
+    /** The redacted request and response panes, compressed: {request:{line,headers,body,truncated}, response:{...}}. */
+    public byte[] evZ = new byte[0];
+    /** The path in the request line (redacted), for tables. */
+    public String reqPath = "";
+
+    public void setEv(Map<String, Object> ev) {
+        evZ = EvidenceLog.pack(ev);
+    }
+
+    public Map<String, Object> ev() {
+        return EvidenceLog.unpack(evZ);
+    }
 
     // ---- persistence: names, shapes and the redacted panes; never a raw value
 
@@ -94,7 +106,7 @@ public final class Exchange {
         m.put("scan_truncated", scanTruncated);
         m.put("gql_ops", gqlOps);
         m.put("preflight", preflight);
-        m.put("ev", ev);
+        m.put("evz", java.util.Base64.getEncoder().encodeToString(evZ));
         return m;
     }
 
@@ -150,7 +162,12 @@ public final class Exchange {
         e.scanTruncated = Boolean.TRUE.equals(r.get("scan_truncated"));
         e.gqlOps = new ArrayList<>((List<String>) r.getOrDefault("gql_ops", List.of()));
         e.preflight = Boolean.TRUE.equals(r.get("preflight"));
-        e.ev = (Map<String, Object>) r.getOrDefault("ev", new LinkedHashMap<>());
+        if (r.get("evz") instanceof String z) {
+            e.evZ = java.util.Base64.getDecoder().decode(z);
+        } else {
+            e.setEv((Map<String, Object>) r.getOrDefault("ev", new LinkedHashMap<>()));
+        }
+        e.reqPath = e.path;
         return e;
     }
 }

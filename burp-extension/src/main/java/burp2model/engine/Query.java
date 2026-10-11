@@ -50,8 +50,8 @@ public final class Query {
             out.computeIfAbsent(e.src, k -> new ArrayList<>()).add(e);
             inc.computeIfAbsent(e.dst, k -> new ArrayList<>()).add(e);
         }
-        for (Map<String, Object> ev : m.evidenceLog) {
-            requests.add(requestRow(ev));
+        for (int i = 0; i < m.evidenceLog.size(); i++) {
+            requests.add(new ReqRow(i));
         }
     }
 
@@ -70,27 +70,55 @@ public final class Query {
         return String.join("\n", lines);
     }
 
+    private static final java.util.Set<String> HEAVY = java.util.Set.of("req_headers", "req_body", "resp_headers", "resp_body");
+    private int cachedIdx = -1;
+    private Map<String, Object> cachedFull;
+
+    /** The unpacked request and response text of entry i; the last one is kept, so a filter that reads several fields unpacks once. */
     @SuppressWarnings("unchecked")
-    static Map<String, Object> requestRow(Map<String, Object> ev) {
-        Map<String, Object> rq = ev.get("request") instanceof Map<?, ?> r ? (Map<String, Object>) r : Map.of();
-        Map<String, Object> rs = ev.get("response") instanceof Map<?, ?> r ? (Map<String, Object>) r : Map.of();
-        String[] parts = String.valueOf(rq.getOrDefault("line", "")).split(" ");
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", ev.get("id"));
-        row.put("source", ev.get("source"));
-        row.put("item", ev.get("item"));
-        row.put("role", ev.get("role"));
-        row.put("method", ev.get("method"));
-        row.put("host", ev.get("host"));
-        row.put("path", parts.length >= 2 ? parts[1] : "");
-        row.put("path_template", ev.get("path"));
-        row.put("status", ev.get("status"));
-        row.put("mime", ev.get("mime"));
-        row.put("req_headers", headersText(rq.get("headers")));
-        row.put("req_body", rq.getOrDefault("body", ""));
-        row.put("resp_headers", headersText(rs.get("headers")));
-        row.put("resp_body", rs.getOrDefault("body", ""));
-        return row;
+    private synchronized Map<String, Object> heavy(int i) {
+        if (cachedIdx != i) {
+            Map<String, Object> ev = m.evidenceLog.get(i);
+            Map<String, Object> rq = ev.get("request") instanceof Map<?, ?> r ? (Map<String, Object>) r : Map.of();
+            Map<String, Object> rs = ev.get("response") instanceof Map<?, ?> r ? (Map<String, Object>) r : Map.of();
+            Map<String, Object> full = new HashMap<>();
+            full.put("req_headers", headersText(rq.get("headers")));
+            full.put("req_body", rq.getOrDefault("body", ""));
+            full.put("resp_headers", headersText(rs.get("headers")));
+            full.put("resp_body", rs.getOrDefault("body", ""));
+            cachedFull = full;
+            cachedIdx = i;
+        }
+        return cachedFull;
+    }
+
+    /** One captured request as a table row. The small fields are held; the request and response text is unpacked when a filter asks for it. */
+    private final class ReqRow extends HashMap<String, Object> {
+        private static final long serialVersionUID = 1L;
+        private final int idx;
+
+        ReqRow(int idx) {
+            this.idx = idx;
+            Map<String, Object> meta = m.evidenceLog.meta(idx);
+            put("id", meta.get("id"));
+            put("source", meta.get("source"));
+            put("item", meta.get("item"));
+            put("role", meta.get("role"));
+            put("method", meta.get("method"));
+            put("host", meta.get("host"));
+            put("path", m.evidenceLog.path(idx));
+            put("path_template", meta.get("path"));
+            put("status", meta.get("status"));
+            put("mime", meta.get("mime"));
+        }
+
+        @Override
+        public Object get(Object key) {
+            if (HEAVY.contains(key)) {
+                return heavy(idx).get(key);
+            }
+            return super.get(key);
+        }
     }
 
     // ------------------------------------------------------------------ lexing

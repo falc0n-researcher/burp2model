@@ -55,6 +55,41 @@ public final class Redact {
 
     private static final String[] VALUE_KINDS = {"jwt", "openai_key", "aws_key", "google_key", "slack_token",
         "github_token", "stripe_key", "private_key", "card", "email"};
+    /** A cheap test that must hold for the pattern at the same index to have any chance of matching. */
+    private static boolean mayMatch(int k, String text) {
+        return switch (VALUE_KINDS[k]) {
+            case "jwt" -> text.contains("eyJ");
+            case "openai_key" -> text.contains("sk-");
+            case "aws_key" -> text.contains("AKIA") || text.contains("ASIA");
+            case "google_key" -> text.contains("AIza");
+            case "slack_token" -> text.contains("xox");
+            case "github_token" -> text.contains("gh");
+            case "stripe_key" -> text.contains("k_live_") || text.contains("k_test_");
+            case "private_key" -> text.contains("-----BEGIN ");
+            case "card" -> hasDigitRun(text, 13);
+            case "email" -> text.indexOf('@') >= 0;
+            default -> true;
+        };
+    }
+
+    /** Whether the text holds a run of at least n digits, allowing single spaces or dashes between them. */
+    private static boolean hasDigitRun(String s, int n) {
+        int run = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= '0' && c <= '9') {
+                if (++run >= n) {
+                    return true;
+                }
+            } else if ((c == ' ' || c == '-') && run > 0 && i + 1 < s.length() && Character.isDigit(s.charAt(i + 1))) {
+                continue;
+            } else {
+                run = 0;
+            }
+        }
+        return false;
+    }
+
     private static final Pattern[] VALUE_PATTERNS = {
         Pattern.compile("\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{4,}\\b"),
         Pattern.compile("\\bsk-[A-Za-z0-9_-]{20,}\\b"),
@@ -243,6 +278,9 @@ public final class Redact {
         }
         for (int k = 0; k < VALUE_PATTERNS.length; k++) {
             final String kind = VALUE_KINDS[k];
+            if (!mayMatch(k, text)) {
+                continue;
+            }
             text = sub(VALUE_PATTERNS[k], text, m -> {
                 String val = m.group();
                 if (kind.equals("card")) {
@@ -304,19 +342,30 @@ public final class Redact {
         if (text == null || text.isEmpty()) {
             return text;
         }
+        final boolean hasEq = text.indexOf('=') >= 0;
+        final boolean hasJson = text.indexOf('"') >= 0 && text.indexOf(':') >= 0;
+        if (!hasEq && !hasJson && text.indexOf('<') < 0 && text.indexOf(':') < 0) {
+            return text;                                   // nothing in it that could carry a name and a value
+        }
         List<String> names = new ArrayList<>();
-        Matcher a = KV_ANY.matcher(text);
-        while (a.find()) {
-            names.add(a.group(2));
+        if (hasEq) {
+            Matcher a = KV_ANY.matcher(text);
+            while (a.find()) {
+                names.add(a.group(2));
+            }
         }
-        Matcher b = JSON_ANY.matcher(text);
-        while (b.find()) {
-            names.add(b.group(1));
+        if (hasJson) {
+            Matcher b = JSON_ANY.matcher(text);
+            while (b.find()) {
+                names.add(b.group(1));
+            }
         }
-        final boolean group = isCredentialGroup(names);
+        final boolean group = names.size() >= 2 && isCredentialGroup(names);
         java.util.function.Predicate<String> sens = n -> isSensitiveParam(n) || (group && CREDENTIAL_GROUP.contains(leaf(n)));
 
-        text = sub(INPUT_TAG, text, m -> {
+        final String lower = text.toLowerCase();
+        final boolean hasTag = text.indexOf('<') >= 0;
+        text = !hasTag || !lower.contains("<input") ? text : sub(INPUT_TAG, text, m -> {
             String tag = m.group();
             Matcher n = ATTR_NAME.matcher(tag);
             String name = "";
@@ -336,7 +385,7 @@ public final class Redact {
             }
             return tag;
         });
-        text = sub(TAG, text, m -> {
+        text = !hasTag ? text : sub(TAG, text, m -> {
             String tag = m.group();
             if (tag.regionMatches(true, 0, "<input", 0, 6)) {
                 return tag;
@@ -365,14 +414,16 @@ public final class Redact {
                 return am.group();
             });
         });
-        text = sub(HEADER_LINE, text, m -> m.group(1) + m.group(2) + REDACTED);
-        text = sub(KV_ANY, text, m -> {
+        if (lower.contains("cookie") || lower.contains("authorization") || lower.contains("-token") || lower.contains("api-key") || lower.contains("csrf")) {
+            text = sub(HEADER_LINE, text, m -> m.group(1) + m.group(2) + REDACTED);
+        }
+        text = !hasEq ? text : sub(KV_ANY, text, m -> {
             if (sens.test(m.group(2)) && !m.group(4).equals(REDACTED) && !isErrorConstant(m.group(4))) {
                 return m.group(1) + m.group(2) + m.group(3) + REDACTED;
             }
             return m.group();
         });
-        text = sub(JSON_ANY, text, m -> {
+        text = !hasJson ? text : sub(JSON_ANY, text, m -> {
             if (sens.test(m.group(1)) && !isErrorConstant(m.group(3))) {
                 return "\"" + m.group(1) + "\"" + m.group(2) + "\"" + REDACTED + "\"";
             }

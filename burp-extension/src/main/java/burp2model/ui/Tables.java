@@ -170,9 +170,20 @@ final class Tables {
         }
     }
 
+    /** Replace every row at once: one change event, not one per row (the difference between instant and seconds on thousands of rows). */
+    @SuppressWarnings("unchecked")
     static void fill(DefaultTableModel m, List<Object[]> rows) {
-        m.setRowCount(0);
-        rows.forEach(m::addRow);
+        java.util.Vector<java.util.Vector> data = m.getDataVector();
+        data.clear();
+        data.ensureCapacity(rows.size());
+        for (Object[] r : rows) {
+            java.util.Vector<Object> v = new java.util.Vector<>(r.length);
+            for (Object o : r) {
+                v.add(o);
+            }
+            data.add(v);
+        }
+        m.fireTableDataChanged();
     }
 
     static java.awt.Font mono() {
