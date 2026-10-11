@@ -202,3 +202,25 @@ def test_watch_can_ignore_what_is_already_in_the_folder(tmp_path, monkeypatch):
 def test_watch_needs_a_real_folder(tmp_path, capsys):
     assert main(["watch", str(tmp_path / "nope"), "-w", "shop", "--once"]) == 2
     assert "not a folder" in capsys.readouterr().err
+
+
+# ------------------------------------------------------------- graph verbs ---
+
+def test_killer_query_verbs(tmp_path, monkeypatch):
+    monkeypatch.setenv("BURP2MODEL_FP_KEY", "ci")
+    monkeypatch.setenv("BURP2MODEL_OFFLINE", "1")
+    out = str(tmp_path / "o")
+    for i, items in enumerate((v1(), v2())):
+        assert main([export(tmp_path, items, name=f"k{i}.xml"), "-w", "shop", "--out", out]) == 0
+    conn = store.open_db(os.path.join(out, "shop", "graph.db"))
+    from burp2model import bql
+    prov = bql.run_query(conn, "provenance /api/me")
+    assert prov.rows and all(r["ev"].startswith("ev_") for r in prov.rows)
+    assert bql.run_query(conn, "static-only").kind == "table"
+    ch = bql.run_query(conn, "changed-since 1")
+    assert "CHANGED" in ch.note or "NEW" in ch.note
+    with pytest.raises(bql.BQLError):
+        bql.run_query(conn, "changed-since 2")
+    rp = bql.run_query(conn, "reaches-privileged user")
+    assert rp.kind == "table" and rp.columns[0] == "endpoint"
+    conn.close()

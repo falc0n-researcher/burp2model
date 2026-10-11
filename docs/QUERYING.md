@@ -34,6 +34,10 @@ Also: `parameters`, `secrets` (masked), `privileged`, `errors`, `shape`. Anythin
 burp2model q shop 'req.method:POST AND resp.code.gte:400'
 burp2model q shop 'node.type:endpoint AND node.state:STATIC_ONLY'
 burp2model q shop 'reach "POST /api/checkout"'
+burp2model q shop 'provenance "POST /api/checkout"'   # every request behind it
+burp2model q shop 'static-only'                        # named in code, never seen in traffic
+burp2model q shop 'changed-since 1'                    # what moved since build 1
+burp2model q shop 'reaches-privileged user'            # admin-looking endpoints a role reached
 burp2model q shop 'sql SELECT type, count(*) FROM nodes GROUP BY type'
 burp2model q shop            # interactive; `help` lists the language
 ```

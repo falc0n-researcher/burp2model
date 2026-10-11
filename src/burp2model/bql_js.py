@@ -255,7 +255,7 @@ function run(db,text,limit=DEFAULT_LIMIT){
     if(!db.osint)return{kind:"facts",columns:["section","key","value"],rows:[],note:"no OSINT stored yet — build with OSINT enabled (the default)",total:0};
     const sec=rest.toLowerCase(),rows=db.facts.filter(f=>!rest||f.section.toLowerCase()===sec);
     return{kind:"facts",columns:["section","key","value"],rows,note:"OSINT run #"+db.osint.id+" · "+db.osint.host+" · "+db.osint.generated_at,total:rows.length};}
-  if(first==="schema"||first==="sql")fail(first+" is available in the CLI (`burp2model q`), not in the report");
+  if(["schema","sql","provenance","static-only","changed-since","reaches-privileged"].includes(first))fail(first+" is available in the CLI (`burp2model q`), not in the report");
   if(["reach","blast","upstream","neighbors","path"].includes(first)){
     if(!rest)fail(first+" needs a node");
     if(first==="path"){const m=rest.split(/\s+to\s+/i);if(m.length<2)fail("usage: path <a> to <b>");
