@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Burp extension (first version, [`burp-extension/`](burp-extension/)).** Right-click requests in Burp, choose *Send to burp2model*, and the model report opens. It is a thin bridge to the new `burp2model serve`, which listens on `127.0.0.1` only, needs a token, rejects other host names and caps the body size. The Java source has not been compiled or run against a live Burp yet.
 - Much lower memory on large exports: a 40 MB export now peaks near 135 MB instead of 860 MB. The export is parsed straight to disk, request and response text is kept compressed in memory, and model.json, the report and the build snapshot are written piece by piece. Every output file is byte-identical to before.
 - `reaches-privileged` also shows the shortest path from the host to each endpoint.
 
