@@ -963,6 +963,12 @@ def cmd_watch(args) -> int:
     return 0
 
 
+def cmd_serve(args) -> int:
+    from . import serve
+    _init_key()
+    return serve.serve(args.webapp, args.out, port=args.port, token=args.token)
+
+
 def cmd_builds(args) -> int:
     dbp = _db_path(args)
     if dbp is None:
@@ -1370,6 +1376,13 @@ def main(argv=None) -> int:
     wa.add_argument("--out", default="burp2model-out", help="output directory (default: burp2model-out)")
     wa.set_defaults(func=cmd_watch)
 
+    sv = sub.add_parser("serve", help="listen on localhost for the Burp extension, which sends the selected requests")
+    sv.add_argument("--webapp", "-w", required=True, type=_name("webapp"), help="name for the model")
+    sv.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default: 8765)")
+    sv.add_argument("--token", help="shared secret the extension sends (default: a random one is printed)")
+    sv.add_argument("--out", default="burp2model-out", help="output directory (default: burp2model-out)")
+    sv.set_defaults(func=cmd_serve)
+
     bl = sub.add_parser("builds", help="list the builds kept in graph.db, to pick two to diff")
     bl.add_argument("webapp", type=_name("webapp"), help="model name used at build time")
     bl.add_argument("--out", default="burp2model-out", help="output directory used at build time")
@@ -1405,13 +1418,13 @@ def main(argv=None) -> int:
 
     argv = list(sys.argv[1:] if argv is None else argv)
     known = {"build", "crawl", "query", "q", "cross-role", "osint", "graph", "methodology",
-             "gaps", "changes", "diff", "builds", "watch", "falsify", "animate", "-h", "--help", "--version"}
+             "gaps", "changes", "diff", "builds", "watch", "serve", "falsify", "animate", "-h", "--help", "--version"}
     # bare `burp2model file.xml ...` → treat as build, but only when the first
     # word is a real file; a typo'd subcommand gets a clear error instead
     if argv and argv[0] not in known and not argv[0].startswith("-"):
         if not os.path.exists(argv[0]):
             print(f"burp2model: {argv[0]!r} is not a command or an existing file.\n"
-                  f"commands: build, crawl, query, q, cross-role, osint, graph, gaps, changes, diff, builds, watch, "
+                  f"commands: build, crawl, query, q, cross-role, osint, graph, gaps, changes, diff, builds, watch, serve, "
                   f"falsify, methodology, animate "
                   f"(or `burp2model <export.xml>` to build)", file=sys.stderr)
             return 2
