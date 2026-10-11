@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.4 — 2026-10-11
 
 - Four more `burp2model q` verbs: `provenance NODE`, `static-only`, `changed-since BUILD` and `reaches-privileged ROLE`. Each answer cites evidence and works offline. (They are CLI-only; the report console says so.)
 - The report's request viewer shows when an endpoint first appeared ("new in build N", "since build N", or "gone after build N") once graph.db holds two or more builds.
