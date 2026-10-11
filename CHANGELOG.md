@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The report's request viewer shows when an endpoint first appeared ("new in build N", "since build N", or "gone after build N") once graph.db holds two or more builds.
+
 ## 1.0.3 — 2026-10-11
 
 - **`burp2model watch FOLDER -w APP`** rebuilds whenever a new Burp export (Save items XML or

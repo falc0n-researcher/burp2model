@@ -65,6 +65,7 @@ INV_CSS = r"""
 .inv-empty{padding:34px 20px;color:var(--faint);text-align:center;font:13px var(--sans)}
 .inv-view{flex:1;min-height:120px;display:flex;background:var(--panel);overflow:hidden}
 .inv-view>.rr{flex:1}
+.seenchip{font:600 11px var(--mono);padding:3px 8px;border-radius:6px;background:var(--panel2);color:var(--muted);margin-left:8px;white-space:nowrap}
 .ghostcard{padding:22px 24px;color:var(--muted);font-size:13px;max-width:640px}
 .ghostcard h3{margin:0 0 6px;font:700 15px var(--sans);color:var(--text)}
 .ghostcard .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -199,7 +200,11 @@ function initEvq(){
         <div class="tags">${ghost[0].referenced_by.map(x=>`<span>${esc(x)}</span>`).join("")}</div></div>`
         :`<div class="inv-empty" style="flex:1">Select a request to see it here. Arrow keys move through the table.</div>`;return;}
     const e=r.e;
+    const ep=EP.find(x=>(x.evidence||[]).includes(e.id)),sn=ep&&D.seen&&D.seen[ep.id];
+    const bl=sn&&D.builds.find(b=>b[0]===sn[0]);
     rrMount(vw,[e.id],{actions:[["Copy URL",(i,b)=>fallbackCopy(`${e.host}${e.path}`,()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy URL",1200);})],["Details",()=>openEv(e.id)]]});
+    if(sn){const last=D.builds[D.builds.length-1][0],bar=$(".rrbar .sp",vw);
+      if(bar)bar.insertAdjacentHTML("beforebegin",`<span class="seenchip" title="${bl?esc(bl[1]+" "+bl[2]):""}">${sn[0]===last&&last>1?"new in build "+last:"since build "+sn[0]}${sn[1]<last?" · gone after build "+sn[1]:""}</span>`);}
   }
 
   /* site map */
