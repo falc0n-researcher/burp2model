@@ -27,7 +27,7 @@ Or turn on **Capture proxied traffic automatically** in Settings: in-scope Proxy
 | Changes | Each send or snapshot is a build; see what changed between any two |
 | Roles | Send each account under its own role, then compare what they reached |
 | Recon | Light, passive recon on a host you are authorised to test: DNS, TLS, headers, robots.txt, security.txt, mail policy (only when you press the button) |
-| Settings | Model name, role for the next send, scope, live capture, export the model or a Markdown summary |
+| Settings | Model name, role for the next send, scope, live capture, import a HAR or Burp export, export the model or a Markdown summary |
 
 **Copy for AI** (top right) puts a rules-first package on the clipboard for your own model: a hunting methodology, the whole model, the endpoints, or the open questions. Structure, not bytes: every id it cites resolves in its evidence table.
 
@@ -57,6 +57,6 @@ Sending the same request twice adds it once. Every rebuild starts from the same 
 
 ## Build the jar
 
-Java 17: `gradle jar` in this folder, or see the `extension` job in `.github/workflows/ci.yml` for the plain `javac` steps. The Java engine is checked against the Python one in `tests/test_java_parity.py` (same model, query answers and diff on the bundled samples), and `src/test/java/burp2model/Smoke.java` exercises the engine and the tab end to end.
+Java 17: `gradle jar` in this folder (writes `build/libs/burp2model-1.0.0.jar`), or see the `extension` job in `.github/workflows/ci.yml` for the plain `javac` steps. The Java engine is checked against the Python one in `tests/test_java_parity.py` (same model, query answers and diff on the bundled samples), and `src/test/java/burp2model/Smoke.java` exercises the engine and the tab end to end.
 
 Requires Burp 2023.x or later (Montoya API). Only capture traffic you are allowed to test.

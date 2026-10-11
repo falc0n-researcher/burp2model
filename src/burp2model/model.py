@@ -32,6 +32,9 @@ API_HINT = re.compile(r"/(api|v\d+|graphql|rest|gql)(/|$)", re.I)
 PRIV_RE = re.compile(
     r"/(admin|administrator|internal|manage|management|config|privileged|superuser|"
     r"staff|root|debug|actuator|console|backoffice|ops)(/|$)", re.I)
+# Beacons and analytics calls: real traffic, but not where anyone looks for a weakness, so they never outrank the app's own endpoints.
+TELEMETRY_RE = re.compile(
+    r"/(collect|track|tracking|trackevents?|beacon|pixel|analytics|telemetry|gtag|gtm|ping|rum|csp-report)(/|$)", re.I)
 STATIC_EXT_RE = re.compile(
     r"\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|css|woff2?|ttf|otf|eot|map|mp4|webm|"
     r"mp3|wav|pdf|zip)$", re.I)

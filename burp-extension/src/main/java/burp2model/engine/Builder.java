@@ -21,6 +21,9 @@ public final class Builder {
     public static final Pattern PRIV_RE = Pattern.compile(
             "/(admin|administrator|internal|manage|management|config|privileged|superuser|staff|root|debug|actuator|console|backoffice|ops)(/|$)",
             Pattern.CASE_INSENSITIVE);
+    /** Beacons and analytics calls: real traffic, but not a lead. */
+    public static final Pattern TELEMETRY_RE = Pattern.compile(
+            "/(collect|track|tracking|trackevents?|beacon|pixel|analytics|telemetry|gtag|gtm|ping|rum|csp-report)(/|$)", Pattern.CASE_INSENSITIVE);
     private static final Pattern STATIC_EXT = Pattern.compile(
             "\\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|css|woff2?|ttf|otf|eot|map|mp4|webm|mp3|wav|pdf|zip)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{[^/{}]*\\}");

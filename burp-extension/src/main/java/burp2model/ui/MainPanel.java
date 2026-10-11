@@ -1122,9 +1122,10 @@ public final class MainPanel extends JPanel {
         JButton save = new JButton("Save settings");
         JButton export = new JButton("Export model.json…");
         JButton summaryBtn = new JButton("Export summary (Markdown)…");
+        JButton importBtn = new JButton("Import HAR or Burp export…");
         JButton clear = new JButton("Clear this model");
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        for (JButton b : new JButton[] {save, export, summaryBtn, clear}) {
+        for (JButton b : new JButton[] {save, importBtn, export, summaryBtn, clear}) {
             b.setFocusable(false);
             btns.add(b);
         }
@@ -1188,6 +1189,7 @@ public final class MainPanel extends JPanel {
                 }
             }
         });
+        importBtn.addActionListener(e -> importFile());
         summaryBtn.addActionListener(e -> {
             Model m = model();
             if (m == null) {
@@ -1218,6 +1220,43 @@ public final class MainPanel extends JPanel {
         JPanel outer = new JPanel(new BorderLayout());
         outer.add(p, BorderLayout.NORTH);
         return outer;
+    }
+
+    /** Add the requests in a HAR file (browser DevTools, Hetty, mitmproxy, ZAP) or a Burp "Save items" export to the model. */
+    private void importFile() {
+        if (session == null) {
+            return;
+        }
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Import a HAR file or a Burp export");
+        if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        java.io.File f = fc.getSelectedFile();
+        status.setText("importing " + f.getName() + "…");
+        final String role = role();
+        final List<String> scopeNow = scope();
+        new Thread(null, () -> {
+            try {
+                List<burp2model.engine.Parse.Raw> raws = burp2model.engine.Har.looksLike(f) ? burp2model.engine.Har.readRaw(f) : burp2model.engine.BurpXml.readRaw(f);
+                int unreadable = 0;
+                List<burp2model.engine.Parse.Raw> ok = new ArrayList<>();
+                for (burp2model.engine.Parse.Raw r : raws) {
+                    if (r == null) {
+                        unreadable++;
+                    } else {
+                        ok.add(r);
+                    }
+                }
+                session.scope = scopeNow;
+                Session.AddResult r = session.add(ok, role, f.getName(), replaceRole.isSelected());
+                refresh();
+                say("imported " + f.getName() + ": added " + r.added() + (r.duplicates() > 0 ? ", " + r.duplicates() + " already in the model" : "")
+                        + (r.skipped() + unreadable > 0 ? ", " + (r.skipped() + unreadable) + " could not be read" : "") + ".");
+            } catch (Throwable t) {
+                say("could not import " + f.getName() + ": " + t.getMessage());
+            }
+        }, "burp2model-import", 64L * 1024 * 1024).start();
     }
 
     private static int line(JPanel p, GridBagConstraints c, int row, String label, JTextField f, String hint) {

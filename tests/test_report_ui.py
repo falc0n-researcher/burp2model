@@ -207,3 +207,21 @@ def test_changes_tab_shows_what_moved_since_the_previous_build(tmp_path_factory)
         assert p.errors == []
     finally:
         p.close()
+
+
+def test_a_beacon_is_not_a_lead(tmp_path_factory):
+    from test_gaps import export, item
+    out = tmp_path_factory.mktemp("beacon")
+    items = [item("POST", "shop.test", "/api/checkout", "JSON", 200, req_body='{"a":1}'),
+             item("POST", "shop.test", "/v1/collect", "JSON", 202, req_body='{"e":1}')]
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("BURP2MODEL_FP_KEY", "ci")
+        mp.setenv("BURP2MODEL_OFFLINE", "1")
+        assert main([export(out, items), "-w", "shop", "--out", str(out / "o")]) == 0
+    p = Page(str(out / "o" / "shop" / "report.html"))
+    try:
+        paths = p.js("PRIO.map(x=>x.ep.path).join(',')")
+        assert "/api/checkout" in paths and "collect" not in paths
+        assert p.errors == []
+    finally:
+        p.close()

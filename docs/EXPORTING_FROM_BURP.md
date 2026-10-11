@@ -34,6 +34,16 @@ burp2model logs.csv -w app --role user --skip-tools Scanner
 
 The CSV needs `Method`, `Host`, `Request` and `Response` columns (base64 or raw HTTP). Use `--skip-tools` or `--only-tools` to filter by the `Tool` column. Rows split by a spreadsheet at 32,767 characters are rejoined; a response that stays cut off is flagged.
 
+## HAR files (browser, Hetty, mitmproxy, ZAP)
+
+Anything that can export a HAR works too, so you can model an app without Burp:
+
+```bash
+burp2model session.har -w app
+```
+
+In a browser: DevTools, Network, *Save all as HAR with content*. Hetty, mitmproxy, ZAP and Charles export HAR as well. A request that never got a response is skipped, and the result goes through the same masking as a Burp export. The extension has *Import HAR or Burp export* in Settings.
+
 ## Straight from Burp
 
 Load the extension from [`burp-extension/`](../burp-extension/), then right-click requests and choose **Send to burp2model**. The model builds inside Burp, in the burp2model tab; there is nothing else to install. To keep exporting by hand instead, save each export into one folder and run `burp2model watch FOLDER -w app`; every new file becomes a build.

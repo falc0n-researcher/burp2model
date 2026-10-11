@@ -25,7 +25,7 @@ import time
 from . import __version__
 from .context import context_package
 from .methodology import METHODOLOGY_PROMPT, investigation_plan
-from .model import PRIV_RE, Model, to_dict
+from .model import PRIV_RE, TELEMETRY_RE, Model, to_dict
 from .bql_js import BQL_JS
 from .report_dash import DASH_CSS, DASH_JS
 from .report_view import RR_CSS, RR_JS
@@ -219,6 +219,7 @@ def build_payload(m: Model, osint: dict | None = None, lens: str = "attention",
             "referenced_by": uniq(refs_in.get(n["id"], [])),
             "called_from": uniq(calls_in.get(n["id"], [])),
             "privileged": bool(PRIV_RE.search(a.get("path", "") or "")),
+            "telemetry": bool(TELEMETRY_RE.search(a.get("path", "") or "")),
             "evidence": n["evidence"],
         })
 
@@ -693,6 +694,7 @@ const SEV_RANK={hot:0,warn:1,info:2};
 const STATIC_N=EP.filter(e=>e.state==="STATIC_ONLY").length;
 function signalsFor(e){
   const sig=[];
+  if(e.telemetry&&!e.privileged)return sig;          /* a beacon is traffic, not a lead */
   /* a few code-only paths are leads; dozens are just what a big bundle names, so they do not crowd out the rest */
   if(e.state==="STATIC_ONLY") sig.push({sev:STATIC_N>12&&!e.privileged?"info":"hot",ttl:"Referenced in code, never called",
     why:"The client code names this endpoint but no request to it was captured, so nobody has walked this path.",

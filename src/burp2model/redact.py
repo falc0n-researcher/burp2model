@@ -54,6 +54,8 @@ SENSITIVE_PARAM_HINTS = (
     # session and anti-forgery names that do not say "session"/"token": PHPSESSID, ASP.NET_SessionId,
     # WordPress/Django/.NET nonces, __VIEWSTATE and friends
     "sessid", "nonce", "xsrf", "viewstate", "eventvalidation", "verification",
+    # a value that is itself a credential, whatever the field is called around it
+    "cookie", "credential", "bearer",
 )
 
 # Names that are innocuous alone (`new=true`) but are the password fields of a
@@ -253,6 +255,15 @@ _JSON_ANY = re.compile(r'"((?:[^"\\]|\\.){1,64})"(\s*:\s*)("(?:[^"\\]|\\.)*"|-?\
 _INPUT_TAG = re.compile(r"<input\b[^>]*>", re.I)
 _ATTR_NAME = re.compile(r"""\bname\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.I)
 _ATTR_VALUE = re.compile(r"""(\bvalue\s*=\s*)(?:"[^"]*"|'[^']*'|[^\s>]+)""", re.I)
+# Other places a secret sits next to its name: multipart form parts, XML elements, quoted assignments in
+# scripts and config (`const apiKey = "…"`, `{token:'…'}`), YAML lines, JSON arrays of secrets, and JSON that
+# has been percent-encoded into a form field.
+_MULTIPART = re.compile(r'(\bname\s*=\s*"([^"\r\n]{1,64})"[^\r\n]*(?:\r?\n[A-Za-z][A-Za-z\-]*:[^\r\n]*)*\r?\n\r?\n)([^\r\n]+)')
+_XML_EL = re.compile(r"<([A-Za-z_][\w.\-:]{0,63})(\s[^<>]*)?>([^<>]{1,500})</\1>")
+_ASSIGN = re.compile(r'''(["\']?)([A-Za-z_$][\w$.\-]{0,63})\1(\s*[:=]\s*)(["\'])((?:(?!\4)[^\\\r\n]|\\.){4,500})\4''')
+_YAML = re.compile(r'(?m)^([ \t]*)([A-Za-z_][\w.\-]{0,63})([ \t]*:[ \t]*)([^\s"\'#<>{}\[\],][^\r\n#]{5,200})$')
+_JSON_LIST = re.compile(r'"((?:[^"\\]|\\.){1,64})"(\s*:\s*)\[([^\]]{0,2000})\]')
+_ENC_JSON = re.compile(r"(%22([A-Za-z0-9_.\-]{1,64})%22%3[Aa]%22)((?:(?!%22).){1,500})(%22)")
 _TAG = re.compile(r"<[A-Za-z][^<>]{0,2000}>")
 _ATTR_PAIR = re.compile(r"""([A-Za-z_:][\w:.\-]{0,63})(\s*=\s*)("[^"]*"|'[^']*')""")
 _HEADER_LINE = re.compile(
@@ -318,6 +329,47 @@ def redact_named(text: str) -> str:
     text = _HEADER_LINE.sub(lambda m: m.group(1) + m.group(2) + REDACTED, text)
     text = _KV_ANY.sub(_kv, text)
     text = _JSON_ANY.sub(_json, text)
+
+    def _live(v: str) -> bool:
+        return bool(v) and REDACTED not in v and not _is_error_constant(v)
+
+    def _part(m: re.Match) -> str:
+        return m.group(1) + REDACTED if sens(m.group(2)) and _live(m.group(3)) else m.group(0)
+
+    def _xml(m: re.Match) -> str:
+        if sens(m.group(1)) and _live(m.group(3).strip()):
+            return f"<{m.group(1)}{m.group(2) or ''}>{REDACTED}</{m.group(1)}>"
+        return m.group(0)
+
+    def _assign(m: re.Match) -> str:
+        if sens(m.group(2)) and _live(m.group(5)):
+            return f"{m.group(1)}{m.group(2)}{m.group(1)}{m.group(3)}{m.group(4)}{REDACTED}{m.group(4)}"
+        return m.group(0)
+
+    def _yaml(m: re.Match) -> str:
+        if sens(m.group(2)) and _live(m.group(4).strip()):
+            return m.group(1) + m.group(2) + m.group(3) + REDACTED
+        return m.group(0)
+
+    def _list(m: re.Match) -> str:
+        if sens(m.group(1)) and "REDACTED" not in m.group(3):
+            return f'"{m.group(1)}"{m.group(2)}[' + re.sub(r'"(?:[^"\\]|\\.)*"', f'"{REDACTED}"', m.group(3)) + "]"
+        return m.group(0)
+
+    def _enc(m: re.Match) -> str:
+        return m.group(1) + REDACTED + m.group(4) if sens(m.group(2)) and _live(m.group(3)) else m.group(0)
+
+    if "%22" in text:
+        text = _ENC_JSON.sub(_enc, text)
+    if "form-data" in text.lower():
+        text = _MULTIPART.sub(_part, text)
+    if "</" in text:
+        text = _XML_EL.sub(_xml, text)
+    if '"' in text or "'" in text:
+        text = _ASSIGN.sub(_assign, text)
+        text = _JSON_LIST.sub(_list, text)
+    if ":" in text:
+        text = _YAML.sub(_yaml, text)
     return text
 
 

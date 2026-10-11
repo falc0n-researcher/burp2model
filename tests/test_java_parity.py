@@ -122,3 +122,42 @@ def test_same_diff_as_python(classes, tmp_path):
     got = json.loads(_run(java, classes, "DiffMain", str(tmp_path / "a" / "model.json"), str(tmp_path / "b" / "model.json")))
     want["app"] = got["app"] = None
     assert json.dumps(want, sort_keys=True) == json.dumps(got, sort_keys=True)
+
+
+def test_same_redaction_as_python(classes, tmp_path):
+    """The shapes a secret hides in, and ordinary text: the Java engine must mask and keep exactly what Python does."""
+    from test_redaction_realistic import BENIGN, CASES
+    from burp2model.redact import redact_named, redact_value_patterns
+    texts = [t for t, _ in CASES.values()] + BENIGN + [
+        'password=a&new=b&repeat=b', '<input name="user_token" value="zzzzzzzz">', "Cookie: PHPSESSID=abc123; x=1",
+        '{"a":{"b":{"secret":"s3cr3t-value"}}}', "name: shop\nauthor: someone", 'const x = {code: 5, id: "abcdefgh"};']
+    (tmp_path / "t.json").write_text(json.dumps(texts))
+    got = json.loads(_run(_java()[1], classes, "RedactMain", str(tmp_path / "t.json")))
+    want = [redact_named(redact_value_patterns(t)[0]) for t in texts]
+    for t, w, g in zip(texts, want, got):
+        assert g == w, (t, w, g)
+
+
+@pytest.mark.parametrize("xml", ["burp-history-sample.xml", "burp-history-admin-sample.xml"])
+def test_same_stored_requests_as_python(classes, tmp_path, xml):
+    """What is stored for every request (the masked request and response) is the same in both engines."""
+    java = _java()[1]
+    src = os.path.join(SAMPLES, xml)
+    py, _ = _py_model(tmp_path, src, "app")
+    jp = tmp_path / "j.json"
+    _run(java, classes, "Dump", src, str(jp), "app")
+    assert json.load(open(jp))["evidence"] == py["evidence"]
+
+
+def test_same_model_from_a_har_as_python(classes, tmp_path):
+    from test_har import SHOP, har
+    java = _java()[1]
+    src = har(tmp_path, SHOP)
+    py, _ = _py_model(tmp_path, src, "app")
+    jp = tmp_path / "j.json"
+    _run(java, classes, "Dump", src, str(jp), "app")
+    j = json.load(open(jp))
+    assert {n["id"]: (n["label"], n["attrs"], n["evidence"]) for n in j["nodes"]} == {n["id"]: (n["label"], n["attrs"], n["evidence"]) for n in py["nodes"]}
+    assert j["evidence"] == py["evidence"]
+    key = lambda s: (s["kind"], s["hmac_12"])          # noqa: E731
+    assert sorted(j["secrets"], key=key) == sorted(py["secrets"], key=key)

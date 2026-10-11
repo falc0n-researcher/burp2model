@@ -189,7 +189,9 @@ def cmd_build(args) -> int:
             only_tools=tuple((args.only_tools or "").split(","))), stats)
     except (OSError, ValueError, SyntaxError) as e:
         _drop_if_empty(outdir)
-        if str(args.log).lower().endswith(".csv"):
+        if str(args.log).lower().endswith(".har"):
+            extra = "\nExpected a HAR file: browser DevTools (Save all as HAR), Hetty, mitmproxy, ZAP or Charles can export one."
+        elif str(args.log).lower().endswith(".csv"):
             extra = ("\nExpected a Burp Logger++ CSV export with Method, Host, Request and Response "
                      "columns (Request/Response base64 or raw HTTP).")
         elif isinstance(e, SyntaxError):
@@ -212,8 +214,8 @@ def cmd_build(args) -> int:
         os.remove(staged)
         _drop_if_empty(outdir)
         if stats.get("items", 0) == 0:
-            print(f"{args.log}: no <item> elements found. This does not look like a Burp "
-                  "'Save items' export.\n"
+            print(f"{args.log}: no requests found. This does not look like a Burp "
+                  "'Save items' export, a Logger++ CSV or a HAR file.\n"
                   "In Burp: Proxy → HTTP history → select all → right-click → "
                   "Save items → history.xml (keep base64 encoding on).", file=sys.stderr)
         else:
@@ -983,7 +985,7 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd")
 
     b = sub.add_parser("build", help="build the model (also the default: `burp2model file.xml`)")
-    b.add_argument("log", help="Burp 'Save items' XML export to build from")
+    b.add_argument("log", help="Burp 'Save items' XML, Logger++ CSV or HAR export to build from")
     b.add_argument("--webapp", "-w", default="app", type=_name("--webapp"),
                    help="name for this app's model (default: app)")
     b.add_argument("--role", type=_name("--role"),
@@ -1199,13 +1201,13 @@ def main(argv=None) -> int:
 
     wa = sub.add_parser("watch", help="watch a folder of Burp exports: each new export becomes a build, "
                                       "and the change from the last one is printed")
-    wa.add_argument("folder", help="folder Burp exports (Save items XML or Logger++ CSV) are saved into")
+    wa.add_argument("folder", help="folder exports (Burp Save items XML, Logger++ CSV or HAR) are saved into")
     wa.add_argument("--webapp", "-w", required=True, type=_name("webapp"), help="name for the model")
     wa.add_argument("--interval", type=float, default=5.0, metavar="SEC", help="seconds between checks (default: 5)")
     wa.add_argument("--once", action="store_true", help="process what is there and exit instead of watching")
     wa.add_argument("--skip-existing", action="store_true",
                     help="only react to exports that appear after this starts")
-    wa.add_argument("--pattern", default="*.xml,*.csv", help="file patterns to pick up (default: *.xml,*.csv)")
+    wa.add_argument("--pattern", default="*.xml,*.csv,*.har", help="file patterns to pick up (default: *.xml,*.csv,*.har)")
     wa.add_argument("--role", help="tag each export with this role (merges with other roles' inputs)")
     wa.add_argument("--scope", action="append", help="in-scope host (repeatable), as for build")
     wa.add_argument("--skip-tools", metavar="TOOLS", help="Logger++ CSV: drop rows from these Burp tools")

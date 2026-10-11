@@ -227,7 +227,7 @@ def test_empty_export_is_a_clean_error(tmp_path, capsys):
     p = tmp_path / "empty.xml"
     p.write_text('<?xml version="1.0"?><items></items>')
     assert main([str(p), "-w", "t", "--out", str(tmp_path / "o")]) == 2
-    assert "no <item> elements" in capsys.readouterr().err
+    assert "no requests found" in capsys.readouterr().err
 
 
 def test_corrupt_model_json_is_a_clean_error(tmp_path, capsys):
