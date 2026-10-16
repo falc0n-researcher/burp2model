@@ -134,7 +134,7 @@ public final class MainPanel extends JPanel {
             leadsTab.selectLead(l);
         });
         // the Settings fields are filled once; refreshes never touch them, so a half-typed value survives live capture
-        nameField.setText(host.get("app", "burp"));
+        nameField.setText(appName());
         roleField.setText(host.get("role", ""));
         scopeField.setText(host.get("scope", ""));
         replaceRole.setSelected("1".equals(host.get("replace", "0")));
@@ -160,7 +160,7 @@ public final class MainPanel extends JPanel {
         roleField.addFocusListener(keep);
         scopeField.addFocusListener(keep);
         updateSettings();
-        openSession(host.get("app", "burp"), false);
+        openSession(appName(), false);
         addHierarchyListener(e -> {
             if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing() && refreshPending) {
                 refreshPending = false;
@@ -225,9 +225,22 @@ public final class MainPanel extends JPanel {
 
     /** Open (or switch to) a model off the Swing thread; a large one takes a second or more to read and rebuild. */
     private void openSession(String name, boolean applyScope) {
-        async("Opening the model '" + name + "'…", () -> host.session(name), s -> {
+        async("Opening the model '" + name + "'…", () -> {
+            Session s = host.session(name);
+            if (OLD_DEFAULT.equals(name) && s.requestCount() == 0 && s.builds().isEmpty()) {
+                s = host.session(SAMPLE);                       // the old empty default: open the sample instead
+            }
+            if (SAMPLE.equals(s.name)) {
+                fillSample(s);                                  // before it is shown, so the first look is a full model
+            }
+            return s;
+        }, s -> {
             if (applyScope) {
                 s.scope = settings().scope();
+            }
+            if (!s.name.equals(name)) {
+                host.set("app", s.name);
+                nameField.setText(s.name);
             }
             session = s;
             opened.countDown();
@@ -328,28 +341,42 @@ public final class MainPanel extends JPanel {
         };
     }
 
-    /**
-     * Fill a model called "sample" with the bundled demo shop (a user and an admin, so Roles has something to
-     * compare) and switch to it. The user's own model is untouched; Settings switches back.
-     */
+    /** The model that opens when none was chosen: the demo shop, so a first look has something in it. */
+    static final String SAMPLE = "sample";
+    /** What 1.1 opened by default, an empty model nobody asked for. */
+    private static final String OLD_DEFAULT = "burp";
+
+    /** The model to open: the one chosen in Settings, or the sample. An empty model from the old default gives way to it. */
+    private String appName() {
+        return host.get("app", SAMPLE);
+    }
+
+    /** Fill an empty sample model with the bundled demo shop (a user and an admin, so Roles has something to compare). */
+    private static void fillSample(Session s) throws Exception {
+        if (s.requestCount() > 0) {
+            return;
+        }
+        for (String[] part : new String[][] {{"/sample/shop-user.xml", "user"}, {"/sample/shop-admin.xml", "admin"}}) {
+            try (var in = MainPanel.class.getResourceAsStream(part[0])) {
+                if (in == null) {
+                    throw new java.io.IOException("the sample is missing from the jar");
+                }
+                s.add(burp2model.engine.BurpXml.readRaw(in), part[1], "sample (" + part[1] + ")", false);
+            }
+        }
+    }
+
+    /** Switch to the sample model (filling it if it is empty). The user's own models are untouched; the switcher goes back. */
     private void loadSample() {
         async("Loading the sample model…", () -> {
-            Session s = host.session("sample");
-            if (s.requestCount() == 0) {
-                for (String[] part : new String[][] {{"/sample/shop-user.xml", "user"}, {"/sample/shop-admin.xml", "admin"}}) {
-                    try (var in = MainPanel.class.getResourceAsStream(part[0])) {
-                        if (in == null) {
-                            throw new java.io.IOException("the sample is missing from the jar");
-                        }
-                        s.add(burp2model.engine.BurpXml.readRaw(in), part[1], "sample (" + part[1] + ")", false);
-                    }
-                }
-            }
+            Session s = host.session(SAMPLE);
+            fillSample(s);
             return s;
         }, s -> {
             session = s;
-            host.set("app", "sample");
-            nameField.setText("sample");
+            host.set("app", SAMPLE);
+            nameField.setText(SAMPLE);
+            listModels();
             host.set("welcome.seen", "1");
             showWelcome(false);
             lastRequests = s.requestCount();
@@ -674,7 +701,7 @@ public final class MainPanel extends JPanel {
         String[][] opts = {{"methodology", "Hunting methodology", "a recon and hunting plan for this app"}, {"whole", "Whole model", "everything an AI needs, with the rules"},
             {"endpoints", "Endpoints only", "the API surface with parameters and evidence"}, {"open", "Open questions only", "what to test next"}};
         for (String[] o : opts) {
-            JMenuItem mi = new JMenuItem("<html><b>" + o[1] + "</b><br><small>" + o[2] + "</small></html>");
+            JMenuItem mi = new Widgets.TwoLineItem(o[1], o[2]);
             mi.addActionListener(e -> copyForAi(o[0]));
             menu.add(mi);
         }
@@ -733,7 +760,9 @@ public final class MainPanel extends JPanel {
             if (s != null) {
                 names.add(s.name);
                 try (var dirs = Files.list(s.dir().getParent())) {
-                    dirs.filter(Files::isDirectory).forEach(d -> names.add(d.getFileName().toString()));
+                    // a folder with nothing saved in it (an empty model) is not offered; one with requests always is
+                    dirs.filter(Files::isDirectory).filter(d -> Files.exists(d.resolve("inputs.jsonl.gz")) || Files.exists(d.resolve("session.json")))
+                            .forEach(d -> names.add(d.getFileName().toString()));
                 } catch (java.io.IOException ignored) {
                     // the folder is unreadable: the open model is still listed
                 }
@@ -907,7 +936,7 @@ public final class MainPanel extends JPanel {
                 setStatus("The model name must be letters, digits, '.', '_' or '-'.", Level.ERROR);
                 return;
             }
-            boolean renamed = !n.equals(host.get("app", "burp"));
+            boolean renamed = !n.equals(appName());
             host.set("app", n);
             host.set("role", roleField.getText().strip());
             host.set("scope", scopeField.getText().strip());

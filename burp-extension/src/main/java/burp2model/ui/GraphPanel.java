@@ -275,15 +275,24 @@ final class GraphPanel extends JPanel {
 
     private void rebuild(boolean refit) {
         sim.stop();
-        vs.clear();
-        es.clear();
-        byId.clear();
+        // keep what is on screen as the starting point: new requests must not send the map back to older positions
+        if (!vs.isEmpty() && !flow && !layingOut) {
+            remember();
+        }
         matches = new ArrayList<>();
         matchAt = -1;
         if (model == null) {
+            vs.clear();
+            es.clear();
+            byId.clear();
+            layingOut = false;
             canvas.repaint();
             return;
         }
+        // the new graph is built aside; the one on screen stays until the new one is placed
+        List<V> vs = new ArrayList<>();
+        List<E> es = new ArrayList<>();
+        Map<String, V> byId = new HashMap<>();
         Set<String> types = new HashSet<>();
         toggles.forEach((k, c) -> {
             if (c.isSelected()) {
@@ -335,49 +344,62 @@ final class GraphPanel extends JPanel {
         }
         maxSteps = vs.size() > 900 ? 160 : 320;
         int gen = ++layoutGen;
+        String infoText = vs.size() + " nodes · " + es.size() + " edges   ·   solid: seen in traffic · dashed: found in code   ·   scroll to zoom · drag to pan or move · double-click to focus · right-click for more"
+                + (cap > BIG ? "   ·   a large map: turn groups off to see less" : "");
         if (!flow && vs.size() > ASYNC_LAYOUT) {
-            // a big map lays out on a background thread; the canvas says so meanwhile instead of freezing Burp
-            List<V> lv = new ArrayList<>(vs);
-            List<E> le = new ArrayList<>(es);
+            // a big map lays out on a background thread while the current one stays on screen; the camera moves only
+            // when asked to (the first map, a new layout, Fit), never because requests arrived
             Map<String, double[]> mem = new HashMap<>(memory);
             int n = vs.size() > BIG ? 40 : 140;
             int max = maxSteps;
             int st = steps;
+            boolean firstMap = this.vs.isEmpty();
             layingOut = true;
             LAYOUT.execute(() -> {
-                boolean allNew = MapLayout.placeAll(lv, mem);
-                MapLayout.relax(lv, le, n, true, allNew ? 0 : st, max);
+                boolean allNew = MapLayout.placeAll(vs, mem);
+                MapLayout.relax(vs, es, n, true, allNew ? 0 : st, max);
                 javax.swing.SwingUtilities.invokeLater(() -> {
                     if (gen != layoutGen) {
                         return;                                 // a newer model arrived meanwhile
                     }
+                    install(vs, es, byId);
                     layingOut = false;
-                    if (allNew) {
-                        steps = 0;
+                    info.setText(infoText);
+                    if (refit || firstMap) {
+                        fitted = false;
                     }
-                    fitted = false;
-                    steps = 140;
+                    steps = 140;                                // the background steps already cooled it: settle, don't re-heat
                     sim.start();
                     canvas.repaint();
                 });
             });
-        } else {
-            layingOut = false;
-            place();
-            if (!flow) {
-                relax(vs.size() > BIG ? 40 : 140, true);
-            }
+            return;
         }
-        info.setText(vs.size() + " nodes · " + es.size() + " edges   ·   solid: seen in traffic · dashed: found in code   ·   scroll to zoom · drag to pan or move · double-click to focus · right-click for more"
-                + (cap > BIG ? "   ·   a large map: turn groups off to see less" : ""));
-        if (refit || !fitted) {
+        install(vs, es, byId);
+        layingOut = false;
+        place();
+        if (!flow) {
+            relax(vs.size() > BIG ? 40 : 140, true);
+        }
+        info.setText(infoText);
+        if (refit) {
             fitted = false;
         }
-        if (!flow && !vs.isEmpty() && !layingOut) {
+        if (!flow && !vs.isEmpty()) {
             steps = 140;
             sim.start();
         }
         canvas.repaint();
+    }
+
+    /** Put a newly built graph on screen in one step. */
+    private void install(List<V> nv, List<E> ne, Map<String, V> nb) {
+        vs.clear();
+        vs.addAll(nv);
+        es.clear();
+        es.addAll(ne);
+        byId.clear();
+        byId.putAll(nb);
     }
 
     /** Above this many nodes the first layout runs off the Swing thread. */
@@ -872,7 +894,7 @@ final class GraphPanel extends JPanel {
             Color bg = Theme.dark() ? Theme.shift(Theme.bg(), -8) : Theme.surface();
             g.setColor(bg);
             g.fillRect(0, 0, getWidth(), getHeight());
-            if (layingOut) {
+            if (layingOut && vs.isEmpty()) {
                 g.setColor(Theme.muted());
                 g.setFont(Theme.font(13f, Font.PLAIN));
                 g.drawString("Laying out " + vs.size() + " nodes…", 24, 36);
