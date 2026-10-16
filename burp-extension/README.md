@@ -12,6 +12,10 @@ Get `burp2model.jar` from the [extension releases](https://github.com/falc0n-res
 2. In Proxy history or Site map, select requests, right-click, **Send to burp2model**.
 3. Open the **burp2model** tab.
 
+The first time, the tab opens on a welcome page: what burp2model does, three steps to a first model, and buttons that start one (**Try the sample model** loads a small demo shop with two roles into a model of its own, so you can look around before sending anything). It comes back whenever the open model is empty, and the **?** at the top right opens it any time.
+
+<img src="assets/welcome.png" alt="The welcome page" width="700">
+
 Or turn on **Capture proxied traffic automatically** in Settings: in-scope Proxy traffic (Burp's target scope) joins the model every few seconds, with a build recorded every so often.
 
 ## The tabs
@@ -60,3 +64,5 @@ Sending the same request twice adds it once. Every rebuild starts from the same 
 Java 17: `gradle jar` in this folder (writes `build/libs/burp2model-<version>.jar`), `gradle test` for the unit tests, or see the `extension` job in `.github/workflows/ci.yml` for the plain `javac` steps. The Java engine is checked against the Python one in `tests/test_java_parity.py` (same model, query answers and diff on the bundled samples), and `src/test/java/burp2model/Smoke.java` exercises the engine and the tab end to end.
 
 Requires Burp 2023.x or later (Montoya API). Only capture traffic you are allowed to test.
+
+The welcome page's pixel type is [Silkscreen](https://github.com/googlefonts/silkscreen) and [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans), bundled under the SIL Open Font License 1.1 (the licence texts are next to the fonts in `src/main/resources/fonts/`).

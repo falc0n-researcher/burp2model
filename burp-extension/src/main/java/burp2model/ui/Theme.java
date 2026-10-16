@@ -75,6 +75,70 @@ final class Theme {
         return (base == null ? new Font(Font.SANS_SERIF, Font.PLAIN, 12) : base).deriveFont(style, size);
     }
 
+    // ------------------------------------------------------------------ pixel type (the welcome page)
+
+    private static Font silkscreen;
+    private static Font pixelify;
+    private static boolean fontsTried;
+
+    /** Load the bundled pixel fonts once (SIL Open Font License, see resources/fonts); null when they cannot be read. */
+    private static synchronized void loadPixelFonts() {
+        if (fontsTried) {
+            return;
+        }
+        fontsTried = true;
+        silkscreen = load("/fonts/Silkscreen-Regular.ttf");
+        pixelify = load("/fonts/PixelifySans.ttf");
+    }
+
+    private static Font load(String res) {
+        try (var in = Theme.class.getResourceAsStream(res)) {
+            if (in == null) {
+                return null;
+            }
+            Font f = Font.createFont(Font.TRUETYPE_FONT, in);
+            java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(f);
+            return f;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Silkscreen, for display text: titles, step numbers, small caps labels. Its pixel grid is 8 per em, so only
+     * multiples of 8 px are crisp; `step` picks 8, 16, 24... scaled with Burp's font size.
+     */
+    static Font pixel(int step) {
+        loadPixelFonts();
+        float px = 8f * Math.max(1, Math.round(step * uiScale()));
+        return silkscreen != null ? silkscreen.deriveFont(px) : font(px * 0.8f, Font.BOLD);
+    }
+
+    /** Pixelify Sans, for short headings and buttons: crisp at 20 px (and 40 px). */
+    static Font pixelSans(boolean large) {
+        loadPixelFonts();
+        float px = 20f * (large ? 2 : 1) * Math.max(1, Math.round(uiScale()));
+        return pixelify != null ? pixelify.deriveFont(px) : font(px * 0.75f, Font.BOLD);
+    }
+
+    /** Burp's font size against the default 13 px: 1 normally, 2 when the user doubled it. */
+    static float uiScale() {
+        Font base = UIManager.getFont("Label.font");
+        return base == null ? 1f : Math.max(1f, base.getSize2D() / 13f);
+    }
+
+    /** Pixel type is drawn without smoothing, so every pixel of the glyph lands on a screen pixel. */
+    static void pixelHints(Graphics2D g) {
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_OFF);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+    }
+
+    /** A pixel font when it has every character of `text`, otherwise the ordinary bold font at a similar size. */
+    static Font pixelOr(Font pixel, String text) {
+        return pixel.canDisplayUpTo(text) < 0 ? pixel : font(pixel.getSize2D() * 0.75f, Font.BOLD);
+    }
+
     static Font mono(float size) {
         return new Font(Font.MONOSPACED, Font.PLAIN, Math.round(size));
     }

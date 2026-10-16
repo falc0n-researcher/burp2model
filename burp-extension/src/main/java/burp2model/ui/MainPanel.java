@@ -159,7 +159,12 @@ public final class MainPanel extends JPanel {
         tabs.addTab("Recon", reconTab());
         tabs.addTab("Settings", settingsTab());
         tabs.setFont(Theme.font(12f, Font.PLAIN));
-        add(tabs, BorderLayout.CENTER);
+        welcome = new Welcome(welcomeActions(), burp2model.engine.Version.EXTENSION);
+        center.add(welcome, "welcome");
+        center.add(tabs, "tabs");
+        add(center, BorderLayout.CENTER);
+        // first run: the welcome page until the model has something in it (decided again once the model opens)
+        showWelcome(!"1".equals(host.get("welcome.seen", "0")) || "1".equals(host.get("welcome.show", "0")));
         tabs.addChangeListener(e -> fillTab(tabs.getSelectedIndex()));
         status.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 12));
         status.setFont(Theme.font(11f, Font.PLAIN));
@@ -271,6 +276,7 @@ public final class MainPanel extends JPanel {
             }
             session = s;
             opened.countDown();
+            revert.stop();                                      // "Opening the model…" gives way to its summary at once
             refresh();
             reportProblems();
         }, t -> {
@@ -300,6 +306,102 @@ public final class MainPanel extends JPanel {
             host.log("burp2model (" + s.name + "): " + p);
             sayError("burp2model: " + p);
         }
+    }
+
+    // ------------------------------------------------------------------ welcome page
+
+    private final java.awt.CardLayout cards = new java.awt.CardLayout();
+    private final JPanel center = new JPanel(cards);
+    private final Welcome welcome;
+    private boolean welcomeShowing;
+    /** Requests in the model when it was last shown; the welcome page steps aside when the first ones arrive. */
+    private int lastRequests = -1;
+
+    private void showWelcome(boolean on) {
+        welcomeShowing = on;
+        if (on) {
+            welcome.update("1".equals(host.get("auto", "0")), "1".equals(host.get("welcome.show", "0")));
+        }
+        cards.show(center, on ? "welcome" : "tabs");
+    }
+
+    /** Called on each refresh: an empty model shows the welcome page, and the first requests take it away. */
+    private void welcomeFor(Model m) {
+        int n = m == null ? 0 : m.evidenceLog.size();
+        if (session != null && n == 0 && !welcomeShowing) {
+            showWelcome(true);
+        } else if (welcomeShowing && n > 0 && lastRequests == 0) {
+            host.set("welcome.seen", "1");
+            showWelcome(false);
+        }
+        lastRequests = session == null ? -1 : n;
+    }
+
+    private Welcome.Actions welcomeActions() {
+        return new Welcome.Actions() {
+            @Override
+            public void sample() {
+                loadSample();
+            }
+
+            @Override
+            public void importFile() {
+                MainPanel.this.importFile();
+            }
+
+            @Override
+            public void liveCapture() {
+                autoCapture.setSelected(true);
+                host.set("auto", "1");
+                welcome.update(true, "1".equals(host.get("welcome.show", "0")));
+                setStatus("Live capture is on: in-scope Proxy traffic (Burp's target scope) joins the model every few seconds.", Level.OK);
+            }
+
+            @Override
+            public void settings() {
+                host.set("welcome.seen", "1");
+                showWelcome(false);
+                tabs.setSelectedIndex(tabs.getTabCount() - 1);
+            }
+
+            @Override
+            public void getStarted(boolean showOnStart) {
+                host.set("welcome.seen", "1");
+                host.set("welcome.show", showOnStart ? "1" : "0");
+                showWelcome(false);
+            }
+        };
+    }
+
+    /**
+     * Fill a model called "sample" with the bundled demo shop (a user and an admin, so Roles has something to
+     * compare) and switch to it. The user's own model is untouched; Settings switches back.
+     */
+    private void loadSample() {
+        async("Loading the sample model…", () -> {
+            Session s = host.session("sample");
+            if (s.requestCount() == 0) {
+                for (String[] part : new String[][] {{"/sample/shop-user.xml", "user"}, {"/sample/shop-admin.xml", "admin"}}) {
+                    try (var in = MainPanel.class.getResourceAsStream(part[0])) {
+                        if (in == null) {
+                            throw new java.io.IOException("the sample is missing from the jar");
+                        }
+                        s.add(burp2model.engine.BurpXml.readRaw(in), part[1], "sample (" + part[1] + ")", false);
+                    }
+                }
+            }
+            return s;
+        }, s -> {
+            session = s;
+            host.set("app", "sample");
+            nameField.setText("sample");
+            host.set("welcome.seen", "1");
+            showWelcome(false);
+            lastRequests = s.requestCount();
+            refresh();
+            setStatus("This is the sample model: a small demo shop seen as a user and as an admin. Your own model is untouched; "
+                    + "switch back in Settings.", Level.OK);
+        });
     }
 
     /** Stop the map's timers; called when the extension unloads. */
@@ -433,6 +535,7 @@ public final class MainPanel extends JPanel {
 
     private void refreshNow() {
         Model m = model();
+        welcomeFor(m);
         leads = m == null ? new ArrayList<>() : Analysis.leads(m);
         dashboard.update(m, leads);
         headerPills(m);
@@ -535,11 +638,15 @@ public final class MainPanel extends JPanel {
             menu.add(mi);
         }
         ai.addActionListener(e -> menu.show(ai, 0, ai.getHeight()));
+        JButton about = new JButton("?");
+        about.setToolTipText("About burp2model: the welcome page");
+        about.getAccessibleContext().setAccessibleName("About burp2model");
+        about.addActionListener(e -> showWelcome(!welcomeShowing));
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         right.setOpaque(false);
-        right.add(Widgets.muted("Search"));
         right.add(globalSearch);
         right.add(ai);
+        right.add(about);
         bar.add(left, BorderLayout.WEST);
         bar.add(right, BorderLayout.EAST);
         return bar;
@@ -1360,8 +1467,10 @@ public final class MainPanel extends JPanel {
         JButton summaryBtn = new JButton("Export summary (Markdown)…");
         JButton importBtn = new JButton("Import HAR or Burp export…");
         JButton clear = new JButton("Clear this model");
+        JButton aboutBtn = new JButton("About burp2model");
+        aboutBtn.addActionListener(e -> showWelcome(true));
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        for (JButton b : new JButton[] {save, importBtn, export, summaryBtn, clear}) {
+        for (JButton b : new JButton[] {save, importBtn, export, summaryBtn, clear, aboutBtn}) {
             b.setFocusable(false);
             btns.add(b);
         }

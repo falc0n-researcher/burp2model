@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A welcome page.** The first time the tab opens, and whenever the open model is empty, it shows what burp2model does, three steps to a first model, and buttons that start one: try the sample model (a small demo shop seen as a user and an admin, loaded into a model of its own), import a HAR or Burp export, turn on live capture, or open Settings. It explains what stays on your machine. The **?** in the header and **About burp2model** in Settings open it any time; the first requests in an empty model take you to the tabs. Display type is set in two pixel fonts bundled with the extension, Silkscreen and Pixelify Sans (SIL Open Font License), drawn without smoothing at sizes on their pixel grid so they stay crisp; everything meant to be read stays in Burp's font. It follows Burp's light and dark themes, wraps to one column in a narrow pane, and every button works from the keyboard.
+- The header's "Search" label is gone (the box says what it is), so the model name no longer collides with it in a narrow pane.
 - Fix: after **Clear this model**, the model could not be opened again (the next Burp start or rename failed with a missing build file). Clearing now removes the build list too, and a model whose build file has gone missing opens with the builds before it.
 - Fix: live capture lost one request each time a batch filled up (500 requests in one tick).
 - Fix: requests captured live before the first build was recorded were lost when Burp restarted. They are now read back from the saved requests.
