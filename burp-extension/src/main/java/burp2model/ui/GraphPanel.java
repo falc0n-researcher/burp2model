@@ -52,7 +52,7 @@ import javax.swing.Timer;
  * Solid lines were seen in traffic, dashed ones found in code.
  */
 final class GraphPanel extends JPanel {
-    private static final class V {
+    static final class V {
         Model.Node node;
         double x;
         double y;
@@ -80,7 +80,7 @@ final class GraphPanel extends JPanel {
         }
     }
 
-    private record E(V a, V b, String state, String type) {}
+    record E(V a, V b, String state, String type) {}
 
     private static final String[][] GROUPS = {
         {"Hosts", "host"}, {"Pages", "route"}, {"Scripts", "script"}, {"Endpoints", "endpoint,operation"}, {"Parameters", "parameter"},
@@ -347,8 +347,8 @@ final class GraphPanel extends JPanel {
             int st = steps;
             layingOut = true;
             LAYOUT.execute(() -> {
-                boolean allNew = placeAll(lv, mem);
-                relax(lv, le, n, true, allNew ? 0 : st, max);
+                boolean allNew = MapLayout.placeAll(lv, mem);
+                MapLayout.relax(lv, le, n, true, allNew ? 0 : st, max);
                 javax.swing.SwingUtilities.invokeLater(() -> {
                     if (gen != layoutGen) {
                         return;                                 // a newer model arrived meanwhile
@@ -408,134 +408,20 @@ final class GraphPanel extends JPanel {
 
     // ------------------------------------------------------------------ layout
 
-    private static double rnd(String id, int salt) {
-        long h = id.hashCode() * 0x9E3779B97F4A7C15L + salt * 0xBF58476D1CE4E5B9L;
-        h ^= h >>> 29;
-        h *= 0x94D049BB133111EBL;
-        h ^= h >>> 32;
-        return (h & 0xFFFFFFL) / (double) 0x1000000L;
-    }
 
     private void place() {
         if (flow) {
-            layoutFlow();
+            MapLayout.layoutFlow(vs);
+            steps = maxSteps + 1;
             return;
         }
-        if (placeAll(vs, memory)) {
+        if (MapLayout.placeAll(vs, memory)) {
             steps = 0;
         }
     }
 
-    /** Seed positions: remembered ones, or beside placed neighbours, or on a ring by layer. True when every node is new. */
-    private static boolean placeAll(List<V> vs, Map<String, double[]> memory) {
-        int n = Math.max(1, vs.size());
-        double rad = 90 + 11 * Math.sqrt(n) * 3;
-        List<V> fresh = new ArrayList<>();
-        for (V v : vs) {
-            double[] p = memory.get(v.node.id);
-            if (p != null) {
-                v.x = p[0];
-                v.y = p[1];
-                v.settled = true;
-                v.pinned = p.length > 2 && p[2] == 1;
-            } else {
-                fresh.add(v);
-            }
-        }
-        // new nodes start beside the neighbours that are already placed, or on a ring by layer when there are none
-        for (V v : fresh) {
-            double sx = 0;
-            double sy = 0;
-            int c = 0;
-            for (V nb : v.nbrs) {
-                if (memory.containsKey(nb.node.id)) {
-                    sx += nb.x;
-                    sy += nb.y;
-                    c++;
-                }
-            }
-            double a = rnd(v.node.id, 1) * Math.PI * 2;
-            if (c > 0) {
-                v.x = sx / c + Math.cos(a) * 40;
-                v.y = sy / c + Math.sin(a) * 40;
-            } else {
-                double layerR = rad * (0.30 + 0.14 * v.node.layer);
-                v.x = Math.cos(a) * layerR;
-                v.y = Math.sin(a) * layerR;
-            }
-        }
-        return fresh.size() == vs.size();
-    }
 
-    private static int column(Model.Node n) {
-        return switch (n.type) {
-            case "host", "tech" -> 0;
-            case "route" -> 1;
-            case "script" -> 2;
-            case "endpoint", "operation" -> 3;
-            case "parameter" -> 4;
-            default -> 5;
-        };
-    }
 
-    /** Left to right: host, pages, scripts, endpoints, parameters, then third parties and trust. Rows are ordered to keep lines short. */
-    private void layoutFlow() {
-        List<List<V>> cols = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
-            cols.add(new ArrayList<>());
-        }
-        for (V v : vs) {
-            cols.get(column(v.node)).add(v);
-        }
-        for (List<V> c : cols) {
-            c.sort(Comparator.comparing((V v) -> v.node.type).thenComparing(v -> v.node.label));
-        }
-        Map<V, Double> row = new HashMap<>();
-        for (List<V> c : cols) {
-            for (int i = 0; i < c.size(); i++) {
-                row.put(c.get(i), (double) i);
-            }
-        }
-        for (int pass = 0; pass < 4; pass++) {
-            for (int ci = pass % 2 == 0 ? 1 : 4; pass % 2 == 0 ? ci < 6 : ci >= 0; ci += pass % 2 == 0 ? 1 : -1) {
-                List<V> c = cols.get(ci);
-                Map<V, Double> bary = new HashMap<>();
-                for (V v : c) {
-                    double sum = 0;
-                    int cnt = 0;
-                    for (V nb : v.nbrs) {
-                        int nc = column(nb.node);
-                        if (nc != ci && Math.abs(nc - ci) <= 2) {
-                            sum += row.get(nb);
-                            cnt++;
-                        }
-                    }
-                    bary.put(v, cnt > 0 ? sum / cnt : row.get(v));
-                }
-                c.sort(Comparator.comparingDouble((V v) -> bary.get(v)).thenComparing(v -> v.node.label));
-                for (int i = 0; i < c.size(); i++) {
-                    row.put(c.get(i), (double) i);
-                }
-            }
-        }
-        // a tall column wraps into side-by-side stacks, so the whole map fits on screen at a size that can be read
-        final int perStack = 28;
-        double gap = 24;
-        double x = 0;
-        for (List<V> c : cols) {
-            int stacks = Math.max(1, (c.size() + perStack - 1) / perStack);
-            for (int i = 0; i < c.size(); i++) {
-                V v = c.get(i);
-                int sc = i / perStack;
-                int inStack = Math.min(perStack, c.size() - sc * perStack);
-                v.x = x + sc * 310;
-                v.y = (i % perStack - (inStack - 1) / 2.0) * gap;
-                v.pinned = false;
-            }
-            x += stacks * 310 + 70;
-        }
-        steps = maxSteps + 1;
-    }
 
     private void remember() {
         for (V v : vs) {
@@ -566,104 +452,15 @@ final class GraphPanel extends JPanel {
 
     /** Run this many layout steps right away, so the map is already arranged when first drawn. */
     private void relax(int n, boolean cool) {
-        relax(vs, es, n, cool, steps, maxSteps);
+        MapLayout.relax(vs, es, n, cool, steps, maxSteps);
     }
 
-    private static void relax(List<V> vs, List<E> es, int n, boolean cool, int steps, int maxSteps) {
-        for (int i = 0; i < n && !vs.isEmpty(); i++) {
-            step(vs, es, cool ? Math.max(0.04, 1.0 - (steps + i) / (double) maxSteps) : 0.3);
-        }
-    }
 
     private void step(double temp) {
-        step(vs, es, temp);
+        MapLayout.step(vs, es, temp);
     }
 
-    private static void step(List<V> vs, List<E> es, double temp) {
-        double cell = 80;
-        Map<Long, List<V>> grid = new HashMap<>();
-        for (V v : vs) {
-            grid.computeIfAbsent(key((int) Math.floor(v.x / cell), (int) Math.floor(v.y / cell)), k -> new ArrayList<>()).add(v);
-        }
-        for (V v : vs) {
-            double fx = 0;
-            double fy = 0;
-            int cx = (int) Math.floor(v.x / cell);
-            int cy = (int) Math.floor(v.y / cell);
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    List<V> bucket = grid.get(key(cx + dx, cy + dy));
-                    if (bucket == null) {
-                        continue;
-                    }
-                    for (V u : bucket) {
-                        if (u == v) {
-                            continue;
-                        }
-                        double ddx = v.x - u.x;
-                        double ddy = v.y - u.y;
-                        double d2 = ddx * ddx + ddy * ddy;
-                        if (d2 < 0.01) {
-                            ddx = rnd(v.node.id, 7) - 0.5;
-                            ddy = rnd(u.node.id, 9) - 0.5;
-                            d2 = ddx * ddx + ddy * ddy + 0.01;
-                        }
-                        if (d2 > cell * cell) {
-                            continue;
-                        }
-                        double d = Math.sqrt(d2);
-                        double f = (1100.0 + 40 * (v.r + u.r)) / d2;
-                        fx += ddx / d * f;
-                        fy += ddy / d * f;
-                    }
-                }
-            }
-            v.vx += fx;
-            v.vy += fy;
-        }
-        for (E e : es) {
-            double dx = e.b.x - e.a.x;
-            double dy = e.b.y - e.a.y;
-            double d = Math.sqrt(dx * dx + dy * dy) + 0.01;
-            double want = 42 + e.a.r + e.b.r;
-            double k = e.state.equals("INFERRED") ? 0.035 : 0.06;
-            double f = (d - want) * k;
-            double fx = dx / d * f;
-            double fy = dy / d * f;
-            e.a.vx += fx;
-            e.a.vy += fy;
-            e.b.vx -= fx;
-            e.b.vy -= fy;
-        }
-        for (V v : vs) {
-            v.vx -= v.x * 0.006;
-            v.vy -= v.y * 0.006;
-            if (v.pinned) {
-                v.vx = 0;
-                v.vy = 0;
-                continue;
-            }
-            double sp = Math.sqrt(v.vx * v.vx + v.vy * v.vy);
-            double max = 22 * temp + 0.5;
-            if (sp > max) {
-                v.vx = v.vx / sp * max;
-                v.vy = v.vy / sp * max;
-            }
-            double mobility = v.settled ? 0.3 : 1.0;
-            v.x += v.vx * mobility;
-            v.y += v.vy * mobility;
-            v.vx *= 0.55;
-            v.vy *= 0.55;
-            if (Double.isNaN(v.x) || Double.isInfinite(v.x) || Double.isNaN(v.y) || Double.isInfinite(v.y)) {
-                v.x = 0;
-                v.y = 0;
-            }
-        }
-    }
 
-    private static long key(int x, int y) {
-        return ((long) x << 32) ^ (y & 0xffffffffL);
-    }
 
     // ------------------------------------------------------------------ view
 
