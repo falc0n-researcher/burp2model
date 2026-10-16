@@ -80,6 +80,12 @@ class MapLiveTest {
                 }
             });
         }
+        // the first map's fit is animated: let it finish before reading the camera
+        javax.swing.Timer anim = (javax.swing.Timer) get(g, "anim");
+        for (int i = 0; i < 200 && anim.isRunning(); i++) {
+            Thread.sleep(10);
+        }
+        SwingUtilities.invokeAndWait(() -> { });
     }
 
     @Test

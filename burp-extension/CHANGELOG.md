@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The map holds still.** It no longer animates: each layout is computed to the end and shown once, nodes already on the map keep their exact place, and new ones settle among them, so live capture only ever adds. Re-layout starts over. Roles, cookies and credentials ("Trust") are off at first, because each links to most of the map and turned it into a ball of lines; the layout is roomier, and a map of 80 nodes or fewer labels everything that fits.
+- **Settings** is laid out as cards (Model, Next send, Live capture, Data, About) whose fields keep their width; under Burp's theme the old form squeezed the fields to nothing and cut the labels short.
+- **Delete this model…** in ⋯ and in Settings removes a model and everything in it (after asking) and opens the sample. A missing "burp" model from an earlier version is no longer created again.
+- Roles first compares the lower-sounding role against the higher one (user against admin, not admin against user). The Query tab starts with a short guide instead of an empty table. "Comparing builds…" and similar messages give way to the model summary as soon as the work ends.
 - Fix: a large map (over 200 nodes) jumped whenever live capture added to it: the view re-fitted itself, the map blanked to "Laying out…" while the new layout ran, and nodes restarted from older positions. Now the current map stays on screen until the new layout is ready, the camera moves only when you ask (Fit, a new layout, the first map), and every new layout starts from where the nodes are.
 - Fix: inside Burp, some text showed raw markup such as `<html>…</html>` (facts titles, connection links, the site map, the Copy for AI menu). Burp's theme does not always let labels render HTML, so these are now drawn with fonts and colours instead.
 - No more empty "burp" model: with no model chosen, the extension opens the sample model, already filled with the demo shop. An empty "burp" model left by an earlier version gives way to the sample (a "burp" model with requests in it is kept), and the model switcher no longer lists models with nothing saved.
