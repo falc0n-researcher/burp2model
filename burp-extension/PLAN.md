@@ -2,6 +2,28 @@
 
 Drafted 2026-10-16 from a read-only review of `burp-extension/src` (extension 1.1.0). File references are `path:line` under `src/main/java/burp2model/` as of commit `e682211`.
 
+## Status (2026-10-17, extension 1.2.0)
+
+Phases 0-5 are merged into `main` (PRs #1-#11) and ship as 1.2.0. The plan below is kept as written; where the work went differently, this section says so.
+
+**Done**
+- **Phase 0, bug fixes, and 5.1, JUnit:** #1.
+- **Phase 1, data safety and lifecycle (1.1-1.6):** #2.
+- **Phase 2, performance and scale (2.1-2.8):** #3; cheaper live ticks toward 2.9 in #6 (about 110 ms at 20k requests, short of the 60 ms target).
+- **Phase 3, responsive UI (3.1-3.8):** #4.
+- **4A, welcome page:** #5, with IBM Plex Mono in place of the pixel fonts in #9 (open decision 1 is settled: no pixel fonts). The bundled sample model (open decision 2) shipped in #5 and became the default model in #10.
+- **4B, visual polish, keyboard and the header switcher (4.1-4.7):** #8.
+- **Phase 5, structure (5.2, 5.3, 5.5, 5.6; 5.4 in part, `MapLayout`):** #7.
+- **After the plan:** a still map during live capture, no raw HTML text inside Burp, the sample as the default model (#10); a map that never animates with Trust off by default, a Settings form of cards, Delete model (#11).
+
+**Remaining**
+- **2.9, incremental builder.** After #6 the profile is flat; it needs a redesign of `Builder`, worth doing only if large live sessions show a problem.
+- **5.7, splitting `Builder.build` into passes** (and the other large engine methods).
+- **Settings and the header still live in `MainPanel`** (about 1,190 lines); they could become their own classes.
+- **5.4, the rest:** the painter is still inside `GraphPanel` (about 1,200 lines).
+- **Streaming HAR import (part of 2.8):** Burp XML streams, but a HAR file is still read whole.
+- **Montoya message editor (open decision 4):** the spike has not been done.
+
 ## Goals
 
 1. **Trustworthy.** No lost requests, no silently wiped models, no corruption on crash or unload.
