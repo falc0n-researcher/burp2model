@@ -4,7 +4,6 @@ import burp2model.engine.Analysis;
 import burp2model.engine.Json;
 import burp2model.engine.Model;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -262,10 +261,6 @@ final class Facts extends JPanel {
 
     private static String escape(String s) {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-    }
-
-    static Color unused() {
-        return Color.BLACK;
     }
 
 }

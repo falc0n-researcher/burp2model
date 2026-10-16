@@ -9,7 +9,6 @@ import burp2model.engine.Query;
 import burp2model.engine.Recon;
 import burp2model.engine.Session;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -58,7 +57,7 @@ public final class MainPanel extends JPanel {
     }
 
     private final Host host;
-    private Session session;
+    private volatile Session session;
     private final JLabel status = new JLabel(" ");
     private final JTabbedPane tabs = new JTabbedPane();
     private final JLabel modelName = new JLabel(" ");
@@ -178,6 +177,16 @@ public final class MainPanel extends JPanel {
         for (Facts f : all) {
             f.onNode(this::goToNode);
         }
+        // the Settings fields are filled once; refreshes never touch them, so a half-typed value survives live capture
+        nameField.setText(host.get("app", "burp"));
+        roleField.setText(host.get("role", ""));
+        scopeField.setText(host.get("scope", ""));
+        replaceRole.setSelected("1".equals(host.get("replace", "0")));
+        autoCapture.setSelected("1".equals(host.get("auto", "0")));
+        roleField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
+        scopeField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
+        replaceRole.addItemListener(e -> updateSettings());
+        updateSettings();
         refresh();
     }
 
@@ -209,23 +218,29 @@ public final class MainPanel extends JPanel {
         SwingUtilities.invokeLater(() -> status.setText(text));
     }
 
-    public String role() {
-        String r = roleField.getText().strip();
-        return r.isEmpty() ? null : r;
-    }
-
-    public boolean replaceRoleOnSend() {
-        return replaceRole.isSelected();
-    }
-
-    public List<String> scope() {
-        List<String> out = new ArrayList<>();
-        for (String s : scopeField.getText().split("[,\\s]+")) {
-            if (!s.isBlank()) {
-                out.add(s.strip());
+    /** What the next send uses: the role, scope and replace choice as typed in Settings (saved or not). */
+    public record Settings(String role, List<String> scope, boolean replaceRole) {
+        static Settings of(String role, String scope, boolean replaceRole) {
+            List<String> out = new ArrayList<>();
+            for (String s : scope.split("[,\\s]+")) {
+                if (!s.isBlank()) {
+                    out.add(s.strip());
+                }
             }
+            String r = role.strip();
+            return new Settings(r.isEmpty() ? null : r, List.copyOf(out), replaceRole);
         }
-        return out;
+    }
+
+    private volatile Settings settings = new Settings(null, List.of(), false);
+
+    /** Safe to call from any thread: a copy taken on the Swing thread whenever a field changes. */
+    public Settings settings() {
+        return settings;
+    }
+
+    private void updateSettings() {
+        settings = Settings.of(roleField.getText(), scopeField.getText(), replaceRole.isSelected());
     }
 
     /** Run a query as if it were typed in the Query tab. */
@@ -244,11 +259,6 @@ public final class MainPanel extends JPanel {
         leads = m == null ? new ArrayList<>() : Analysis.leads(m);
         dashboard.update(m, leads);
         headerPills(m);
-        nameField.setText(host.get("app", "burp"));
-        roleField.setText(host.get("role", ""));
-        scopeField.setText(host.get("scope", ""));
-        replaceRole.setSelected("1".equals(host.get("replace", "0")));
-        autoCapture.setSelected("1".equals(host.get("auto", "0")));
         for (int i = 1; i < tabs.getTabCount(); i++) {
             stale.add(i);
         }
@@ -1169,7 +1179,7 @@ public final class MainPanel extends JPanel {
                 }
             }
             if (session != null) {
-                session.scope = scope();
+                session.scope = settings().scope();
             }
             refresh();
         });
@@ -1234,8 +1244,7 @@ public final class MainPanel extends JPanel {
         }
         java.io.File f = fc.getSelectedFile();
         status.setText("importing " + f.getName() + "…");
-        final String role = role();
-        final List<String> scopeNow = scope();
+        final Settings set = settings();
         new Thread(null, () -> {
             try {
                 List<burp2model.engine.Parse.Raw> raws = burp2model.engine.Har.looksLike(f) ? burp2model.engine.Har.readRaw(f) : burp2model.engine.BurpXml.readRaw(f);
@@ -1248,8 +1257,9 @@ public final class MainPanel extends JPanel {
                         ok.add(r);
                     }
                 }
-                session.scope = scopeNow;
-                Session.AddResult r = session.add(ok, role, f.getName(), replaceRole.isSelected());
+                Session target = session;
+                target.scope = set.scope();
+                Session.AddResult r = target.add(ok, set.role(), f.getName(), set.replaceRole());
                 refresh();
                 say("imported " + f.getName() + ": added " + r.added() + (r.duplicates() > 0 ? ", " + r.duplicates() + " already in the model" : "")
                         + (r.skipped() + unreadable > 0 ? ", " + (r.skipped() + unreadable) + " could not be read" : "") + ".");
@@ -1293,9 +1303,5 @@ public final class MainPanel extends JPanel {
         public void changedUpdate(javax.swing.event.DocumentEvent e) {
             r.run();
         }
-    }
-
-    static Color unused() {
-        return Color.BLACK;
     }
 }
