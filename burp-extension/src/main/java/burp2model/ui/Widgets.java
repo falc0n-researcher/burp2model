@@ -188,4 +188,115 @@ final class Widgets {
         l.setForeground(Theme.MUTED);
         return l;
     }
+
+    // ------------------------------------------------------------------ text without HTML
+    // Swing labels only render HTML when the look and feel allows it, and inside Burp it may not: the markup then
+    // shows as text ("<html>…</html>"). These pieces style text with fonts and colours instead.
+
+    /**
+     * Read-only text that wraps at its parent's width (less `reserve` for what sits beside it) and asks for the
+     * height that wrapping needs.
+     */
+    static final class WrapText extends javax.swing.JTextArea {
+        private static final long serialVersionUID = 1L;
+        private final int reserve;
+
+        WrapText(String text, int reserve) {
+            super(text);
+            this.reserve = reserve;
+            setEditable(false);
+            setFocusable(false);
+            setLineWrap(true);
+            setWrapStyleWord(true);
+            setOpaque(false);
+            setBorder(null);
+            setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            java.awt.Container p = getParent();
+            if (p != null && p.getWidth() > 0) {
+                java.awt.Insets in = p.getInsets();
+                int w = p.getWidth() - in.left - in.right - reserve;
+                if (w > 0 && w != getWidth()) {
+                    setSize(w, Short.MAX_VALUE);                 // wrap at that width, then measure
+                }
+            }
+            return super.getPreferredSize();
+        }
+
+        @Override
+        public Dimension getMaximumSize() {
+            return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+        }
+    }
+
+    static WrapText wrapText(String text, Font font, Color fg) {
+        WrapText t = new WrapText(text, 0);
+        t.setFont(font);
+        t.setForeground(fg);
+        return t;
+    }
+
+    /** A clickable name, underlined, in a blue that reads at 4.5:1 on the card. */
+    static JLabel link(String text, Font font) {
+        JLabel l = new JLabel(text);
+        l.setFont(font.deriveFont(java.util.Map.of(java.awt.font.TextAttribute.UNDERLINE, java.awt.font.TextAttribute.UNDERLINE_ON)));
+        l.setForeground(Theme.readable(Theme.BLUE, Theme.surface()));
+        l.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+        return l;
+    }
+
+    /** A menu item with a bold title and a muted line under it, drawn directly. */
+    static final class TwoLineItem extends javax.swing.JMenuItem {
+        private static final long serialVersionUID = 1L;
+        private final String title;
+        private final String desc;
+
+        TwoLineItem(String title, String desc) {
+            super("");
+            this.title = title;
+            this.desc = desc;
+            getAccessibleContext().setAccessibleName(title);
+            getAccessibleContext().setAccessibleDescription(desc);
+        }
+
+        private Font titleFont() {
+            return Theme.font(12f, Font.BOLD);
+        }
+
+        private Font descFont() {
+            return Theme.font(11f, Font.PLAIN);
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            java.awt.FontMetrics a = getFontMetrics(titleFont());
+            java.awt.FontMetrics b = getFontMetrics(descFont());
+            return new Dimension(Math.max(a.stringWidth(title), b.stringWidth(desc)) + 36, a.getHeight() + b.getHeight() + 12);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g0) {
+            super.paintComponent(g0);                           // the background, and the highlight when armed
+            Graphics2D g = (Graphics2D) g0.create();
+            Theme.textHints(g);
+            boolean armed = isArmed() || isSelected();
+            Color fg = armed ? orDefault(javax.swing.UIManager.getColor("MenuItem.selectionForeground"), Color.WHITE)
+                    : orDefault(javax.swing.UIManager.getColor("MenuItem.foreground"), Theme.fg());
+            java.awt.FontMetrics a = g.getFontMetrics(titleFont());
+            g.setFont(titleFont());
+            g.setColor(fg);
+            g.drawString(title, 18, 6 + a.getAscent());
+            g.setFont(descFont());
+            g.setColor(new Color(fg.getRed(), fg.getGreen(), fg.getBlue(), 170));
+            g.drawString(desc, 18, 6 + a.getHeight() + g.getFontMetrics().getAscent());
+            g.dispose();
+        }
+
+        private static Color orDefault(Color c, Color d) {
+            return c == null ? d : c;
+        }
+    }
 }

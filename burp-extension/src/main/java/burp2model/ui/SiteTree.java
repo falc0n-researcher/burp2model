@@ -2,6 +2,7 @@ package burp2model.ui;
 
 import burp2model.engine.Model;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
 import java.util.ArrayList;
@@ -45,12 +46,13 @@ final class SiteTree extends JPanel {
                     if (e.node() != null) {
                         l.setFont(Theme.mono(12f));
                         String st = String.valueOf(e.node().attrs.get("api_state"));
-                        String dot = "<font color='" + Theme.hex(Theme.state(st)) + "'>●</font> ";
                         Object m = e.node().attrs.get("method");
-                        String chip = e.node().type.equals("endpoint")
-                                ? "<font color='" + Theme.hex(Theme.method(m == null ? "" : String.valueOf(m))) + "'><b>" + (m == null ? "*" : m) + "</b></font>"
-                                : "<font color='" + Theme.hex(Theme.GREEN) + "'><b>page</b></font>";
-                        l.setText("<html>" + dot + chip + " <font color='" + Theme.hex(Theme.muted()) + "'>" + e.node().evidence.size() + " req</font></html>");
+                        boolean endpoint = e.node().type.equals("endpoint");
+                        String verb = endpoint ? (m == null ? "any" : String.valueOf(m)) : "page";
+                        Color verbColor = endpoint ? Theme.method(m == null ? "" : String.valueOf(m)) : Theme.GREEN;
+                        l.setText("");
+                        l.setIcon(new Cell(Theme.state(st), verb, verbColor, e.node().evidence.size() + " req", l.getFont()));
+                        l.getAccessibleContext().setAccessibleName(verb + " " + e.node().label + ", " + e.node().evidence.size() + " requests");
                     } else {
                         l.setFont(Theme.mono(12f).deriveFont(kids > 0 ? Font.BOLD : Font.PLAIN));
                         l.setText(e.label() + (kids > 0 ? "   " + counts.getOrDefault(value, 0) : ""));
@@ -143,5 +145,55 @@ final class SiteTree extends JPanel {
             parent.add(c);
             return c;
         });
+    }
+
+    /** A leaf of the site map drawn directly: a state dot, the method in its colour, and the request count. */
+    private static final class Cell implements javax.swing.Icon {
+        private final Color dot;
+        private final String verb;
+        private final Color verbColor;
+        private final String count;
+        private final Font font;
+
+        Cell(Color dot, String verb, Color verbColor, String count, Font font) {
+            this.dot = dot;
+            this.verb = verb;
+            this.verbColor = verbColor;
+            this.count = count;
+            this.font = font;
+        }
+
+        private java.awt.FontMetrics fm(Font f) {
+            return new java.awt.Canvas().getFontMetrics(f);
+        }
+
+        @Override
+        public int getIconWidth() {
+            return 14 + fm(font.deriveFont(Font.BOLD)).stringWidth(verb) + 8 + fm(font).stringWidth(count);
+        }
+
+        @Override
+        public int getIconHeight() {
+            return fm(font).getHeight();
+        }
+
+        @Override
+        public void paintIcon(Component c, java.awt.Graphics g0, int x, int y) {
+            java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+            Theme.quality(g);
+            int h = getIconHeight();
+            g.setColor(dot);
+            g.fillOval(x, y + (h - 8) / 2, 8, 8);
+            Font bold = font.deriveFont(Font.BOLD);
+            java.awt.FontMetrics fb = g.getFontMetrics(bold);
+            int base = y + (h - fb.getHeight()) / 2 + fb.getAscent();
+            g.setFont(bold);
+            g.setColor(Theme.readable(verbColor, c.getBackground() == null ? Theme.bg() : c.getBackground()));
+            g.drawString(verb, x + 14, base);
+            g.setFont(font);
+            g.setColor(Theme.muted());
+            g.drawString(count, x + 14 + fb.stringWidth(verb) + 8, base);
+            g.dispose();
+        }
     }
 }

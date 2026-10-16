@@ -239,12 +239,12 @@ final class Welcome extends JPanel {
         c.insets = new Insets(0, 0, 6, 0);
         c.fill = GridBagConstraints.HORIZONTAL;
         int beside = WelcomeArt.logoSize(px) + 26;                   // the logo's column, left of the text
-        Wrap tag = new Wrap("Turn Burp traffic into an evidence-backed model of the app.", beside);
+        Widgets.WrapText tag = new Widgets.WrapText("Turn Burp traffic into an evidence-backed model of the app.", beside);
         tag.setFont(Theme.font(16f, Font.PLAIN));
         card.add(styled(tag, Theme.fg()), c);
         c.gridy = 2;
         c.insets = new Insets(0, 0, 0, 0);
-        Wrap meta = new Wrap("Extension " + version + "  ·  works offline  ·  secrets are masked before anything is stored", beside);
+        Widgets.WrapText meta = new Widgets.WrapText("Extension " + version + "  ·  works offline  ·  secrets are masked before anything is stored", beside);
         meta.setFont(Theme.font(12f, Font.PLAIN));
         card.add(styled(meta, Theme.muted()), c);
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, card.getPreferredSize().height + 4));
@@ -284,12 +284,12 @@ final class Welcome extends JPanel {
 
     /** Wrapped body text in Burp's font. */
     private static JComponent body(String text, boolean small) {
-        Wrap a = new Wrap(text, 0);
+        Widgets.WrapText a = new Widgets.WrapText(text, 0);
         a.setFont(Theme.font(small ? 13f : 13.5f, Font.PLAIN));
         return styled(a, Theme.fg());
     }
 
-    private static JComponent styled(Wrap a, java.awt.Color fg) {
+    private static JComponent styled(Widgets.WrapText a, java.awt.Color fg) {
         a.setEditable(false);
         a.setFocusable(false);                                  // read-only text: Tab goes to the buttons, not through paragraphs
         a.setLineWrap(true);
@@ -299,40 +299,6 @@ final class Welcome extends JPanel {
         a.setForeground(fg);
         a.setAlignmentX(Component.LEFT_ALIGNMENT);
         return a;
-    }
-
-    /**
-     * A text area whose preferred height is the height of its text wrapped at its parent's width. A plain one
-     * asks for one line until it has been laid out once, so the page would cut every paragraph short.
-     */
-    private static final class Wrap extends javax.swing.JTextArea {
-        private static final long serialVersionUID = 1L;
-
-        /** Width taken by siblings beside it in the same parent (the logo in the hero). */
-        private final int reserve;
-
-        Wrap(String text, int reserve) {
-            super(text);
-            this.reserve = reserve;
-        }
-
-        @Override
-        public Dimension getPreferredSize() {
-            java.awt.Container p = getParent();
-            if (p != null && p.getWidth() > 0) {
-                Insets in = p.getInsets();
-                int w = p.getWidth() - in.left - in.right - reserve;
-                if (w > 0 && w != getWidth()) {
-                    setSize(w, Short.MAX_VALUE);                 // wrap at that width, then measure
-                }
-            }
-            return super.getPreferredSize();
-        }
-
-        @Override
-        public Dimension getMaximumSize() {
-            return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
-        }
     }
 
     /** The column: tracks the viewport width, so text wraps instead of scrolling sideways. */
