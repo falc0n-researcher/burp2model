@@ -103,7 +103,7 @@ jobs:
       - name: The Gradle build works too
         run: gradle -p burp-extension jar --no-daemon -q
       - name: Unit tests
-        run: gradle -p burp-extension test --no-daemon -q
+        run: gradle -p burp-extension test --no-daemon
       - name: The tab and the engine work end to end
         run: java -Djava.awt.headless=true -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.Smoke samples/burp-history-sample.xml
       - name: The map is stable
