@@ -135,6 +135,9 @@ public final class Smoke {
             }
         }));
         panel[0].setSize(1300, 820);
+        // the model opens in the background; wait for it, then for the refresh it queues
+        check(panel[0].awaitSession(10_000) != null, "the model opens in the background");
+        Thread.sleep(300);
         SwingUtilities.invokeAndWait(() -> {
             panel[0].refresh();
             panel[0].doLayout();

@@ -43,6 +43,7 @@ public final class MapStability {
     }
 
     private static void settle(GraphPanel g) throws Exception {
+        g.awaitLayout(30_000);                                  // a larger map is first laid out in the background
         Field tf = GraphPanel.class.getDeclaredField("sim");
         tf.setAccessible(true);
         javax.swing.Timer timer = (javax.swing.Timer) tf.get(g);

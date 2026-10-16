@@ -147,11 +147,6 @@ public final class MainPanel extends JPanel {
     public MainPanel(Host host) {
         super(new BorderLayout());
         this.host = host;
-        try {
-            this.session = host.session(host.get("app", "burp"));
-        } catch (Exception e) {
-            host.log("burp2model: could not open the saved model (" + e.getMessage() + ")");
-        }
         add(header(), BorderLayout.NORTH);
         tabs.addTab("Overview", dashboard);
         tabs.addTab("To check", checkTab());
@@ -166,10 +161,21 @@ public final class MainPanel extends JPanel {
         tabs.setFont(Theme.font(12f, Font.PLAIN));
         add(tabs, BorderLayout.CENTER);
         tabs.addChangeListener(e -> fillTab(tabs.getSelectedIndex()));
-        status.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
+        status.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 12));
         status.setFont(Theme.font(11f, Font.PLAIN));
         status.setForeground(Theme.muted());
-        add(status, BorderLayout.SOUTH);
+        status.setIconTextGap(6);
+        busyBar.setIndeterminate(true);
+        busyBar.setPreferredSize(new java.awt.Dimension(70, 8));
+        busyBar.setVisible(false);
+        JPanel south = new JPanel(new BorderLayout());
+        JPanel busyBox = new JPanel(new java.awt.GridBagLayout());
+        busyBox.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 0));
+        busyBox.add(busyBar);
+        south.add(busyBox, BorderLayout.WEST);
+        south.add(status, BorderLayout.CENTER);
+        add(south, BorderLayout.SOUTH);
+        revert.setRepeats(false);
         dashboard.onLead(l -> {
             tabs.setSelectedIndex(1);
             checkTabs.setSelectedIndex(0);
@@ -194,6 +200,7 @@ public final class MainPanel extends JPanel {
         scopeField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
         replaceRole.addItemListener(e -> updateSettings());
         updateSettings();
+        openSession(host.get("app", "burp"), false);
         addHierarchyListener(e -> {
             if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing() && refreshPending) {
                 refreshPending = false;
@@ -201,7 +208,86 @@ public final class MainPanel extends JPanel {
             }
         });
         refresh();
-        reportProblems();
+    }
+
+    // ------------------------------------------------------------------ background work
+
+    private final javax.swing.JProgressBar busyBar = new javax.swing.JProgressBar();
+    private final java.util.concurrent.atomic.AtomicInteger busy = new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.CountDownLatch opened = new java.util.concurrent.CountDownLatch(1);
+
+    /** Show the busy indicator (from any thread); pair each call with idle(). */
+    public void working(String what) {
+        busy.incrementAndGet();
+        SwingUtilities.invokeLater(() -> {
+            busyBar.setVisible(busy.get() > 0);
+            if (what != null) {
+                setStatus(what, Level.INFO);
+            }
+        });
+    }
+
+    public void idle() {
+        busy.updateAndGet(n -> Math.max(0, n - 1));
+        SwingUtilities.invokeLater(() -> busyBar.setVisible(busy.get() > 0));
+    }
+
+    /**
+     * Run slow work off the Swing thread, with the busy indicator on, so Burp never freezes; `done` gets the
+     * result back on the Swing thread, and a failure is shown in the status line.
+     */
+    private <T> void async(String what, java.util.concurrent.Callable<T> work, java.util.function.Consumer<T> done) {
+        async(what, work, done, t -> sayError((what == null ? "failed" : what.replace("…", "")) + ": " + messageOf(t)));
+    }
+
+    private <T> void async(String what, java.util.concurrent.Callable<T> work, java.util.function.Consumer<T> done,
+                           java.util.function.Consumer<Throwable> failed) {
+        working(what);
+        host.background("burp2model-ui", () -> {
+            try {
+                T r = work.call();
+                SwingUtilities.invokeLater(() -> {
+                    idle();
+                    done.accept(r);
+                });
+            } catch (Throwable t) {
+                SwingUtilities.invokeLater(() -> {
+                    idle();
+                    failed.accept(t);
+                });
+            }
+        });
+    }
+
+    private static String messageOf(Throwable t) {
+        return t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+    }
+
+    /** Open (or switch to) a model off the Swing thread; a large one takes a second or more to read and rebuild. */
+    private void openSession(String name, boolean applyScope) {
+        async("Opening the model '" + name + "'…", () -> host.session(name), s -> {
+            if (applyScope) {
+                s.scope = settings().scope();
+            }
+            session = s;
+            opened.countDown();
+            refresh();
+            reportProblems();
+        }, t -> {
+            opened.countDown();
+            host.log("burp2model: could not open the model '" + name + "' (" + messageOf(t) + ")");
+            sayError("could not open the model '" + name + "': " + messageOf(t));
+        });
+    }
+
+    /** The open model, waiting up to `ms` for the first one to finish opening (a send right after Burp starts). */
+    public Session awaitSession(long ms) {
+        try {
+            opened.await(ms, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return session;
     }
 
     /** Say what could not be read when the model was opened; the damaged files are kept beside it. */
@@ -212,7 +298,7 @@ public final class MainPanel extends JPanel {
         }
         for (String p : s.problems()) {
             host.log("burp2model (" + s.name + "): " + p);
-            say("burp2model: " + p);
+            sayError("burp2model: " + p);
         }
     }
 
@@ -255,8 +341,58 @@ public final class MainPanel extends JPanel {
         return session;
     }
 
+    enum Level { INFO, OK, ERROR }
+
+    /** What the status line shows when no message is: the model summary. */
+    private String summary = " ";
+    private final javax.swing.Timer revert = new javax.swing.Timer(10_000, e -> setStatus(summary, null));
+
     public void say(String text) {
-        SwingUtilities.invokeLater(() -> status.setText(text));
+        SwingUtilities.invokeLater(() -> setStatus(text, Level.INFO));
+    }
+
+    public void sayError(String text) {
+        SwingUtilities.invokeLater(() -> setStatus(text, Level.ERROR));
+    }
+
+    /** A message with a coloured dot (errors red); it goes back to the model summary after a while. */
+    private void setStatus(String text, Level level) {
+        status.setText(text);
+        status.setIcon(level == null ? null : new Dot(level == Level.ERROR ? Theme.RED : level == Level.OK ? Theme.GREEN : Theme.BLUE));
+        status.setForeground(level == Level.ERROR ? Theme.RED : Theme.muted());
+        if (level == null) {
+            revert.stop();
+        } else {
+            revert.setInitialDelay(level == Level.ERROR ? 20_000 : 10_000);
+            revert.restart();
+        }
+    }
+
+    private static final class Dot implements javax.swing.Icon {
+        private final java.awt.Color c;
+
+        Dot(java.awt.Color c) {
+            this.c = c;
+        }
+
+        @Override
+        public void paintIcon(Component comp, java.awt.Graphics g0, int x, int y) {
+            java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+            Theme.quality(g);
+            g.setColor(c);
+            g.fillOval(x, y + 1, 7, 7);
+            g.dispose();
+        }
+
+        @Override
+        public int getIconWidth() {
+            return 7;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return 9;
+        }
     }
 
     /** What the next send uses: the role, scope and replace choice as typed in Settings (saved or not). */
@@ -305,9 +441,14 @@ public final class MainPanel extends JPanel {
         }
         queryEngine = null;
         fillTab(tabs.getSelectedIndex());
-        status.setText(m == null ? "No requests yet. Right-click requests in Burp and choose Send to burp2model."
-                : m.nodes.size() + " nodes · " + m.edges.size() + " edges · " + m.evidenceLog.size() + " requests · build " + session.builds().size()
-                + " · stored in " + session.dir());
+        Session s = session;
+        summary = s == null ? "Opening the model…" : m == null ? "No requests yet. Right-click requests in Burp and choose Send to burp2model."
+                : m.nodes.size() + " nodes · " + m.edges.size() + " edges · " + m.evidenceLog.size() + " requests · build " + s.builds().size()
+                + " · stored in " + s.dir().getFileName();
+        status.setToolTipText(s == null ? null : s.dir().toString());
+        if (!revert.isRunning()) {
+            setStatus(summary, null);
+        }
     }
 
     /** Fill one tab from the current model, if it is out of date. */
@@ -410,8 +551,10 @@ public final class MainPanel extends JPanel {
             say("Nothing to copy yet. Send some requests first.");
             return;
         }
-        Tables.copy(ContextPack.forAi(m, scope));
-        say("Copied the " + scope + " package for your own AI (about " + ContextPack.tokens(m) / 1000 + "k tokens). Values are masked; every claim cites a request.");
+        async("Packing the " + scope + " package…", () -> new String[] {ContextPack.forAi(m, scope), String.valueOf(ContextPack.tokens(m) / 1000)}, r -> {
+            Tables.copy(r[0]);
+            setStatus("Copied the " + scope + " package for your own AI (about " + r[1] + "k tokens). Values are masked; every claim cites a request.", Level.OK);
+        });
     }
 
     private void headerPills(Model m) {
@@ -564,7 +707,7 @@ public final class MainPanel extends JPanel {
         top.add(list);
         top.add(tree);
         typeBox.addActionListener(e -> fillSurface());
-        surfaceFilter.getDocument().addDocumentListener(new SimpleDoc(() -> Tables.filter(surfaceTable, surfaceFilter.getText())));
+        surfaceFilter.getDocument().addDocumentListener(debounced(150, () -> Tables.filter(surfaceTable, surfaceFilter.getText())));
         surfaceTable.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting()) {
                 return;
@@ -661,7 +804,7 @@ public final class MainPanel extends JPanel {
         top.add(new JLabel("Filter"));
         top.add(reqFilter);
         top.add(Widgets.muted("method, host, path, status or role"));
-        reqFilter.getDocument().addDocumentListener(new SimpleDoc(() -> Tables.filter(reqTable, reqFilter.getText())));
+        reqFilter.getDocument().addDocumentListener(debounced(150, () -> Tables.filter(reqTable, reqFilter.getText())));
         reqTable.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting()) {
                 return;
@@ -715,10 +858,16 @@ public final class MainPanel extends JPanel {
         JButton copy = new JButton("Copy results");
         JButton csv = new JButton("Save CSV…");
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        for (JButton b : new JButton[] {run, help, copy, csv}) {
+        for (JButton b : new JButton[] {run, cancelQuery, help, copy, csv}) {
             b.setFocusable(false);
             buttons.add(b);
         }
+        cancelQuery.setVisible(false);
+        cancelQuery.addActionListener(e -> {
+            if (queryStop != null) {
+                queryStop.set(true);
+            }
+        });
         top.add(queryField, BorderLayout.CENTER);
         top.add(buttons, BorderLayout.EAST);
         run.addActionListener(e -> runQuery(queryField.getText()));
@@ -813,7 +962,7 @@ public final class MainPanel extends JPanel {
                 Files.writeString(fc.getSelectedFile().toPath(), sb.toString(), StandardCharsets.UTF_8);
                 say("Saved " + fc.getSelectedFile());
             } catch (Exception ex) {
-                say("could not save: " + ex.getMessage());
+                sayError("could not save: " + ex.getMessage());
             }
         }
     }
@@ -852,59 +1001,96 @@ public final class MainPanel extends JPanel {
             queryEngineFor = m;
         }
         Query q = queryEngine;
-        q.history = id -> session.historyOf(id);
+        Session sess = session;
+        q.history = id -> sess.historyOf(id);
         q.changedSince = ref -> {
             try {
                 int older = resolveBuild(ref);
-                int newer = session.builds().size();
+                int newer = sess.builds().size();
                 if (older == newer) {
                     throw new Query.QueryError("build #" + older + " is the latest; nothing to compare yet");
                 }
-                return Diff.formatText(session.diff(older, newer));
+                return Diff.formatText(sess.diff(older, newer));
             } catch (java.io.IOException e) {
                 throw new Query.QueryError(e.getMessage());
             }
         };
-        try {
-            Query.Result r = q.run(text);
-            lastResult = r;
-            queryNote.setForeground(Theme.muted());
-            queryNote.setText(r.kind().equals("text") ? "text answer" : r.note());
-            queryText.setText(r.kind().equals("text") ? r.note() : "");
-            queryText.setCaretPosition(0);
-            queryModel.setRowCount(0);
-            queryModel.setColumnCount(0);
-            if (!r.kind().equals("text")) {
-                for (String c : r.columns()) {
-                    queryModel.addColumn(c);
-                }
-                for (Map<String, Object> row : r.rows()) {
-                    Object[] cells = new Object[r.columns().size()];
-                    for (int i = 0; i < cells.length; i++) {
-                        Object v = row.get(r.columns().get(i));
-                        cells[i] = v instanceof List<?> l ? String.join(",", l.stream().map(String::valueOf).toList()) : v == null ? "" : String.valueOf(v);
-                    }
-                    queryModel.addRow(cells);
-                }
-                for (String col : new String[] {"method"}) {
-                    Tables.render(queryTable, col, Renderers.method());
-                }
-                Tables.render(queryTable, "status", Renderers.status());
-                Tables.render(queryTable, "state", Renderers.state());
-                Tables.render(queryTable, "type", Renderers.type());
-                Tables.render(queryTable, "ev", Renderers.ids());
-                Tables.render(queryTable, "evidence", Renderers.ids());
-                for (String col : new String[] {"label", "path", "endpoint", "from", "to", "src", "dst", "url"}) {
-                    Tables.render(queryTable, col, Renderers.path());
-                }
-            }
-            queryOut.setSelectedIndex(r.kind().equals("text") ? 1 : 0);
-            queryViewer.clear();
-        } catch (Query.QueryError e) {
-            queryNote.setForeground(Theme.RED);
-            queryNote.setText("error: " + e.getMessage());
-            lastResult = null;
+        // a new query stops the one still running; a query that runs past QUERY_SECONDS stops itself
+        if (queryStop != null) {
+            queryStop.set(true);
         }
+        java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
+        queryStop = stop;
+        long deadline = System.currentTimeMillis() + QUERY_SECONDS * 1000L;
+        q.stop = () -> stop.get() || System.currentTimeMillis() > deadline;
+        int gen = ++queryGen;
+        queryNote.setForeground(Theme.muted());
+        queryNote.setText("running…");
+        cancelQuery.setVisible(true);
+        async(null, () -> {
+            synchronized (q) {
+                return q.run(text);
+            }
+        }, r -> {
+            if (gen == queryGen) {
+                cancelQuery.setVisible(false);
+                showResult(r);
+            }
+        }, t -> {
+            if (gen != queryGen) {
+                return;
+            }
+            cancelQuery.setVisible(false);
+            lastResult = null;
+            queryNote.setForeground(Theme.RED);
+            if (t instanceof Query.Stopped) {
+                queryNote.setText(stop.get() ? "stopped." : "stopped after " + QUERY_SECONDS + " s: narrow the filter, or simplify the regex.");
+            } else {
+                queryNote.setText("error: " + messageOf(t));
+            }
+        });
+    }
+
+    private static final int QUERY_SECONDS = 20;
+    private java.util.concurrent.atomic.AtomicBoolean queryStop;
+    private int queryGen;
+    private final JButton cancelQuery = new JButton("Cancel");
+
+    /** Put a query's answer on screen (Swing thread). */
+    private void showResult(Query.Result r) {
+        lastResult = r;
+        queryNote.setForeground(Theme.muted());
+        queryNote.setText(r.kind().equals("text") ? "text answer" : r.note());
+        queryText.setText(r.kind().equals("text") ? r.note() : "");
+        queryText.setCaretPosition(0);
+        queryModel.setRowCount(0);
+        queryModel.setColumnCount(0);
+        if (!r.kind().equals("text")) {
+            for (String c : r.columns()) {
+                queryModel.addColumn(c);
+            }
+            for (Map<String, Object> row : r.rows()) {
+                Object[] cells = new Object[r.columns().size()];
+                for (int i = 0; i < cells.length; i++) {
+                    Object v = row.get(r.columns().get(i));
+                    cells[i] = v instanceof List<?> l ? String.join(",", l.stream().map(String::valueOf).toList()) : v == null ? "" : String.valueOf(v);
+                }
+                queryModel.addRow(cells);
+            }
+            for (String col : new String[] {"method"}) {
+                Tables.render(queryTable, col, Renderers.method());
+            }
+            Tables.render(queryTable, "status", Renderers.status());
+            Tables.render(queryTable, "state", Renderers.state());
+            Tables.render(queryTable, "type", Renderers.type());
+            Tables.render(queryTable, "ev", Renderers.ids());
+            Tables.render(queryTable, "evidence", Renderers.ids());
+            for (String col : new String[] {"label", "path", "endpoint", "from", "to", "src", "dst", "url"}) {
+                Tables.render(queryTable, col, Renderers.path());
+            }
+        }
+        queryOut.setSelectedIndex(r.kind().equals("text") ? 1 : 0);
+        queryViewer.clear();
     }
 
     private int resolveBuild(String ref) {
@@ -970,11 +1156,10 @@ public final class MainPanel extends JPanel {
             diffView.show("Send more requests first: a comparison needs two builds.");
             return;
         }
-        try {
-            diffView.show(Diff.formatText(session.diff(older, newer)));
-        } catch (Exception e) {
-            diffView.show("could not compare: " + e.getMessage());
-        }
+        Session s = session;
+        diffView.show("Comparing build " + older + " with build " + newer + "…");
+        async("Comparing builds…", () -> Diff.formatText(s.diff(older, newer)), diffView::show,
+                t -> diffView.show("could not compare: " + messageOf(t)));
     }
 
     private void fillBuilds() {
@@ -1203,7 +1388,7 @@ public final class MainPanel extends JPanel {
         save.addActionListener(e -> {
             String n = nameField.getText().strip();
             if (!n.matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")) {
-                status.setText("The model name must be letters, digits, '.', '_' or '-'.");
+                setStatus("The model name must be letters, digits, '.', '_' or '-'.", Level.ERROR);
                 return;
             }
             boolean renamed = !n.equals(host.get("app", "burp"));
@@ -1213,16 +1398,11 @@ public final class MainPanel extends JPanel {
             host.set("replace", replaceRole.isSelected() ? "1" : "0");
             host.set("auto", autoCapture.isSelected() ? "1" : "0");
             if (renamed) {
-                try {
-                    session = host.session(n);
-                    reportProblems();
-                } catch (Exception ex) {
-                    status.setText("could not open " + n + ": " + ex.getMessage());
-                }
-            }
-            if (session != null) {
+                openSession(n, true);
+            } else if (session != null) {
                 session.scope = settings().scope();
             }
+            setStatus("Settings saved.", Level.OK);
             refresh();
         });
         export.addActionListener(e -> {
@@ -1233,12 +1413,9 @@ public final class MainPanel extends JPanel {
             JFileChooser fc = new JFileChooser();
             fc.setSelectedFile(new java.io.File(m.name + "-model.json"));
             if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-                try {
-                    Files.writeString(fc.getSelectedFile().toPath(), Json.pretty(m.toMap()), StandardCharsets.UTF_8);
-                    status.setText("exported " + fc.getSelectedFile());
-                } catch (Exception ex) {
-                    status.setText("could not export: " + ex.getMessage());
-                }
+                java.nio.file.Path to = fc.getSelectedFile().toPath();
+                async("Exporting the model…", () -> Files.writeString(to, Json.pretty(m.toMap()), StandardCharsets.UTF_8),
+                        x -> setStatus("exported " + to, Level.OK), t -> sayError("could not export: " + messageOf(t)));
             }
         });
         importBtn.addActionListener(e -> importFile());
@@ -1250,23 +1427,22 @@ public final class MainPanel extends JPanel {
             JFileChooser fc = new JFileChooser();
             fc.setSelectedFile(new java.io.File(m.name + "-summary.md"));
             if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-                try {
-                    Files.writeString(fc.getSelectedFile().toPath(), burp2model.engine.Markdown.summary(m), StandardCharsets.UTF_8);
-                    status.setText("exported " + fc.getSelectedFile());
-                } catch (Exception ex) {
-                    status.setText("could not export: " + ex.getMessage());
-                }
+                java.nio.file.Path to = fc.getSelectedFile().toPath();
+                async("Writing the summary…", () -> Files.writeString(to, burp2model.engine.Markdown.summary(m), StandardCharsets.UTF_8),
+                        x -> setStatus("exported " + to, Level.OK), t -> sayError("could not export: " + messageOf(t)));
             }
         });
         clear.addActionListener(e -> {
             if (session != null && JOptionPane.showConfirmDialog(this, "Delete everything in the model '" + session.name + "'?", "burp2model",
                     JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-                try {
-                    session.clear();
-                } catch (Exception ex) {
-                    status.setText("could not clear: " + ex.getMessage());
-                }
-                refresh();
+                Session s = session;
+                async("Clearing the model…", () -> {
+                    s.clear();
+                    return s;
+                }, x -> {
+                    setStatus("Cleared the model '" + s.name + "'.", Level.OK);
+                    refresh();
+                }, t -> sayError("could not clear: " + messageOf(t)));
             }
         });
         JPanel outer = new JPanel(new BorderLayout());
@@ -1285,8 +1461,8 @@ public final class MainPanel extends JPanel {
             return;
         }
         java.io.File f = fc.getSelectedFile();
-        status.setText("importing " + f.getName() + "…");
         final Settings set = settings();
+        working("Importing " + f.getName() + "…");
         host.background("burp2model-import", () -> {
             try {
                 List<burp2model.engine.Parse.Raw> raws = burp2model.engine.Har.looksLike(f) ? burp2model.engine.Har.readRaw(f) : burp2model.engine.BurpXml.readRaw(f);
@@ -1303,10 +1479,12 @@ public final class MainPanel extends JPanel {
                 target.scope = set.scope();
                 Session.AddResult r = target.add(ok, set.role(), f.getName(), set.replaceRole());
                 refresh();
+                idle();
                 say("imported " + f.getName() + ": added " + r.added() + (r.duplicates() > 0 ? ", " + r.duplicates() + " already in the model" : "")
                         + (r.skipped() + unreadable > 0 ? ", " + (r.skipped() + unreadable) + " could not be read" : "") + ".");
             } catch (Throwable t) {
-                say("could not import " + f.getName() + ": " + t.getMessage());
+                idle();
+                sayError("could not import " + f.getName() + ": " + t.getMessage());
             }
         });
     }
@@ -1321,6 +1499,13 @@ public final class MainPanel extends JPanel {
         JLabel h = Widgets.muted(hint);
         p.add(h, c);
         return row + 1;
+    }
+
+    /** A document listener that runs `r` once typing pauses for `ms` (filtering thousands of rows per keystroke lags). */
+    private static SimpleDoc debounced(int ms, Runnable r) {
+        javax.swing.Timer t = new javax.swing.Timer(ms, e -> r.run());
+        t.setRepeats(false);
+        return new SimpleDoc(t::restart);
     }
 
     /** A document listener that calls one runnable. */
