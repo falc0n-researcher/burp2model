@@ -34,9 +34,43 @@ import javax.swing.JTextArea;
 
 /** The first screen: numbers, code versus runtime, response mix, the technology stack and the leads to open first. */
 final class Dashboard extends JPanel {
-    private final JPanel content = new JPanel();
+    /** The page tracks the pane's width: long lines are cut short with "…" instead of scrolling sideways. */
+    private final JPanel content = new Fit();
+
+    private static final class Fit extends JPanel implements javax.swing.Scrollable {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        @Override
+        public int getScrollableUnitIncrement(java.awt.Rectangle r, int o, int d) {
+            return 18;
+        }
+
+        @Override
+        public int getScrollableBlockIncrement(java.awt.Rectangle r, int o, int d) {
+            return o == javax.swing.SwingConstants.VERTICAL ? r.height - 36 : r.width;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
+    }
     private final JScrollPane scroll;
     private Consumer<Analysis.Lead> onLead = l -> { };
+    private Runnable onWelcome = () -> { };
+    private Model shown;
+    private List<Analysis.Lead> shownLeads = List.of();
+    private int columns = 6;
 
     Dashboard() {
         super(new BorderLayout());
@@ -46,6 +80,25 @@ final class Dashboard extends JPanel {
         scroll.setBorder(null);
         scroll.getVerticalScrollBar().setUnitIncrement(18);
         add(scroll, BorderLayout.CENTER);
+        // the tiles and the stack reflow with the width: six tiles in a row when there is room, then three, then two
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                int c = columnsFor(getWidth());
+                if (c != columns) {
+                    columns = c;
+                    update(shown, shownLeads);
+                }
+            }
+        });
+    }
+
+    private static int columnsFor(int width) {
+        return width <= 0 || width >= 900 ? 6 : width >= 520 ? 3 : 2;
+    }
+
+    void onWelcome(Runnable r) {
+        onWelcome = r;
     }
 
     void onLead(Consumer<Analysis.Lead> c) {
@@ -54,6 +107,8 @@ final class Dashboard extends JPanel {
 
     @SuppressWarnings("unchecked")
     void update(Model m, List<Analysis.Lead> leads) {
+        shown = m;
+        shownLeads = leads == null ? List.of() : leads;
         content.removeAll();
         if (m == null) {
             empty();
@@ -67,17 +122,18 @@ final class Dashboard extends JPanel {
         name.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel sub = new JLabel(summary(m, c, st));
         sub.setFont(Theme.font(13f, Font.PLAIN));
-        sub.setForeground(Theme.muted());
+        sub.setForeground(Theme.MUTED);
         sub.setAlignmentX(Component.LEFT_ALIGNMENT);
         content.add(name);
         content.add(Box.createVerticalStrut(4));
         content.add(sub);
         content.add(Box.createVerticalStrut(16));
 
-        JPanel tiles = new JPanel(new GridLayout(1, 6, 10, 0));
+        int rows = (6 + columns - 1) / columns;
+        JPanel tiles = new JPanel(new GridLayout(rows, columns, 10, 10));
         tiles.setOpaque(false);
         tiles.setAlignmentX(Component.LEFT_ALIGNMENT);
-        tiles.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
+        tiles.setMaximumSize(new Dimension(Integer.MAX_VALUE, Math.round(rows * 86 * Theme.uiScale())));
         tile(tiles, "API endpoints", c.get("endpoints"), null);
         tile(tiles, "Requests", m.evidenceLog.size(), null);
         tile(tiles, "Pages", c.get("routes"), null);
@@ -87,10 +143,11 @@ final class Dashboard extends JPanel {
         content.add(tiles);
         content.add(Box.createVerticalStrut(14));
 
-        JPanel row = new JPanel(new GridLayout(1, 2, 14, 0));
+        boolean narrow = columns < 6;
+        JPanel row = new JPanel(new GridLayout(narrow ? 2 : 1, narrow ? 1 : 2, 14, 14));
         row.setOpaque(false);
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 130));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, Math.round((narrow ? 260 : 130) * Theme.uiScale())));
         row.add(codeVsRuntime(st));
         row.add(responses(m));
         content.add(row);
@@ -157,9 +214,9 @@ final class Dashboard extends JPanel {
     private JComponent stack(Model m) {
         Widgets.Card card = new Widgets.Card(12);
         card.add(Widgets.heading("Technology stack"), BorderLayout.NORTH);
-        JPanel list = new JPanel();
+        // two columns of categories when the pane is wide, so the card does not leave half its width empty
+        JPanel list = new JPanel(new GridLayout(0, columns >= 6 ? 2 : 1, 12, 0));
         list.setOpaque(false);
-        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
         Map<String, List<Map<String, Object>>> byCat = new LinkedHashMap<>();
         for (String cat : Stack.categories()) {
             byCat.put(cat, new ArrayList<>());
@@ -174,7 +231,7 @@ final class Dashboard extends JPanel {
             JPanel line = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 3));
             line.setOpaque(false);
             JLabel l = Widgets.muted(cat.toUpperCase());
-            l.setPreferredSize(new Dimension(150, 22));
+            l.setPreferredSize(new Dimension(Math.round(150 * Theme.uiScale()), l.getPreferredSize().height + 6));
             line.add(l);
             for (Map<String, Object> t : items) {
                 String v = String.valueOf(t.get("version"));
@@ -222,11 +279,16 @@ final class Dashboard extends JPanel {
     }
 
     private JComponent leadRow(int n, Analysis.Lead l) {
+        boolean[] hover = {false};
         JPanel row = new JPanel(new BorderLayout(10, 0)) {
             @Override
             protected void paintComponent(Graphics g0) {
                 Graphics2D g = (Graphics2D) g0.create();
                 Theme.quality(g);
+                if (hover[0]) {
+                    g.setColor(Theme.surface2());
+                    g.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                }
                 g.setColor(Theme.severity(l.sev()));
                 g.fillRoundRect(0, 4, 3, getHeight() - 8, 3, 3);
                 g.dispose();
@@ -238,30 +300,62 @@ final class Dashboard extends JPanel {
         JLabel rank = new JLabel(String.valueOf(n));
         rank.setFont(Theme.font(12f, Font.BOLD));
         rank.setForeground(Theme.severity(l.sev()));
-        rank.setPreferredSize(new Dimension(18, 20));
+        rank.setPreferredSize(new Dimension(Math.round(18 * Theme.uiScale()), rank.getPreferredSize().height + 4));
         JPanel text = new JPanel(new GridLayout(2, 1));
         text.setOpaque(false);
-        JLabel path = new JLabel(l.endpoint().label);
+        String label = l.endpoint().label;
+        JLabel path = new JLabel(label.startsWith("* ") ? "any " + label.substring(2) : label);
         path.setFont(Theme.mono(13f));
         JLabel why = new JLabel(l.signals().get(0).title() + (l.signals().size() > 1 ? "   +" + (l.signals().size() - 1) + " more" : "")
                 + "   ·   next: " + l.signals().get(0).next());
         why.setFont(Theme.font(11f, Font.PLAIN));
-        why.setForeground(Theme.muted());
+        why.setForeground(Theme.MUTED);
         text.add(path);
         text.add(why);
-        JButton open = new JButton("Open");
-        open.setFocusable(false);
-        open.setMargin(new Insets(2, 10, 2, 10));
-        open.addActionListener(e -> onLead.accept(l));
         row.add(rank, BorderLayout.WEST);
         row.add(text, BorderLayout.CENTER);
-        row.add(open, BorderLayout.EAST);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, Math.round(52 * Theme.uiScale())));
         row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        row.setToolTipText("Open this lead in To check");
+        // the whole row opens the lead (keyboard too: Tab to it, Enter); it lights up under the pointer
+        row.setFocusable(true);
         row.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 onLead.accept(l);
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                hover[0] = true;
+                row.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                hover[0] = false;
+                row.repaint();
+            }
+        });
+        row.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER || e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE) {
+                    onLead.accept(l);
+                }
+            }
+        });
+        row.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                hover[0] = true;
+                row.repaint();
+            }
+
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                hover[0] = false;
+                row.repaint();
             }
         });
         return row;
@@ -328,10 +422,15 @@ final class Dashboard extends JPanel {
         box.add(t);
         box.add(Box.createVerticalStrut(12));
         box.add(how);
+        box.add(Box.createVerticalStrut(14));
+        JButton welcome = new JButton("Show the welcome page");
+        welcome.setAlignmentX(Component.LEFT_ALIGNMENT);
+        welcome.addActionListener(e -> onWelcome.run());
+        box.add(welcome);
         Widgets.Card card = new Widgets.Card(22);
         card.add(box, BorderLayout.CENTER);
         card.setAlignmentX(Component.LEFT_ALIGNMENT);
-        card.setMaximumSize(new Dimension(760, 240));
+        card.setMaximumSize(new Dimension(Math.round(760 * Theme.uiScale()), Math.round(290 * Theme.uiScale())));
         content.add(card);
         content.revalidate();
         content.repaint();

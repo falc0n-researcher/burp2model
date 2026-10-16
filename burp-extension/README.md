@@ -33,6 +33,10 @@ Or turn on **Capture proxied traffic automatically** in Settings: in-scope Proxy
 | Recon | Light, passive recon on a host you are authorised to test: DNS, TLS, headers, robots.txt, security.txt, mail policy (only when you press the button) |
 | Settings | Model name, role for the next send, scope, live capture, import a HAR or Burp export, export the model or a Markdown summary |
 
+The header shows the open model (switch to another, or make a new one) and a **Live** button for live capture; ⋯ holds import, export and Settings.
+
+Keyboard, while focus is in the tab: **Cmd/Ctrl+1–9, 0** switch tabs, **Cmd/Ctrl+F** searches, **Cmd/Ctrl+L** goes to the query box, **Cmd/Ctrl+Shift+C** copies the whole model for AI, **Alt+←** goes back after a jump, and **/** on the map jumps to Find.
+
 **Copy for AI** (top right) puts a rules-first package on the clipboard for your own model: a hunting methodology, the whole model, the endpoints, or the open questions. Structure, not bytes: every id it cites resolves in its evidence table.
 
 ![The map, network layout with a node selected](assets/map-network.png)

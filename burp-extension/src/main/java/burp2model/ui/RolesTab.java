@@ -53,7 +53,6 @@ final class RolesTab implements Tab {
         top.add(new JLabel("Higher-privilege role"));
         top.add(highBox);
         JButton go = new JButton("Compare");
-        go.setFocusable(false);
         top.add(go);
         go.addActionListener(e -> compareRoles());
         rolesTable.getSelectionModel().addListSelectionListener(e -> {
@@ -68,7 +67,7 @@ final class RolesTab implements Tab {
         Tables.render(rolesTable, "Endpoint", Renderers.path());
         Tables.widths(rolesTable, 200, 340, 160, 300, 340);
         rolesNote.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
-        rolesNote.setForeground(Theme.muted());
+        rolesNote.setForeground(Theme.MUTED);
         JPanel head = new JPanel(new BorderLayout());
         head.add(top, BorderLayout.NORTH);
         head.add(rolesNote, BorderLayout.SOUTH);

@@ -67,8 +67,6 @@ final class SurfaceTab implements Tab {
         ButtonGroup bg = new ButtonGroup();
         bg.add(list);
         bg.add(tree);
-        list.setFocusable(false);
-        tree.setFocusable(false);
         list.addActionListener(e -> showSurfaceList(true));
         tree.addActionListener(e -> showSurfaceList(false));
         top.add(list);

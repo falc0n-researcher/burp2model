@@ -16,6 +16,7 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.event.KeyEvent;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
@@ -60,7 +62,6 @@ public final class MainPanel extends JPanel {
     private volatile Session session;
     private final JLabel status = new JLabel(" ");
     private final JTabbedPane tabs = new JTabbedPane();
-    private final JLabel modelName = new JLabel(" ");
     private final JPanel pills = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
     private final JTextField globalSearch = new JTextField(22);
 
@@ -100,10 +101,21 @@ public final class MainPanel extends JPanel {
         add(center, BorderLayout.CENTER);
         // first run: the welcome page until the model has something in it (decided again once the model opens)
         showWelcome(!"1".equals(host.get("welcome.seen", "0")) || "1".equals(host.get("welcome.show", "0")));
-        tabs.addChangeListener(e -> fillTab(tabs.getSelectedComponent()));
+        tabs.addChangeListener(e -> {
+            Component now = tabs.getSelectedComponent();
+            if (lastTab != null && lastTab != now && !goingBack) {
+                history.push(lastTab);
+                while (history.size() > 30) {
+                    history.removeLast();
+                }
+            }
+            lastTab = now;
+            fillTab(now);
+        });
+        shortcuts();
         status.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 12));
         status.setFont(Theme.font(11f, Font.PLAIN));
-        status.setForeground(Theme.muted());
+        status.setForeground(Theme.MUTED);
         status.setIconTextGap(6);
         busyBar.setIndeterminate(true);
         busyBar.setPreferredSize(new java.awt.Dimension(70, 8));
@@ -116,6 +128,7 @@ public final class MainPanel extends JPanel {
         south.add(status, BorderLayout.CENTER);
         add(south, BorderLayout.SOUTH);
         revert.setRepeats(false);
+        dashboard.onWelcome(() -> showWelcome(true));
         dashboard.onLead(l -> {
             select(leadsTab);
             leadsTab.selectLead(l);
@@ -128,7 +141,24 @@ public final class MainPanel extends JPanel {
         autoCapture.setSelected("1".equals(host.get("auto", "0")));
         roleField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
         scopeField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
-        replaceRole.addItemListener(e -> updateSettings());
+        replaceRole.addItemListener(e -> {
+            updateSettings();
+            host.set("replace", replaceRole.isSelected() ? "1" : "0");
+        });
+        autoCapture.addItemListener(e -> {
+            host.set("auto", autoCapture.isSelected() ? "1" : "0");
+            showLive();
+        });
+        // role and scope are kept as soon as the field is left; only a new model name needs Save (it opens another model)
+        java.awt.event.FocusAdapter keep = new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                host.set("role", roleField.getText().strip());
+                host.set("scope", scopeField.getText().strip());
+            }
+        };
+        roleField.addFocusListener(keep);
+        scopeField.addFocusListener(keep);
         updateSettings();
         openSession(host.get("app", "burp"), false);
         addHierarchyListener(e -> {
@@ -376,7 +406,7 @@ public final class MainPanel extends JPanel {
     void setStatus(String text, Level level) {
         status.setText(text);
         status.setIcon(level == null ? null : new Dot(level == Level.ERROR ? Theme.RED : level == Level.OK ? Theme.GREEN : Theme.BLUE));
-        status.setForeground(level == Level.ERROR ? Theme.RED : Theme.muted());
+        status.setForeground(level == Level.ERROR ? Theme.readable(Theme.RED, Theme.bg()) : Theme.MUTED);
         if (level == null) {
             revert.stop();
         } else {
@@ -459,6 +489,78 @@ public final class MainPanel extends JPanel {
         byView.put(t.view(), t);
     }
 
+    // ------------------------------------------------------------------ keyboard
+
+    private final java.util.ArrayDeque<Component> history = new java.util.ArrayDeque<>();
+    private Component lastTab;
+    private boolean goingBack;
+
+    /** Alt+Left: the tab shown before (after a jump from a lead, a search or a connection). */
+    private void back() {
+        Component prev = history.poll();
+        if (prev != null) {
+            goingBack = true;
+            try {
+                showWelcome(false);
+                tabs.setSelectedComponent(prev);
+                lastTab = prev;
+            } finally {
+                goingBack = false;
+            }
+        }
+    }
+
+    /**
+     * Shortcuts, active while focus is anywhere in the tab (never elsewhere in Burp): Cmd/Ctrl+1..9 and 0 for the
+     * tabs, Cmd/Ctrl+F to search, Cmd/Ctrl+L for the query box, Cmd/Ctrl+Shift+C for Copy for AI, Alt+Left to go back.
+     */
+    private void shortcuts() {
+        int menu = menuMask();
+        javax.swing.InputMap im = getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+        javax.swing.ActionMap am = getActionMap();
+        for (int i = 0; i <= 9; i++) {
+            int index = i == 0 ? tabs.getTabCount() - 1 : i - 1;
+            bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_0 + i, menu), "tab" + i, () -> {
+                if (index < tabs.getTabCount()) {
+                    showWelcome(false);
+                    tabs.setSelectedIndex(index);
+                }
+            });
+        }
+        bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_F, menu), "search", () -> {
+            globalSearch.requestFocusInWindow();
+            globalSearch.selectAll();
+        });
+        bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_L, menu), "query", () -> {
+            select(queryTab);
+            queryTab.focusField();
+        });
+        bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_C, menu | java.awt.event.InputEvent.SHIFT_DOWN_MASK), "copyForAi", () -> copyForAi("whole"));
+        bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, java.awt.event.InputEvent.ALT_DOWN_MASK), "back", this::back);
+    }
+
+    /** Cmd on a Mac, Ctrl elsewhere (asked of the toolkit, which a headless JVM cannot answer). */
+    static int menuMask() {
+        try {
+            return java.awt.Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        } catch (java.awt.HeadlessException e) {
+            return System.getProperty("os.name", "").toLowerCase().contains("mac") ? java.awt.event.InputEvent.META_DOWN_MASK
+                    : java.awt.event.InputEvent.CTRL_DOWN_MASK;
+        }
+    }
+
+    private static void bind(javax.swing.InputMap im, javax.swing.ActionMap am, javax.swing.KeyStroke k, String name, Runnable r) {
+        im.put(k, name);
+        am.put(name, new javax.swing.AbstractAction() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                r.run();
+            }
+        });
+    }
+
     /** Bring a tab to the front (filling it first if it is out of date). */
     void select(Tab t) {
         showWelcome(false);
@@ -529,23 +631,45 @@ public final class MainPanel extends JPanel {
         bar.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 12));
         JLabel logo = new JLabel("burp2model");
         logo.setFont(Theme.font(16f, Font.BOLD));
-        modelName.setFont(Theme.mono(12f));
-        modelName.setForeground(Theme.muted());
+        models.setFont(Theme.mono(12f));
+        models.setToolTipText("The open model; pick another, or make a new one");
+        models.getAccessibleContext().setAccessibleName("Model");
+        models.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) {
+                listModels();
+            }
+
+            @Override
+            public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) {
+            }
+
+            @Override
+            public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {
+            }
+        });
+        models.addActionListener(e -> {
+            if (!listingModels && models.getSelectedItem() != null) {
+                switchModel(String.valueOf(models.getSelectedItem()));
+            }
+        });
+        live.setToolTipText("Live capture: add in-scope Proxy traffic to the model every few seconds. Click to turn it on or off.");
+        live.addActionListener(e -> setLive(!"1".equals(host.get("auto", "0"))));
         pills.setOpaque(false);
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         left.setOpaque(false);
         left.add(logo);
-        left.add(modelName);
+        left.add(models);
+        left.add(live);
         left.add(pills);
         globalSearch.putClientProperty("JTextField.placeholderText", "Search endpoints, hosts, params…");
-        globalSearch.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.line()), BorderFactory.createEmptyBorder(4, 8, 4, 8)));
+        globalSearch.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.LINE), BorderFactory.createEmptyBorder(4, 8, 4, 8)));
         globalSearch.setToolTipText("Search the whole surface (Enter)");
         globalSearch.addActionListener(e -> {
             select(surfaceTab);
             surfaceTab.search(globalSearch.getText());
         });
         JButton ai = new JButton("Copy for AI  ▾");
-        ai.setFocusable(false);
         JPopupMenu menu = new JPopupMenu();
         String[][] opts = {{"methodology", "Hunting methodology", "a recon and hunting plan for this app"}, {"whole", "Whole model", "everything an AI needs, with the rules"},
             {"endpoints", "Endpoints only", "the API surface with parameters and evidence"}, {"open", "Open questions only", "what to test next"}};
@@ -555,6 +679,27 @@ public final class MainPanel extends JPanel {
             menu.add(mi);
         }
         ai.addActionListener(e -> menu.show(ai, 0, ai.getHeight()));
+        JButton more = new JButton("⋯");
+        more.setToolTipText("Import, export and settings");
+        more.getAccessibleContext().setAccessibleName("More actions");
+        JPopupMenu moreMenu = new JPopupMenu();
+        JMenuItem imp = new JMenuItem("Import HAR or Burp export…");
+        imp.addActionListener(e -> importFile());
+        JMenuItem expJson = new JMenuItem("Export model.json…");
+        expJson.addActionListener(e -> exportModel());
+        JMenuItem expMd = new JMenuItem("Export summary (Markdown)…");
+        expMd.addActionListener(e -> exportSummary());
+        JMenuItem set = new JMenuItem("Settings");
+        set.addActionListener(e -> {
+            showWelcome(false);
+            tabs.setSelectedComponent(settingsView);
+        });
+        for (JMenuItem mi : new JMenuItem[] {imp, expJson, expMd}) {
+            moreMenu.add(mi);
+        }
+        moreMenu.addSeparator();
+        moreMenu.add(set);
+        more.addActionListener(e -> moreMenu.show(more, 0, more.getHeight()));
         JButton about = new JButton("?");
         about.setToolTipText("About burp2model: the welcome page");
         about.getAccessibleContext().setAccessibleName("About burp2model");
@@ -563,10 +708,88 @@ public final class MainPanel extends JPanel {
         right.setOpaque(false);
         right.add(globalSearch);
         right.add(ai);
+        right.add(more);
         right.add(about);
         bar.add(left, BorderLayout.WEST);
         bar.add(right, BorderLayout.EAST);
         return bar;
+    }
+
+    // ------------------------------------------------------------------ header: model switcher and live capture
+
+    private final JComboBox<String> models = new JComboBox<>();
+    private final JButton live = new JButton();
+    private boolean listingModels;
+    private static final String NEW_MODEL = "New model…";
+
+    /** Fill the switcher with the models saved on this machine, the open one selected. */
+    private void listModels() {
+        Session s = session;
+        listingModels = true;
+        try {
+            Object keep = s == null ? null : s.name;
+            models.removeAllItems();
+            java.util.TreeSet<String> names = new java.util.TreeSet<>();
+            if (s != null) {
+                names.add(s.name);
+                try (var dirs = Files.list(s.dir().getParent())) {
+                    dirs.filter(Files::isDirectory).forEach(d -> names.add(d.getFileName().toString()));
+                } catch (java.io.IOException ignored) {
+                    // the folder is unreadable: the open model is still listed
+                }
+            }
+            names.forEach(models::addItem);
+            models.addItem(NEW_MODEL);
+            if (keep != null) {
+                models.setSelectedItem(keep);
+            }
+        } finally {
+            listingModels = false;
+        }
+    }
+
+    private void showModelName() {
+        Session s = session;
+        if (s != null && !s.name.equals(models.getSelectedItem())) {
+            listModels();
+        }
+    }
+
+    /** Open another model (or make a new one), as Settings does when its name changes. */
+    private void switchModel(String picked) {
+        String name = picked;
+        if (NEW_MODEL.equals(name)) {
+            String n = JOptionPane.showInputDialog(this, "Name of the new model (letters, digits, '.', '_' or '-'):", "New model", JOptionPane.PLAIN_MESSAGE);
+            listModels();
+            if (n == null || n.isBlank()) {
+                return;
+            }
+            name = n.strip();
+        }
+        if (!name.matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")) {
+            setStatus("The model name must be letters, digits, '.', '_' or '-'.", Level.ERROR);
+            return;
+        }
+        if (session != null && name.equals(session.name)) {
+            return;
+        }
+        nameField.setText(name);
+        host.set("app", name);
+        openSession(name, true);
+    }
+
+    private void setLive(boolean on) {
+        host.set("auto", on ? "1" : "0");
+        autoCapture.setSelected(on);
+        showLive();
+        setStatus(on ? "Live capture is on: in-scope Proxy traffic (Burp's target scope) joins the model every few seconds." : "Live capture is off.", Level.OK);
+    }
+
+    private void showLive() {
+        boolean on = "1".equals(host.get("auto", "0"));
+        live.setText(on ? "● Live" : "Live: off");
+        live.setForeground(on ? Theme.readable(Theme.GREEN, Theme.surface()) : Theme.MUTED);
+        live.getAccessibleContext().setAccessibleName(on ? "Live capture is on" : "Live capture is off");
     }
 
     private void copyForAi(String scope) {
@@ -581,17 +804,10 @@ public final class MainPanel extends JPanel {
         });
     }
 
+    /** The header shows the open model and whether live capture is on; the counts are on the Overview. */
     private void headerPills(Model m) {
-        pills.removeAll();
-        modelName.setText(session == null ? "" : session.name);
-        if (m != null) {
-            Map<String, Object> c = m.counts();
-            pills.add(new Widgets.Chip(c.get("endpoints") + " endpoints", Theme.BLUE));
-            pills.add(new Widgets.Chip(leads.size() + " to check", Theme.ACCENT));
-            pills.add(new Widgets.Chip(m.evidenceLog.size() + " requests", Theme.GRAY));
-        }
-        pills.revalidate();
-        pills.repaint();
+        showModelName();
+        showLive();
     }
 
     // ------------------------------------------------------------------ layout helpers
@@ -663,7 +879,6 @@ public final class MainPanel extends JPanel {
         aboutBtn.addActionListener(e -> showWelcome(true));
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT));
         for (JButton b : new JButton[] {save, importBtn, export, summaryBtn, clear, aboutBtn}) {
-            b.setFocusable(false);
             btns.add(b);
         }
         c.gridx = 1;
@@ -680,7 +895,7 @@ public final class MainPanel extends JPanel {
         about.setEditable(false);
         about.setOpaque(false);
         about.setFont(Theme.font(12f, Font.PLAIN));
-        about.setForeground(Theme.muted());
+        about.setForeground(Theme.MUTED);
         c.gridx = 0;
         c.gridy = row;
         c.gridwidth = 3;
@@ -706,33 +921,9 @@ public final class MainPanel extends JPanel {
             setStatus("Settings saved.", Level.OK);
             refresh();
         });
-        export.addActionListener(e -> {
-            Model m = model();
-            if (m == null) {
-                return;
-            }
-            JFileChooser fc = new JFileChooser();
-            fc.setSelectedFile(new java.io.File(m.name + "-model.json"));
-            if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-                java.nio.file.Path to = fc.getSelectedFile().toPath();
-                async("Exporting the model…", () -> Files.writeString(to, Json.pretty(m.toMap()), StandardCharsets.UTF_8),
-                        x -> setStatus("exported " + to, Level.OK), t -> sayError("could not export: " + messageOf(t)));
-            }
-        });
+        export.addActionListener(e -> exportModel());
         importBtn.addActionListener(e -> importFile());
-        summaryBtn.addActionListener(e -> {
-            Model m = model();
-            if (m == null) {
-                return;
-            }
-            JFileChooser fc = new JFileChooser();
-            fc.setSelectedFile(new java.io.File(m.name + "-summary.md"));
-            if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-                java.nio.file.Path to = fc.getSelectedFile().toPath();
-                async("Writing the summary…", () -> Files.writeString(to, burp2model.engine.Markdown.summary(m), StandardCharsets.UTF_8),
-                        x -> setStatus("exported " + to, Level.OK), t -> sayError("could not export: " + messageOf(t)));
-            }
-        });
+        summaryBtn.addActionListener(e -> exportSummary());
         clear.addActionListener(e -> {
             if (session != null && JOptionPane.showConfirmDialog(this, "Delete everything in the model '" + session.name + "'?", "burp2model",
                     JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
@@ -749,6 +940,36 @@ public final class MainPanel extends JPanel {
         JPanel outer = new JPanel(new BorderLayout());
         outer.add(p, BorderLayout.NORTH);
         return outer;
+    }
+
+    /** Save the whole model as JSON (in the background). */
+    private void exportModel() {
+        Model m = model();
+        if (m == null) {
+            return;
+        }
+        JFileChooser fc = new JFileChooser();
+        fc.setSelectedFile(new java.io.File(m.name + "-model.json"));
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            java.nio.file.Path to = fc.getSelectedFile().toPath();
+            async("Exporting the model…", () -> Files.writeString(to, Json.pretty(m.toMap()), StandardCharsets.UTF_8),
+                    x -> setStatus("exported " + to, Level.OK), t -> sayError("could not export: " + messageOf(t)));
+        }
+    }
+
+    /** Save a Markdown summary of the model (in the background). */
+    private void exportSummary() {
+        Model m = model();
+        if (m == null) {
+            return;
+        }
+        JFileChooser fc = new JFileChooser();
+        fc.setSelectedFile(new java.io.File(m.name + "-summary.md"));
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            java.nio.file.Path to = fc.getSelectedFile().toPath();
+            async("Writing the summary…", () -> Files.writeString(to, burp2model.engine.Markdown.summary(m), StandardCharsets.UTF_8),
+                    x -> setStatus("exported " + to, Level.OK), t -> sayError("could not export: " + messageOf(t)));
+        }
     }
 
     /** Add the requests in a HAR file (browser DevTools, Hetty, mitmproxy, ZAP) or a Burp "Save items" export to the model. */

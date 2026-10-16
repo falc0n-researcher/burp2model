@@ -69,7 +69,7 @@ final class Layouts {
 
     static JPanel toolbar() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
-        p.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.line()));
+        p.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.LINE));
         return p;
     }
 
