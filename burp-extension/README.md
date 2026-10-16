@@ -69,4 +69,4 @@ Java 17: `gradle jar` in this folder (writes `build/libs/burp2model-<version>.ja
 
 Requires Burp 2023.x or later (Montoya API). Only capture traffic you are allowed to test.
 
-The welcome page's pixel type is [Silkscreen](https://github.com/googlefonts/silkscreen) and [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans), bundled under the SIL Open Font License 1.1 (the licence texts are next to the fonts in `src/main/resources/fonts/`).
+The welcome page's display type is [IBM Plex Mono](https://github.com/IBM/plex) (Bold and SemiBold), bundled under the SIL Open Font License 1.1 (the licence text is next to the fonts in `src/main/resources/fonts/`).

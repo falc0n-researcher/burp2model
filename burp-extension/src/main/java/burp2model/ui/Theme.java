@@ -167,20 +167,20 @@ final class Theme {
         return out;
     }
 
-    // ------------------------------------------------------------------ pixel type (the welcome page)
+    // ------------------------------------------------------------------ display type (the welcome page)
 
-    private static Font silkscreen;
-    private static Font pixelify;
+    private static Font plexBold;
+    private static Font plexSemi;
     private static boolean fontsTried;
 
-    /** Load the bundled pixel fonts once (SIL Open Font License, see resources/fonts); null when they cannot be read. */
-    private static synchronized void loadPixelFonts() {
+    /** Load the bundled IBM Plex Mono once (SIL Open Font License, see resources/fonts); null when it cannot be read. */
+    private static synchronized void loadDisplayFonts() {
         if (fontsTried) {
             return;
         }
         fontsTried = true;
-        silkscreen = load("/fonts/Silkscreen-Regular.ttf");
-        pixelify = load("/fonts/PixelifySans.ttf");
+        plexBold = load("/fonts/IBMPlexMono-Bold.ttf");
+        plexSemi = load("/fonts/IBMPlexMono-SemiBold.ttf");
     }
 
     private static Font load(String res) {
@@ -196,21 +196,23 @@ final class Theme {
         }
     }
 
-    /**
-     * Silkscreen, for display text: titles, step numbers, small caps labels. Its pixel grid is 8 per em, so only
-     * multiples of 8 px are crisp; `step` picks 8, 16, 24... scaled with Burp's font size.
-     */
-    static Font pixel(int step) {
-        loadPixelFonts();
-        float px = 8f * Math.max(1, Math.round(step * uiScale()));
-        return silkscreen != null ? silkscreen.deriveFont(px) : font(px * 0.8f, Font.BOLD);
+    /** IBM Plex Mono Bold, for the title and step numbers; sized for Burp's default and scaled with its font setting. */
+    static Font display(float size) {
+        loadDisplayFonts();
+        float px = size * uiScale();
+        return plexBold != null ? plexBold.deriveFont(px) : mono(size).deriveFont(Font.BOLD);
     }
 
-    /** Pixelify Sans, for short headings and buttons: crisp at 20 px (and 40 px). */
-    static Font pixelSans(boolean large) {
-        loadPixelFonts();
-        float px = 20f * (large ? 2 : 1) * Math.max(1, Math.round(uiScale()));
-        return pixelify != null ? pixelify.deriveFont(px) : font(px * 0.75f, Font.BOLD);
+    /** IBM Plex Mono SemiBold, for headings, section labels and buttons. */
+    static Font displayMedium(float size) {
+        loadDisplayFonts();
+        float px = size * uiScale();
+        return plexSemi != null ? plexSemi.deriveFont(px) : mono(size).deriveFont(Font.BOLD);
+    }
+
+    /** Small capitals spaced out a little: the section labels. */
+    static Font tracked(Font f, float tracking) {
+        return f.deriveFont(java.util.Map.of(java.awt.font.TextAttribute.TRACKING, tracking));
     }
 
     /** Burp's font size against the default 13 px: 1 normally, 2 when the user doubled it. */
@@ -219,16 +221,16 @@ final class Theme {
         return base == null ? 1f : Math.max(1f, base.getSize2D() / 13f);
     }
 
-    /** Pixel type is drawn without smoothing, so every pixel of the glyph lands on a screen pixel. */
-    static void pixelHints(Graphics2D g) {
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
-        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_OFF);
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+    /** Smooth text with exact glyph spacing, for the display type. */
+    static void textHints(Graphics2D g) {
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
     }
 
-    /** A pixel font when it has every character of `text`, otherwise the ordinary bold font at a similar size. */
-    static Font pixelOr(Font pixel, String text) {
-        return pixel.canDisplayUpTo(text) < 0 ? pixel : font(pixel.getSize2D() * 0.75f, Font.BOLD);
+    /** The display font when it has every character of `text`, otherwise Burp's bold font at a similar size. */
+    static Font displayOr(Font f, String text) {
+        return f.canDisplayUpTo(text) < 0 ? f : font(f.getSize2D() / uiScale(), Font.BOLD);
     }
 
     static Font mono(float size) {

@@ -147,11 +147,11 @@ class WelcomeTest {
     }
 
     @Test
-    void thePixelFontsAreInTheJar() {
-        assertTrue(Theme.pixel(2).getFamily().contains("Silkscreen"), Theme.pixel(2).getFamily());
-        assertTrue(Theme.pixelSans(false).getFamily().contains("Pixelify"), Theme.pixelSans(false).getFamily());
-        assertEquals(16f, Theme.pixel(2).getSize2D(), "multiples of 8 px stay crisp");
-        assertNotNull(WelcomeTest.class.getResource("/fonts/OFL-Silkscreen.txt"), "the licence ships with the font");
-        assertNotNull(WelcomeTest.class.getResource("/fonts/OFL-PixelifySans.txt"));
+    void theDisplayFontIsInTheJar() {
+        assertTrue(Theme.display(20f).getFamily().contains("IBM Plex Mono"), Theme.display(20f).getFamily());
+        assertTrue(Theme.displayMedium(14f).getFontName().contains("SemiBold"), Theme.displayMedium(14f).getFontName());
+        assertTrue(Theme.display(20f).getFontName().contains("Bold"), Theme.display(20f).getFontName());
+        assertNotNull(WelcomeTest.class.getResource("/fonts/OFL-IBMPlexMono.txt"), "the licence ships with the font");
+        assertTrue(Theme.display(20f).canDisplayUpTo("burp2model HOW IT WORKS Send Explore Ask Get started") < 0);
     }
 }
