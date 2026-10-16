@@ -130,7 +130,9 @@ class PolishTest {
     @Test
     void theSwitcherListsTheSavedModels() throws Exception {
         new Session(home, "alpha");
-        new Session(home, "beta");
+        new Session(home, "beta").add(burp2model.engine.BurpXml.readRaw(
+                new java.io.File(System.getProperty("burp2model.samples", "../samples"), "burp-history-sample.xml")), null, "one", false);
+        new Session(home, "empty");                             // nothing saved: not offered
         MainPanel p = open(new HashMap<>(Map.of("app", "alpha", "welcome.seen", "1")));
         JComboBox<String> models = field(p, "models");
         List<String> items = new ArrayList<>();
@@ -140,6 +142,7 @@ class PolishTest {
             }
         });
         assertTrue(items.contains("alpha") && items.contains("beta"), items.toString());
+        assertTrue(!items.contains("empty"), "an empty model is not offered: " + items);
         assertEquals("New model…", items.get(items.size() - 1));
         assertEquals("alpha", models.getSelectedItem());
     }
