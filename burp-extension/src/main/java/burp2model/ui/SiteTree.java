@@ -45,12 +45,12 @@ final class SiteTree extends JPanel {
                     if (e.node() != null) {
                         l.setFont(Theme.mono(12f));
                         String st = String.valueOf(e.node().attrs.get("api_state"));
-                        String dot = "<font color='" + hex(Theme.state(st)) + "'>●</font> ";
+                        String dot = "<font color='" + Theme.hex(Theme.state(st)) + "'>●</font> ";
                         Object m = e.node().attrs.get("method");
                         String chip = e.node().type.equals("endpoint")
-                                ? "<font color='" + hex(Theme.method(m == null ? "" : String.valueOf(m))) + "'><b>" + (m == null ? "*" : m) + "</b></font>"
-                                : "<font color='" + hex(Theme.GREEN) + "'><b>page</b></font>";
-                        l.setText("<html>" + dot + chip + " <font color='" + hex(Theme.muted()) + "'>" + e.node().evidence.size() + " req</font></html>");
+                                ? "<font color='" + Theme.hex(Theme.method(m == null ? "" : String.valueOf(m))) + "'><b>" + (m == null ? "*" : m) + "</b></font>"
+                                : "<font color='" + Theme.hex(Theme.GREEN) + "'><b>page</b></font>";
+                        l.setText("<html>" + dot + chip + " <font color='" + Theme.hex(Theme.muted()) + "'>" + e.node().evidence.size() + " req</font></html>");
                     } else {
                         l.setFont(Theme.mono(12f).deriveFont(kids > 0 ? Font.BOLD : Font.PLAIN));
                         l.setText(e.label() + (kids > 0 ? "   " + counts.getOrDefault(value, 0) : ""));
@@ -72,9 +72,6 @@ final class SiteTree extends JPanel {
         add(sp, BorderLayout.CENTER);
     }
 
-    private static String hex(java.awt.Color c) {
-        return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
-    }
 
     /** Fill `into` with the number of model nodes under each folder; returns the count under n. */
     private static int count(DefaultMutableTreeNode n, Map<DefaultMutableTreeNode, Integer> into) {
