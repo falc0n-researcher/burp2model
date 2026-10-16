@@ -147,6 +147,19 @@ final class QueryTab implements Tab {
         });
         queryOut.addTab("Table", scroll(queryTable));
         queryOut.addTab("Text", scroll(queryText));
+        // until the first query, the answer area says what to type instead of standing empty
+        queryText.setText("""
+                Ask the model a question; every answer cites the requests behind it, and nothing leaves Burp.
+
+                Plain questions        list-apis · privileged · auth-surface · secrets · unknowns · third-parties · stats
+                Filters (BQL)          req.method:POST AND resp.code.gte:400
+                                       node.type:endpoint AND node.state:STATIC_ONLY
+                                       resp.body.regex:"pass(word)?"
+                Graph questions        reach "POST /api/checkout"    path <a> to <b>    blast <node> depth 2
+                History                changed-since previous    provenance <node>    reaches-privileged user
+
+                Click an example above, type help for everything, and press ↑ for earlier queries.""");
+        queryOut.setSelectedIndex(1);
         JSplitPane sp = split(JSplitPane.VERTICAL_SPLIT, queryOut, queryViewer, 0.5, 0.55);
         JPanel p = new JPanel(new BorderLayout());
         p.add(head, BorderLayout.NORTH);

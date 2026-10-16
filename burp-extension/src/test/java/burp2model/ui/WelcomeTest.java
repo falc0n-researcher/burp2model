@@ -165,6 +165,35 @@ class WelcomeTest {
     }
 
     @Test
+    void aMissingOldDefaultIsNotCreatedAgain() throws Exception {
+        Map<String, String> prefs = new HashMap<>(Map.of("app", "burp", "welcome.seen", "1"));
+        MainPanel[] p = new MainPanel[1];
+        SwingUtilities.invokeAndWait(() -> p[0] = new MainPanel(new MainPanel.Host() {
+            public String get(String k, String d) {
+                return prefs.getOrDefault(k, d);
+            }
+
+            public void set(String k, String v) {
+                prefs.put(k, v);
+            }
+
+            public void log(String l) {
+            }
+
+            public Session session(String name) throws java.io.IOException {
+                return new Session(home, name);
+            }
+
+            public boolean hasModel(String name) {
+                return java.nio.file.Files.isDirectory(home.resolve(name));
+            }
+        }));
+        assertNotNull(p[0].awaitSession(10_000));
+        assertEquals("sample", p[0].session().name);
+        assertFalse(java.nio.file.Files.exists(home.resolve("burp")), "no empty 'burp' folder appears");
+    }
+
+    @Test
     void aBurpModelWithRequestsIsKept() throws Exception {
         new Session(home, "burp").add(BurpXml.readRaw(new File(System.getProperty("burp2model.samples", "../samples"), "burp-history-sample.xml")),
                 null, "one", false);

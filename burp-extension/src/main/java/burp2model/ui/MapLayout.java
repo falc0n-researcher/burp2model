@@ -139,7 +139,7 @@ final class MapLayout {
     }
 
     static void step(List<GraphPanel.V> vs, List<GraphPanel.E> es, double temp) {
-        double cell = 80;
+        double cell = 110;
         Map<Long, List<GraphPanel.V>> grid = new HashMap<>();
         for (GraphPanel.V v : vs) {
             grid.computeIfAbsent(key((int) Math.floor(v.x / cell), (int) Math.floor(v.y / cell)), k -> new ArrayList<>()).add(v);
@@ -171,7 +171,7 @@ final class MapLayout {
                             continue;
                         }
                         double d = Math.sqrt(d2);
-                        double f = (1100.0 + 40 * (v.r + u.r)) / d2;
+                        double f = (2000.0 + 60 * (v.r + u.r)) / d2;
                         fx += ddx / d * f;
                         fy += ddy / d * f;
                     }
@@ -184,7 +184,7 @@ final class MapLayout {
             double dx = e.b().x - e.a().x;
             double dy = e.b().y - e.a().y;
             double d = Math.sqrt(dx * dx + dy * dy) + 0.01;
-            double want = 42 + e.a().r + e.b().r;
+            double want = 64 + e.a().r + e.b().r;
             double k = e.state().equals("INFERRED") ? 0.035 : 0.06;
             double f = (d - want) * k;
             double fx = dx / d * f;
@@ -208,7 +208,8 @@ final class MapLayout {
                 v.vx = v.vx / sp * max;
                 v.vy = v.vy / sp * max;
             }
-            double mobility = v.settled ? 0.3 : 1.0;
+            // a node already on the map stays exactly where it is; only new ones find a place among them
+            double mobility = v.settled ? 0.0 : 1.0;
             v.x += v.vx * mobility;
             v.y += v.vy * mobility;
             v.vx *= 0.55;
