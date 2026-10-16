@@ -25,8 +25,8 @@ import javax.swing.SwingConstants;
 
 /**
  * The page a new user lands on: what burp2model is, three steps to a first model, buttons that start one, and what
- * stays private. Display type is pixel art (the bundled Silkscreen and Pixelify Sans); everything meant to be read
- * at length stays in Burp's own font. Shown on first run and whenever the open model is empty.
+ * stays private. Display type is the bundled IBM Plex Mono; everything meant to be read at length stays in Burp's
+ * own font. Shown on first run and whenever the open model is empty.
  */
 final class Welcome extends JPanel {
     private static final long serialVersionUID = 1L;
@@ -44,11 +44,11 @@ final class Welcome extends JPanel {
         void getStarted(boolean showOnStart);
     }
 
-    private final PixelArt.Button live = new PixelArt.Button("Turn on live capture", false, false);
+    private final WelcomeArt.Button live = new WelcomeArt.Button("Turn on live capture", false, false);
     private final JCheckBox showOnStart = new JCheckBox("Show this page every time Burp starts");
     private final JPanel steps = new JPanel(new GridLayout(1, 3, 14, 14));
     private final JPanel buttons = new JPanel(new GridLayout(2, 2, 12, 12));
-    private final PixelArt.Button start = new PixelArt.Button("Get started", true, true);
+    private final WelcomeArt.Button start = new WelcomeArt.Button("Get started", true, true);
 
     Welcome(Actions actions, String version) {
         super(new BorderLayout());
@@ -74,9 +74,9 @@ final class Welcome extends JPanel {
         column.add(label("START HERE"));
         column.add(Box.createVerticalStrut(10));
 
-        PixelArt.Button sample = new PixelArt.Button("Try the sample model", true, false);
-        PixelArt.Button importBtn = new PixelArt.Button("Import HAR or Burp XML", false, false);
-        PixelArt.Button settings = new PixelArt.Button("Open Settings", false, false);
+        WelcomeArt.Button sample = new WelcomeArt.Button("Try the sample model", true, false);
+        WelcomeArt.Button importBtn = new WelcomeArt.Button("Import HAR or Burp XML", false, false);
+        WelcomeArt.Button settings = new WelcomeArt.Button("Open Settings", false, false);
         sample.setToolTipText("Load a small demo shop (two roles) into a model called 'sample', to look around");
         importBtn.setToolTipText("Add the requests from a HAR file (browser DevTools, ZAP, mitmproxy) or a Burp \"Save items\" export");
         live.setToolTipText("Add in-scope Proxy traffic (Burp's target scope) to the model every few seconds");
@@ -130,7 +130,7 @@ final class Welcome extends JPanel {
                 g.setColor(Theme.bg());
                 g.fillRect(0, 0, getWidth(), getHeight());
                 if (Theme.dark()) {
-                    PixelArt.dither(g, getWidth(), getHeight(), 8, Theme.alpha(Theme.fg(), 18));
+                    WelcomeArt.dither(g, getWidth(), getHeight(), 8, Theme.alpha(Theme.fg(), 18));
                 }
                 g.dispose();
             }
@@ -195,11 +195,9 @@ final class Welcome extends JPanel {
             @Override
             protected void paintComponent(Graphics g0) {
                 Graphics2D g = (Graphics2D) g0.create();
-                int px = Math.max(2, Math.round(2 * Theme.uiScale()));
-                PixelArt.frame(g, px, px, getWidth() - px, getHeight() - px, px, null, Theme.alpha(Theme.fg(), 30));
-                PixelArt.frame(g, 0, 0, getWidth() - px, getHeight() - px, px, Theme.surface(), Theme.line());
+                WelcomeArt.frame(g, 0, 0, getWidth(), getHeight(), 10, Theme.surface(), Theme.line());
                 g.setColor(Theme.ACCENT);
-                g.fillRect(px, px, 2 * px, getHeight() - 3 * px);            // the accent stripe the header uses too
+                g.fillRect(1, 12, 4, getHeight() - 24);                   // the accent stripe the header uses too
                 g.dispose();
             }
         };
@@ -210,17 +208,17 @@ final class Welcome extends JPanel {
         JLabel mark = new JLabel(new javax.swing.Icon() {
             @Override
             public void paintIcon(Component comp, Graphics g, int x, int y) {
-                PixelArt.logo((Graphics2D) g, x, y, px);
+                WelcomeArt.logo((Graphics2D) g, x, y, px);
             }
 
             @Override
             public int getIconWidth() {
-                return PixelArt.logoSize(px);
+                return WelcomeArt.logoSize(px);
             }
 
             @Override
             public int getIconHeight() {
-                return PixelArt.logoSize(px);
+                return WelcomeArt.logoSize(px);
             }
         });
         mark.getAccessibleContext().setAccessibleName("burp2model logo");
@@ -236,11 +234,11 @@ final class Welcome extends JPanel {
         c.weightx = 1;
         c.anchor = GridBagConstraints.WEST;
         c.insets = new Insets(0, 0, 10, 0);
-        card.add(new PixelArt.Text("BURP2MODEL", () -> Theme.pixel(6), () -> Theme.ACCENT), c);
+        card.add(new WelcomeArt.Text("burp2model", () -> Theme.display(40f), () -> Theme.ACCENT), c);
         c.gridy = 1;
         c.insets = new Insets(0, 0, 6, 0);
         c.fill = GridBagConstraints.HORIZONTAL;
-        int beside = PixelArt.logoSize(px) + 26;                   // the logo's column, left of the text
+        int beside = WelcomeArt.logoSize(px) + 26;                   // the logo's column, left of the text
         Wrap tag = new Wrap("Turn Burp traffic into an evidence-backed model of the app.", beside);
         tag.setFont(Theme.font(16f, Font.PLAIN));
         card.add(styled(tag, Theme.fg()), c);
@@ -260,8 +258,7 @@ final class Welcome extends JPanel {
             @Override
             protected void paintComponent(Graphics g0) {
                 Graphics2D g = (Graphics2D) g0.create();
-                int px = Math.max(2, Math.round(2 * Theme.uiScale()));
-                PixelArt.frame(g, 0, 0, getWidth(), getHeight(), px, Theme.surface(), Theme.line());
+                WelcomeArt.frame(g, 0, 0, getWidth(), getHeight(), 8, Theme.surface(), Theme.line());
                 g.dispose();
             }
         };
@@ -269,18 +266,18 @@ final class Welcome extends JPanel {
         card.setBorder(BorderFactory.createEmptyBorder(16, 18, 18, 18));
         JPanel head = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         head.setOpaque(false);
-        head.add(new PixelArt.Text(n, () -> Theme.pixel(3), () -> Theme.ACCENT));
+        head.add(new WelcomeArt.Text(n, () -> Theme.display(20f), () -> Theme.ACCENT));
         head.add(Box.createHorizontalStrut(12));
-        head.add(new PixelArt.Text(title, () -> Theme.pixelSans(false), Theme::fg));
+        head.add(new WelcomeArt.Text(title, () -> Theme.displayMedium(17f), Theme::fg));
         card.add(head, BorderLayout.NORTH);
         card.add(body(text, true), BorderLayout.CENTER);
         card.getAccessibleContext().setAccessibleName("Step " + n + ": " + title);
         return card;
     }
 
-    /** A section heading in small pixel capitals. */
+    /** A section heading in small, spaced capitals. */
     private static JComponent label(String text) {
-        PixelArt.Text t = new PixelArt.Text(text, () -> Theme.pixel(2), Theme::muted);
+        WelcomeArt.Text t = new WelcomeArt.Text(text, () -> Theme.tracked(Theme.displayMedium(12f), 0.08f), Theme::muted);
         t.setAlignmentX(Component.LEFT_ALIGNMENT);
         return t;
     }
