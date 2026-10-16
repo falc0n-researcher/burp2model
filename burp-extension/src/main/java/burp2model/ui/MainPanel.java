@@ -50,6 +50,15 @@ public final class MainPanel extends JPanel {
 
         Session session(String name) throws java.io.IOException;
 
+        /** Whether a model of this name has a folder yet (asking must not create one). */
+        default boolean hasModel(String name) {
+            return true;
+        }
+
+        /** Delete a model and everything saved in it; the extension also forgets its open copy. */
+        default void deleteModel(String name) throws java.io.IOException {
+        }
+
         /** Run slow work off the Swing thread; the extension tracks it so unloading waits for it. */
         default void background(String name, Runnable task) {
             Thread t = new Thread(null, task, name, 64L * 1024 * 1024);
@@ -177,8 +186,14 @@ public final class MainPanel extends JPanel {
     private final java.util.concurrent.CountDownLatch opened = new java.util.concurrent.CountDownLatch(1);
 
     /** Show the busy indicator (from any thread); pair each call with idle(). */
+    /** The last "…ing" message shown while busy; when the work ends and it is still showing, the summary comes back. */
+    private volatile String workingText;
+
     public void working(String what) {
         busy.incrementAndGet();
+        if (what != null) {
+            workingText = what;
+        }
         SwingUtilities.invokeLater(() -> {
             busyBar.setVisible(busy.get() > 0);
             if (what != null) {
@@ -189,7 +204,12 @@ public final class MainPanel extends JPanel {
 
     public void idle() {
         busy.updateAndGet(n -> Math.max(0, n - 1));
-        SwingUtilities.invokeLater(() -> busyBar.setVisible(busy.get() > 0));
+        SwingUtilities.invokeLater(() -> {
+            busyBar.setVisible(busy.get() > 0);
+            if (busy.get() == 0 && workingText != null && workingText.equals(status.getText())) {
+                setStatus(summary, null);                       // "Comparing builds…" must not outlive the comparison
+            }
+        });
     }
 
     /**
@@ -226,9 +246,15 @@ public final class MainPanel extends JPanel {
     /** Open (or switch to) a model off the Swing thread; a large one takes a second or more to read and rebuild. */
     private void openSession(String name, boolean applyScope) {
         async("Opening the model '" + name + "'…", () -> {
-            Session s = host.session(name);
-            if (OLD_DEFAULT.equals(name) && s.requestCount() == 0 && s.builds().isEmpty()) {
-                s = host.session(SAMPLE);                       // the old empty default: open the sample instead
+            Session s;
+            if (OLD_DEFAULT.equals(name) && !host.hasModel(name)) {
+                s = host.session(SAMPLE);                       // the old default, gone: open the sample, never re-create it
+            } else {
+                s = host.session(name);
+                if (OLD_DEFAULT.equals(name) && s.requestCount() == 0 && s.builds().isEmpty()) {
+                    host.deleteModel(name);                     // the old empty default: remove it, open the sample instead
+                    s = host.session(SAMPLE);
+                }
             }
             if (SAMPLE.equals(s.name)) {
                 fillSample(s);                                  // before it is shown, so the first look is a full model
@@ -716,6 +742,8 @@ public final class MainPanel extends JPanel {
         expJson.addActionListener(e -> exportModel());
         JMenuItem expMd = new JMenuItem("Export summary (Markdown)…");
         expMd.addActionListener(e -> exportSummary());
+        JMenuItem del = new JMenuItem("Delete this model…");
+        del.addActionListener(e -> deleteModel());
         JMenuItem set = new JMenuItem("Settings");
         set.addActionListener(e -> {
             showWelcome(false);
@@ -724,6 +752,8 @@ public final class MainPanel extends JPanel {
         for (JMenuItem mi : new JMenuItem[] {imp, expJson, expMd}) {
             moreMenu.add(mi);
         }
+        moreMenu.addSeparator();
+        moreMenu.add(del);
         moreMenu.addSeparator();
         moreMenu.add(set);
         more.addActionListener(e -> moreMenu.show(more, 0, more.getHeight()));
@@ -807,6 +837,33 @@ public final class MainPanel extends JPanel {
         openSession(name, true);
     }
 
+    /** Delete the open model (after asking) and open the sample; deleting the sample itself just empties and refills it. */
+    private void deleteModel() {
+        Session s = session;
+        if (s == null) {
+            return;
+        }
+        int ok = JOptionPane.showConfirmDialog(this, "Delete the model '" + s.name + "' and every request saved in it?\n\nThis cannot be undone.",
+                "Delete model", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (ok != JOptionPane.OK_OPTION) {
+            return;
+        }
+        String name = s.name;
+        async("Deleting the model '" + name + "'…", () -> {
+            host.deleteModel(name);
+            Session next = host.session(SAMPLE);
+            fillSample(next);
+            return next;
+        }, next -> {
+            session = next;
+            host.set("app", SAMPLE);
+            nameField.setText(SAMPLE);
+            listModels();
+            refresh();
+            setStatus("Deleted the model '" + name + "'. The sample model is open.", Level.OK);
+        }, t -> sayError("could not delete '" + name + "': " + messageOf(t)));
+    }
+
     private void setLive(boolean on) {
         host.set("auto", on ? "1" : "0");
         autoCapture.setSelected(on);
@@ -884,52 +941,84 @@ public final class MainPanel extends JPanel {
     // ------------------------------------------------------------------ settings
 
     private Component settingsTab() {
-        JPanel p = new JPanel(new GridBagLayout());
-        p.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
+        // a column of cards, at most 760 wide: a form whose fields keep their width whatever the pane does
+        JPanel col = new JPanel();
+        col.setLayout(new javax.swing.BoxLayout(col, javax.swing.BoxLayout.Y_AXIS));
+        col.setBorder(BorderFactory.createEmptyBorder(18, 22, 22, 22));
+
+        JPanel model = formCard("Model");
+        formRow(model, 0, "Name", nameField, "Each name is a separate model; the header's switcher changes it too. Save to open it.");
+        col.add(model);
+        col.add(javax.swing.Box.createVerticalStrut(12));
+
+        JPanel send = formCard("Next send");
+        formRow(send, 0, "Role", roleField, "Optional, for example user or admin. Leave empty for one account.");
+        formRow(send, 2, "In-scope hosts", scopeField, "Optional, comma separated. Default: the busiest host's registrable domain.");
         GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(6, 8, 6, 8);
+        c.gridx = 1;
+        c.gridy = 4;
         c.anchor = GridBagConstraints.WEST;
-        int row = 0;
-        row = line(p, c, row, "Model name", nameField, "Each name is a separate model.");
-        row = line(p, c, row, "Role for the next send", roleField, "Optional, for example user or admin. Leave empty for one account.");
-        row = line(p, c, row, "In-scope hosts", scopeField, "Optional, comma separated. Default: the busiest host's registrable domain.");
-        c.gridx = 1;
-        c.gridy = row++;
-        p.add(replaceRole, c);
-        c.gridx = 1;
-        c.gridy = row++;
-        p.add(autoCapture, c);
+        c.insets = new Insets(8, 0, 0, 0);
+        send.add(replaceRole, c);
+        col.add(send);
+        col.add(javax.swing.Box.createVerticalStrut(12));
+
+        JPanel liveCard = formCard("Live capture");
+        c = new GridBagConstraints();
+        c.gridx = 0;
+        c.gridy = 0;
+        c.gridwidth = 2;
+        c.anchor = GridBagConstraints.WEST;
+        liveCard.add(autoCapture, c);
+        c.gridy = 1;
+        c.insets = new Insets(4, 24, 0, 0);
+        liveCard.add(Widgets.muted("In-scope Proxy traffic joins the model every few seconds; a few samples of each request shape are kept."), c);
+        col.add(liveCard);
+        col.add(javax.swing.Box.createVerticalStrut(12));
+
         JButton save = new JButton("Save settings");
         JButton export = new JButton("Export model.json…");
         JButton summaryBtn = new JButton("Export summary (Markdown)…");
         JButton importBtn = new JButton("Import HAR or Burp export…");
         JButton clear = new JButton("Clear this model");
-        JButton aboutBtn = new JButton("About burp2model");
+        JButton deleteBtn = new JButton("Delete this model…");
+        deleteBtn.addActionListener(e -> deleteModel());
+        JButton aboutBtn = new JButton("Welcome page");
         aboutBtn.addActionListener(e -> showWelcome(true));
-        JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        for (JButton b : new JButton[] {save, importBtn, export, summaryBtn, clear, aboutBtn}) {
+        JPanel saveRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        saveRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        saveRow.add(save);
+        col.add(saveRow);
+        col.add(javax.swing.Box.createVerticalStrut(18));
+
+        JPanel data = formCard("Data");
+        JPanel btns = new JPanel(new java.awt.GridLayout(0, 2, 8, 8));
+        btns.setOpaque(false);
+        for (JButton b : new JButton[] {importBtn, export, summaryBtn, clear, deleteBtn, aboutBtn}) {
             btns.add(b);
         }
-        c.gridx = 1;
-        c.gridy = row++;
-        p.add(btns, c);
-        JTextArea about = new JTextArea("""
-                burp2model builds an evidence-cited model of one web app from the requests you send it. Every line cites the request that shows it.
-                Cookies, tokens, keys and personal data are masked before anything is stored; only names and shapes are kept.
-                It is a model builder, never a scanner: leads are hypotheses to verify in an authorised session.
-
-                Models live in ~/.burp2model/models/<name>/.  Nothing is sent anywhere unless you run Recon or paste a package into your own AI.
-
-                burp2model extension """ + burp2model.engine.Version.EXTENSION + "  ·  https://github.com/falc0n-researcher/burp2model");
-        about.setEditable(false);
-        about.setOpaque(false);
-        about.setFont(Theme.font(12f, Font.PLAIN));
-        about.setForeground(Theme.MUTED);
+        c = new GridBagConstraints();
         c.gridx = 0;
-        c.gridy = row;
-        c.gridwidth = 3;
-        c.insets = new Insets(22, 8, 6, 8);
-        p.add(about, c);
+        c.gridy = 0;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        data.add(btns, c);
+        col.add(data);
+        col.add(javax.swing.Box.createVerticalStrut(12));
+
+        JPanel aboutCard = formCard("About");
+        c = new GridBagConstraints();
+        c.gridx = 0;
+        c.gridy = 0;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        aboutCard.add(Widgets.wrapText("burp2model builds an evidence-cited model of one web app from the requests you send it; every line cites the "
+                + "request that shows it. Cookies, tokens, keys and personal data are masked before anything is stored. It is a model "
+                + "builder, never a scanner: leads are hypotheses to verify in an authorised session.\n\nModels live in "
+                + "~/.burp2model/models/<name>/. Nothing is sent anywhere unless you run Recon or paste a package into your own AI.\n\n"
+                + "Extension " + burp2model.engine.Version.EXTENSION + "  ·  github.com/falc0n-researcher/burp2model",
+                Theme.font(12f, Font.PLAIN), Theme.MUTED), c);
+        col.add(aboutCard);
         save.addActionListener(e -> {
             String n = nameField.getText().strip();
             if (!n.matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")) {
@@ -966,9 +1055,67 @@ public final class MainPanel extends JPanel {
                 }, t -> sayError("could not clear: " + messageOf(t)));
             }
         });
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.add(p, BorderLayout.NORTH);
-        return outer;
+        JPanel holder = new JPanel(new BorderLayout()) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public java.awt.Dimension getPreferredSize() {
+                java.awt.Dimension d = super.getPreferredSize();
+                return new java.awt.Dimension(Math.min(d.width, Math.round(760 * Theme.uiScale())), d.height);
+            }
+        };
+        holder.add(col, BorderLayout.NORTH);
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        left.add(holder);
+        javax.swing.JScrollPane sp = new javax.swing.JScrollPane(left);
+        sp.setBorder(null);
+        sp.getVerticalScrollBar().setUnitIncrement(16);
+        return sp;
+    }
+
+    /** A titled card for one group of settings; rows go in with formRow. */
+    private static JPanel formCard(String title) {
+        JPanel card = new JPanel(new GridBagLayout()) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected void paintComponent(java.awt.Graphics g0) {
+                java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+                Theme.quality(g);
+                g.setColor(Theme.surface());
+                g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
+                g.setColor(Theme.line());
+                g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
+                g.dispose();
+            }
+        };
+        card.setOpaque(false);
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0),
+                BorderFactory.createTitledBorder(BorderFactory.createEmptyBorder(30, 16, 14, 16), title, javax.swing.border.TitledBorder.LEFT,
+                        javax.swing.border.TitledBorder.TOP, Theme.font(12f, Font.BOLD))));
+        return card;
+    }
+
+    /** A label, its field filling the rest of the row, and a muted hint under the field. */
+    private static void formRow(JPanel card, int row, String label, JTextField field, String hint) {
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridx = 0;
+        c.gridy = row;
+        c.anchor = GridBagConstraints.WEST;
+        c.insets = new Insets(row == 0 ? 0 : 10, 0, 0, 12);
+        JLabel l = new JLabel(label);
+        l.setPreferredSize(new java.awt.Dimension(Math.round(120 * Theme.uiScale()), l.getPreferredSize().height));
+        card.add(l, c);
+        c.gridx = 1;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.insets = new Insets(row == 0 ? 0 : 10, 0, 0, 0);
+        field.setMinimumSize(new java.awt.Dimension(Math.round(240 * Theme.uiScale()), field.getPreferredSize().height));
+        card.add(field, c);
+        c.gridy = row + 1;
+        c.insets = new Insets(4, 0, 0, 0);
+        card.add(Widgets.muted(hint), c);
     }
 
     /** Save the whole model as JSON (in the background). */
