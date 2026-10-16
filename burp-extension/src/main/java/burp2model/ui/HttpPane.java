@@ -35,11 +35,11 @@ final class HttpPane extends JPanel {
         title.setText(name);
         title.setFont(Theme.font(12f, Font.BOLD));
         meta.setFont(Theme.font(11f, Font.PLAIN));
-        meta.setForeground(Theme.muted());
+        meta.setForeground(Theme.MUTED);
         pane.setEditable(false);
         pane.setFont(Theme.mono(12f));
         pane.setMargin(new java.awt.Insets(8, 10, 8, 10));
-        pane.setBackground(Theme.surface());
+        pane.setBackground(Theme.SURFACE);
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 6));
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
@@ -49,12 +49,10 @@ final class HttpPane extends JPanel {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         right.setOpaque(false);
         for (JButton b : new JButton[] {pretty, raw}) {
-            b.setFocusable(false);
             b.setMargin(new java.awt.Insets(1, 8, 1, 8));
             right.add(b);
         }
         JButton copy = new JButton("Copy");
-        copy.setFocusable(false);
         copy.setMargin(new java.awt.Insets(1, 8, 1, 8));
         right.add(copy);
         pretty.addActionListener(e -> {
@@ -69,7 +67,7 @@ final class HttpPane extends JPanel {
         bar.add(left, BorderLayout.WEST);
         bar.add(right, BorderLayout.EAST);
         JScrollPane sp = new JScrollPane(pane);
-        sp.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.line()));
+        sp.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.LINE));
         add(bar, BorderLayout.NORTH);
         add(sp, BorderLayout.CENTER);
         syncButtons();

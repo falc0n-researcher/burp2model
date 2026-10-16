@@ -66,7 +66,7 @@ final class EvidenceViewer extends JPanel {
         panes.setResizeWeight(0.5);
         panes.setBorder(null);
         JScrollPane idScroll = new JScrollPane(ids);
-        idScroll.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.line()));
+        idScroll.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.LINE));
         idScroll.setPreferredSize(new java.awt.Dimension(150, 100));
         JPanel body = new JPanel(new BorderLayout());
         body.add(idScroll, BorderLayout.WEST);

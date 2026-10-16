@@ -294,7 +294,7 @@ final class Welcome extends JPanel {
 
     private static JComponent styled(Wrap a, java.awt.Color fg) {
         a.setEditable(false);
-        a.setFocusable(false);
+        a.setFocusable(false);                                  // read-only text: Tab goes to the buttons, not through paragraphs
         a.setLineWrap(true);
         a.setWrapStyleWord(true);
         a.setOpaque(false);

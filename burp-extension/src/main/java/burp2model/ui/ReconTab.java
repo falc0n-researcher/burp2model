@@ -48,7 +48,6 @@ final class ReconTab implements Tab {
         reconHost.setPreferredSize(new java.awt.Dimension(280, 26));
         top.add(reconHost);
         JButton run = new JButton("Run light recon…");
-        run.setFocusable(false);
         top.add(run);
         top.add(reconStatus);
         run.addActionListener(e -> runRecon());
