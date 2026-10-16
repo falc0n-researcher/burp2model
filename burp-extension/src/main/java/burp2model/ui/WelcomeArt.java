@@ -11,11 +11,11 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 
 /**
- * The welcome page's pixel look, drawn in code: a logo mark, frames with stepped corners, an arrow, a dither, and
- * text and buttons set in the bundled pixel fonts. Every shape is whole pixels at a whole-number scale.
+ * The welcome page's look, drawn in code: the logo mark, cards with a thin border, an arrow, a faint dot texture,
+ * and text and buttons set in the bundled IBM Plex Mono.
  */
-final class PixelArt {
-    private PixelArt() {}
+final class WelcomeArt {
+    private WelcomeArt() {}
 
     /** The mark: three nodes of the model (a page, a script, an endpoint) and the links between them. */
     private static final String[] LOGO = {
@@ -60,27 +60,30 @@ final class PixelArt {
         }
     }
 
-    /** A rectangle whose corners are cut by one pixel step: the classic pixel-art card. */
-    static void frame(Graphics2D g, int x, int y, int w, int h, int px, Color fill, Color line) {
+    /** A card: rounded corners, a one-pixel border. */
+    static void frame(Graphics2D g, int x, int y, int w, int h, int radius, Color fill, Color line) {
+        Graphics2D c = (Graphics2D) g.create();
+        Theme.quality(c);
         if (fill != null) {
-            g.setColor(fill);
-            g.fillRect(x + px, y + px, w - 2 * px, h - 2 * px);
+            c.setColor(fill);
+            c.fillRoundRect(x, y, w - 1, h - 1, radius * 2, radius * 2);
         }
         if (line != null) {
-            g.setColor(line);
-            g.fillRect(x + px, y, w - 2 * px, px);                // top
-            g.fillRect(x + px, y + h - px, w - 2 * px, px);       // bottom
-            g.fillRect(x, y + px, px, h - 2 * px);                // left
-            g.fillRect(x + w - px, y + px, px, h - 2 * px);       // right
+            c.setColor(line);
+            c.drawRoundRect(x, y, w - 1, h - 1, radius * 2, radius * 2);
         }
+        c.dispose();
     }
 
-    /** A right-pointing arrow, 4 pixels wide and 7 high. */
-    static void arrow(Graphics2D g, int x, int y, int px, Color c) {
-        g.setColor(c);
-        for (int i = 0; i < 4; i++) {
-            g.fillRect(x + i * px, y + i * px, px, (7 - 2 * i) * px);
-        }
+    /** A small right-pointing arrow head, `size` pixels tall. */
+    static void arrow(Graphics2D g, int x, int y, int size, Color c) {
+        Graphics2D a = (Graphics2D) g.create();
+        Theme.quality(a);
+        a.setColor(c);
+        a.setStroke(new java.awt.BasicStroke(Math.max(1.6f, size / 6f), java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
+        a.drawLine(x, y, x + size / 2, y + size / 2);
+        a.drawLine(x + size / 2, y + size / 2, x, y + size);
+        a.dispose();
     }
 
     /** A faint grid of dots, the texture behind the page in dark mode. */
@@ -93,7 +96,7 @@ final class PixelArt {
         }
     }
 
-    /** One line of pixel type; its colour is looked up at paint time, so it follows a theme switch. */
+    /** One line of display type; its colour is looked up at paint time, so it follows a theme switch. */
     static final class Text extends JComponent {
         private static final long serialVersionUID = 1L;
         private final String text;
@@ -129,7 +132,7 @@ final class PixelArt {
         }
 
         private Font f() {
-            return Theme.pixelOr(font.get(), text);
+            return Theme.displayOr(font.get(), text);
         }
 
         @Override
@@ -143,7 +146,7 @@ final class PixelArt {
             return getPreferredSize();
         }
 
-        /** Never squeezed: a layout short of room must not shrink pixel type to nothing. */
+        /** Never squeezed: a layout short of room must not shrink the title to nothing. */
         @Override
         public Dimension getMinimumSize() {
             return getPreferredSize();
@@ -152,7 +155,7 @@ final class PixelArt {
         @Override
         protected void paintComponent(Graphics g0) {
             Graphics2D g = (Graphics2D) g0.create();
-            Theme.pixelHints(g);
+            Theme.textHints(g);
             g.setFont(f());
             g.setColor(color.get());
             g.drawString(text, 0, g.getFontMetrics().getAscent());
@@ -161,8 +164,8 @@ final class PixelArt {
     }
 
     /**
-     * A button drawn as a pixel card. The primary one is filled with a darker orange that keeps white text above
-     * 4.5:1; the others are outlined. Keyboard focus shows as a second frame.
+     * A button drawn as a card. The primary one is filled with a darker orange that keeps white text above 4.5:1;
+     * the others are outlined. Keyboard focus shows as an accent ring.
      */
     static final class Button extends JButton {
         private static final long serialVersionUID = 1L;
@@ -182,50 +185,49 @@ final class PixelArt {
             setRolloverEnabled(true);
         }
 
-        private int px() {
-            return Math.max(2, Math.round(2 * Theme.uiScale()));
+        private Font f() {
+            return Theme.displayOr(Theme.displayMedium(14f), getText());
         }
 
-        private Font f() {
-            return Theme.pixelOr(Theme.pixelSans(false), getText());
+        private int arrowSize(FontMetrics fm) {
+            return Math.max(8, fm.getAscent() / 2);
         }
 
         @Override
         public Dimension getPreferredSize() {
             FontMetrics fm = getFontMetrics(f());
-            int px = px();
-            return new Dimension(fm.stringWidth(getText()) + 18 * px + (arrow ? 7 * px : 0), fm.getHeight() + 8 * px);
+            int extra = arrow ? arrowSize(fm) + 12 : 0;
+            return new Dimension(fm.stringWidth(getText()) + 40 + extra, fm.getHeight() + 20);
         }
 
         @Override
         protected void paintComponent(Graphics g0) {
             Graphics2D g = (Graphics2D) g0.create();
-            Theme.pixelHints(g);
-            int px = px();
+            Theme.textHints(g);
             int w = getWidth();
             int h = getHeight();
             boolean down = getModel().isPressed();
             boolean over = getModel().isRollover();
-            int sink = down ? px : 0;
-            Color fill = !isEnabled() ? Theme.surface2() : primary ? (over ? Theme.ACCENT : PRIMARY) : over ? Theme.surface2() : Theme.surface();
-            Color line = primary ? PRIMARY.darker() : Theme.line();
-            if (!down && isEnabled()) {
-                PixelArt.frame(g, px, px, w - px, h - px, px, null, Theme.alpha(Theme.fg(), 40));   // the drop shadow
-            }
-            PixelArt.frame(g, sink, sink, w - px, h - px, px, fill, line);
+            int r = 7;
+            Color fill = !isEnabled() ? Theme.surface2() : primary ? (over || down ? Theme.ACCENT : PRIMARY) : over ? Theme.surface2() : Theme.surface();
+            Color line = primary ? PRIMARY.darker() : over ? Theme.alpha(Theme.ACCENT, 160) : Theme.line();
+            WelcomeArt.frame(g, 0, down ? 1 : 0, w, h - 1, r, fill, line);
             if (isFocusOwner()) {
-                PixelArt.frame(g, sink + 2 * px, sink + 2 * px, w - 5 * px, h - 5 * px, px, null, primary ? Color.WHITE : Theme.ACCENT);
+                g.setColor(primary ? Theme.alpha(Color.WHITE, 200) : Theme.ACCENT);
+                g.setStroke(new java.awt.BasicStroke(1.5f));
+                g.drawRoundRect(3, (down ? 1 : 0) + 3, w - 7, h - 8, r * 2 - 4, r * 2 - 4);
             }
             Color text = !isEnabled() ? Theme.muted() : primary ? Color.WHITE : Theme.fg();
             g.setFont(f());
             g.setColor(text);
             FontMetrics fm = g.getFontMetrics();
-            int tw = fm.stringWidth(getText()) + (arrow ? 7 * px : 0);
-            int tx = (w - px - tw) / 2 + sink;
-            int ty = (h - px - fm.getHeight()) / 2 + fm.getAscent() + sink;
+            int as = arrowSize(fm);
+            int tw = fm.stringWidth(getText()) + (arrow ? as + 12 : 0);
+            int tx = (w - tw) / 2;
+            int ty = (h - 1 - fm.getHeight()) / 2 + fm.getAscent() + (down ? 1 : 0);
             g.drawString(getText(), tx, ty);
             if (arrow) {
-                PixelArt.arrow(g, tx + fm.stringWidth(getText()) + 3 * px, ty - fm.getAscent() / 2 - 3 * px, px, text);
+                WelcomeArt.arrow(g, tx + fm.stringWidth(getText()) + 12, ty - fm.getAscent() / 2 - as / 2 + 2, as, text);
             }
             g.dispose();
         }
