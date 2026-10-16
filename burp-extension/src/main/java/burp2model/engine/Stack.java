@@ -18,6 +18,11 @@ public final class Stack {
 
     private record Sign(Pattern rx, String name, String category) {}
 
+    /** A body sign plus the lowercase literals one of which any match must contain (null: no cheap test, always run). */
+    private record BodySign(Sign sign, String[] needles) {}
+
+    private static final List<BodySign> BODY_FAST = new ArrayList<>();
+
     private static final List<HeadSign> HEAD = new ArrayList<>();
     private static final List<Sign> COOK = new ArrayList<>();
     private static final List<Sign> BODY = new ArrayList<>();
@@ -35,11 +40,145 @@ public final class Stack {
             COOK.add(new Sign(Pattern.compile(r[0], Pattern.CASE_INSENSITIVE), r[1], r[2]));
         }
         for (String[] r : StackData.BODY_SIGNS) {
-            BODY.add(new Sign(Pattern.compile(r[0], Pattern.CASE_INSENSITIVE), r[1], r[2]));
+            Sign s = new Sign(Pattern.compile(r[0], Pattern.CASE_INSENSITIVE), r[1], r[2]);
+            BODY.add(s);
+            BODY_FAST.add(new BodySign(s, needles(r[0])));
         }
         for (String[] r : StackData.PATH_SIGNS) {
             PATH.add(new Sign(Pattern.compile(r[0], Pattern.CASE_INSENSITIVE), r[1], r[2]));
         }
+    }
+
+    private static boolean containsAny(String text, String[] needles) {
+        for (String n : needles) {
+            if (text.contains(n)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * For a pattern made of top-level alternatives, the longest literal each alternative must contain, lowercased.
+     * Groups, classes and optional characters are skipped, so a literal found is always required. If any
+     * alternative has no literal of 3 characters or more there is no cheap test: null.
+     */
+    static String[] needles(String rx) {
+        List<String> alts = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < rx.length(); i++) {
+            char c = rx.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == '[') {
+                i = classEnd(rx, i);
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (c == '|' && depth == 0) {
+                alts.add(rx.substring(start, i));
+                start = i + 1;
+            }
+        }
+        alts.add(rx.substring(start));
+        String[] out = new String[alts.size()];
+        for (int k = 0; k < alts.size(); k++) {
+            String lit = longestLiteral(alts.get(k));
+            if (lit.length() < 3) {
+                return null;
+            }
+            out[k] = lit.toLowerCase(java.util.Locale.ROOT);
+        }
+        return out;
+    }
+
+    private static int classEnd(String rx, int open) {
+        int i = open + 1;
+        if (i < rx.length() && rx.charAt(i) == '^') {
+            i++;
+        }
+        if (i < rx.length() && rx.charAt(i) == ']') {
+            i++;
+        }
+        for (; i < rx.length(); i++) {
+            char c = rx.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == ']') {
+                return i;
+            }
+        }
+        return rx.length();
+    }
+
+    private static String longestLiteral(String alt) {
+        String best = "";
+        StringBuilder run = new StringBuilder();
+        for (int i = 0; i < alt.length(); i++) {
+            char c = alt.charAt(i);
+            Character lit = null;
+            int next = i + 1;
+            if (c == '\\' && i + 1 < alt.length()) {
+                char e = alt.charAt(i + 1);
+                next = i + 2;
+                if (!Character.isLetterOrDigit(e)) {
+                    lit = e;                                   // \. \/ \" and the like are the character itself
+                }
+            } else if (c == '[') {
+                next = classEnd(alt, i) + 1;
+            } else if (c == '(') {
+                int d = 1;
+                int j = i + 1;
+                for (; j < alt.length() && d > 0; j++) {
+                    char x = alt.charAt(j);
+                    if (x == '\\') {
+                        j++;
+                    } else if (x == '[') {
+                        j = classEnd(alt, j);
+                    } else if (x == '(') {
+                        d++;
+                    } else if (x == ')') {
+                        d--;
+                    }
+                }
+                next = j;
+            } else if (".^$|)?*+{}".indexOf(c) < 0) {
+                lit = c;
+            }
+            // a character followed by ?, * or {0 may be absent: it cannot be part of a required literal
+            boolean optional = next < alt.length() && (alt.charAt(next) == '?' || alt.charAt(next) == '*' || alt.startsWith("{0", next));
+            if (lit != null && !optional) {
+                run.append(lit);
+            } else {
+                if (run.length() > best.length()) {
+                    best = run.toString();
+                }
+                run.setLength(0);
+                if (lit != null && optional) {
+                    // nothing: the optional character ends the run
+                }
+            }
+            boolean quantified = next < alt.length() && "?*+{".indexOf(alt.charAt(next)) >= 0;
+            if (quantified) {
+                if (run.length() > best.length()) {
+                    best = run.toString();
+                }
+                run.setLength(0);
+                if (alt.charAt(next) == '{') {
+                    int close = alt.indexOf('}', next);
+                    next = close < 0 ? alt.length() : close + 1;
+                } else {
+                    next++;
+                }
+                if (next < alt.length() && (alt.charAt(next) == '?' || alt.charAt(next) == '+')) {
+                    next++;                                    // lazy or possessive
+                }
+            }
+            i = next - 1;
+        }
+        return run.length() > best.length() ? run.toString() : best;
     }
 
     public static List<String> categories() {
@@ -82,7 +221,13 @@ public final class Stack {
             return List.of();
         }
         String text = body.length() > SCAN_CAP ? body.substring(0, SCAN_CAP) : body;
-        for (Sign s : BODY) {
+        // one lowercase copy and a few contains() calls rule out most signs before any regex runs over the body
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        for (BodySign b : BODY_FAST) {
+            if (b.needles() != null && !containsAny(lower, b.needles())) {
+                continue;
+            }
+            Sign s = b.sign();
             Matcher m = s.rx().matcher(text);
             if (m.find()) {
                 add(found, s.name(), s.category(), "page", ver(m));

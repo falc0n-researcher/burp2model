@@ -33,6 +33,8 @@ public final class Query {
     /** kind: requests | nodes | edges | paths | table | text. */
     public record Result(String kind, List<String> columns, List<Map<String, Object>> rows, String note, int total) {}
 
+    private static final Pattern EVIDENCE_ID = Pattern.compile("^(?:ev_|evd[ _]?)?(\\d+)$", Pattern.CASE_INSENSITIVE);
+
     private final Model m;
     private final Map<String, List<Model.Edge>> out = new HashMap<>();
     private final Map<String, List<Model.Edge>> inc = new HashMap<>();
@@ -381,7 +383,7 @@ public final class Query {
             get = fd.get();
             kind = fd.kind();
         } else if (f.equals("node.evidence")) {
-            Matcher em = Pattern.compile("^(?:ev_|evd[ _]?)?(\\d+)$", Pattern.CASE_INSENSITIVE).matcher(value.strip());
+            Matcher em = EVIDENCE_ID.matcher(value.strip());
             if (!em.find()) {
                 throw new QueryError("node.evidence needs an evidence id, got '" + value + "'");
             }

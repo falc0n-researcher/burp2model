@@ -164,21 +164,19 @@ public final class Builder {
         templates.forEach((k, v) -> cur.put(k, new ArrayList<>(v)));
         for (int d = 0; d < depth; d++) {
             Map<String, Set<String>> groups = new LinkedHashMap<>();       // host \0 prefix -> values
-            Map<String, String> groupHost = new HashMap<>();
-            Map<String, List<String>> groupPrefix = new HashMap<>();
+            // the paths in each group: a group's prefix (segments before d) is fixed while depth d is folded,
+            // so looking a value's paths up here is the same as scanning every path, without the n^2
+            Map<String, List<List<String>>> members = new HashMap<>();
             for (Map.Entry<Key, List<String>> e : cur.entrySet()) {
                 List<String> segs = e.getValue();
                 if (segs.size() > d) {
-                    List<String> prefix = new ArrayList<>(segs.subList(0, d));
-                    String gk = e.getKey().host() + "\u0000" + String.join("/", prefix);
+                    String gk = e.getKey().host() + "\u0000" + String.join("/", segs.subList(0, d));
                     groups.computeIfAbsent(gk, x -> new LinkedHashSet<>()).add(segs.get(d));
-                    groupHost.put(gk, e.getKey().host());
-                    groupPrefix.put(gk, prefix);
+                    members.computeIfAbsent(gk, x -> new ArrayList<>()).add(segs);
                 }
             }
             for (Map.Entry<String, Set<String>> g : groups.entrySet()) {
-                String host = groupHost.get(g.getKey());
-                List<String> prefix = groupPrefix.get(g.getKey());
+                List<List<String>> inGroup = members.get(g.getKey());
                 Set<String> plain = new LinkedHashSet<>();
                 for (String v : g.getValue()) {
                     if (!v.contains("{") && !FILE_SEG.matcher(v).find()) {
@@ -205,15 +203,16 @@ public final class Builder {
                 Set<String> rest = new LinkedHashSet<>(plain);
                 rest.removeAll(fold.keySet());
                 if (rest.size() >= SIBLING_SHAPE) {
+                    Map<String, Set<String>> kidsOf = new HashMap<>();
+                    for (List<String> segs : inGroup) {
+                        if (segs.size() > d + 1) {
+                            kidsOf.computeIfAbsent(segs.get(d), x -> new TreeSet<>()).add(segs.get(d + 1));
+                        }
+                    }
                     Map<String, Set<String>> shaped = new LinkedHashMap<>();
                     for (String v : rest) {
-                        Set<String> kids = new TreeSet<>();
-                        for (List<String> segs : cur.values()) {
-                            if (segs.size() > d + 1 && segs.get(d).equals(v) && segs.subList(0, d).equals(prefix)) {
-                                kids.add(segs.get(d + 1));
-                            }
-                        }
-                        if (!kids.isEmpty()) {
+                        Set<String> kids = kidsOf.get(v);
+                        if (kids != null) {
                             shaped.put(v, kids);
                         }
                     }
@@ -242,10 +241,10 @@ public final class Builder {
                 if (fold.isEmpty()) {
                     continue;
                 }
-                for (Map.Entry<Key, List<String>> e : cur.entrySet()) {
-                    List<String> segs = e.getValue();
-                    if (e.getKey().host().equals(host) && segs.size() > d && segs.subList(0, d).equals(prefix) && fold.containsKey(segs.get(d))) {
-                        segs.set(d, fold.get(segs.get(d)));
+                for (List<String> segs : inGroup) {
+                    String to = fold.get(segs.get(d));
+                    if (to != null) {
+                        segs.set(d, to);
                     }
                 }
             }
@@ -587,9 +586,10 @@ public final class Builder {
                 m.edgeIndex.put(Model.edgeKey(e.src, e.dst, e.type), e);
             }
             for (String k : new ArrayList<>(m.nodes.keySet())) {
+                // "param:<gone node id>:<name>": try each ':' as the end of the node id instead of every gone id
                 if (k.startsWith("param:")) {
-                    for (String g : gone) {
-                        if (k.startsWith("param:" + g + ":")) {
+                    for (int c = k.indexOf(':', 6); c > 0; c = k.indexOf(':', c + 1)) {
+                        if (dead.contains(k.substring(6, c))) {
                             m.nodes.remove(k);
                             break;
                         }

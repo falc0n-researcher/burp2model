@@ -53,7 +53,7 @@ import javax.swing.Timer;
  */
 final class GraphPanel extends JPanel {
     private static final class V {
-        final Model.Node node;
+        Model.Node node;
         double x;
         double y;
         double vx;
@@ -210,7 +210,39 @@ final class GraphPanel extends JPanel {
         onOpen = c;
     }
 
+    /** The model's nodes and edges as a fingerprint: the same structure needs no new layout. */
+    private long structure;
+
+    private static long structureOf(Model m) {
+        long h = 0xcbf29ce484222325L;
+        for (Model.Node n : m.nodes.values()) {
+            h = (h ^ n.id.hashCode()) * 0x100000001b3L;
+            h = (h ^ n.type.hashCode()) * 0x100000001b3L;
+            h = (h ^ String.valueOf(n.attrs.get("api_state")).hashCode()) * 0x100000001b3L;
+        }
+        for (Model.Edge e : m.edges) {
+            h = (h ^ e.src.hashCode()) * 0x100000001b3L;
+            h = (h ^ e.dst.hashCode()) * 0x100000001b3L;
+            h = (h ^ e.type.hashCode()) * 0x100000001b3L;
+            h = (h ^ String.valueOf(e.state).hashCode()) * 0x100000001b3L;
+        }
+        return h ^ ((long) m.nodes.size() << 32) ^ m.edges.size();
+    }
+
     void setModel(Model m) {
+        if (m != null && model != null && structureOf(m) == structure) {
+            // live capture added requests but nothing new to draw: keep the layout, the selection and the view
+            this.model = m;
+            for (V v : vs) {
+                Model.Node n = m.nodes.get(v.node.id);
+                if (n != null) {
+                    v.node = n;
+                }
+            }
+            canvas.repaint();
+            return;
+        }
+        structure = m == null ? 0 : structureOf(m);
         boolean first = model == null;
         this.model = m;
         selected = null;

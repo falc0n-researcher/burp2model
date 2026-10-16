@@ -149,11 +149,7 @@ public final class Redact {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(key(), "HmacSHA256"));
             byte[] d = mac.doFinal(value.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder();
-            for (int i = 0; i < 6; i++) {
-                hex.append(String.format("%02x", d[i]));
-            }
-            return new Fingerprint(kind, hex.toString(), value.codePointCount(0, value.length()), entropy(value));
+            return new Fingerprint(kind, java.util.HexFormat.of().formatHex(d, 0, 6), value.codePointCount(0, value.length()), entropy(value));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }

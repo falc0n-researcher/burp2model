@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -34,7 +33,13 @@ public final class Session {
     private final Set<String> seen = new LinkedHashSet<>();
     // read by the Swing thread while a background add writes them: copy-on-write, concurrent, or synchronized
     private final List<BuildInfo> builds = new CopyOnWriteArrayList<>();
-    private final Map<Integer, Model> cache = new ConcurrentHashMap<>();
+    /** The last few builds read back for diffs; a build on disk carries no request panes, so each is small. */
+    private final Map<Integer, Model> cache = Collections.synchronizedMap(new LinkedHashMap<>(8, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Integer, Model> eldest) {
+            return size() > 3;
+        }
+    });
     /** node id -> {first build, last build}. */
     private final Map<String, int[]> nodeHistory = Collections.synchronizedMap(new LinkedHashMap<>());
     private volatile Model model;
@@ -142,17 +147,47 @@ public final class Session {
             if (r.response() != null) {
                 md.update(r.response());
             }
-            StringBuilder sb = new StringBuilder();
-            for (byte b : md.digest()) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
+            return java.util.HexFormat.of().formatHex(md.digest());
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
 
-    public record AddResult(int added, int duplicates, int skipped, BuildInfo build) {}
+    /** `capped`: new requests left out because their shape already had enough samples (live capture only). */
+    public record AddResult(int added, int duplicates, int skipped, BuildInfo build, int capped) {
+        public AddResult(int added, int duplicates, int skipped, BuildInfo build) {
+            this(added, duplicates, skipped, build, 0);
+        }
+    }
+
+    /** How many requests of each shape are kept, so live capture can stop at a few samples of each. */
+    private final Map<String, Integer> shapes = new java.util.HashMap<>();
+
+    /**
+     * Requests of one shape: same method, host, port, path template (query names only), status and role. Live
+     * traffic repeats a shape endlessly (polling, cache-busters, rotating cookies); a few samples tell all of it.
+     */
+    static String shape(Exchange e) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(e.method).append('|').append(e.host).append('|').append(e.port).append('|')
+                .append(e.rawTemplate != null ? e.rawTemplate : e.pathTemplate).append('|').append(e.status).append('|').append(e.role).append('|');
+        int q = e.path == null ? -1 : e.path.indexOf('?');
+        if (q >= 0) {
+            Set<String> names = new TreeSet<>();
+            for (String kv : e.path.substring(q + 1).split("#", 2)[0].split("&")) {
+                names.add(kv.split("=", 2)[0]);
+            }
+            sb.append(String.join("&", names));
+        }
+        return sb.toString();
+    }
+
+    private void countShapes() {
+        shapes.clear();
+        for (Exchange e : exchanges) {
+            shapes.merge(shape(e), 1, Integer::sum);
+        }
+    }
 
     /** Parse and add requests (the same request seen again is not added twice), then rebuild and keep the build. */
     public synchronized AddResult add(List<Parse.Raw> raws, String role, String label, boolean replaceRole) throws IOException {
@@ -161,10 +196,16 @@ public final class Session {
 
     /** `snapshot` false keeps the new requests in the working model without recording a build (live capture). */
     public synchronized AddResult add(List<Parse.Raw> raws, String role, String label, boolean replaceRole, boolean snapshot) throws IOException {
+        return add(raws, role, label, replaceRole, snapshot, 0);
+    }
+
+    /** `perShape` above 0 keeps at most that many requests of any one shape (see shape()); the rest are counted as capped. */
+    public synchronized AddResult add(List<Parse.Raw> raws, String role, String label, boolean replaceRole, boolean snapshot, int perShape) throws IOException {
         if (replaceRole && role != null) {
             exchanges.removeIf(e -> role.equals(e.role));
             seen.removeIf(s -> s.endsWith("@" + role));
             fullRewrite = true;
+            countShapes();
         }
         final String roleKey = role == null ? "" : role;
         int n = raws.size();
@@ -190,13 +231,19 @@ public final class Session {
         });
         int added = 0;
         int skipped = 0;
+        int capped = 0;
         List<Exchange> fresh = new ArrayList<>();
         List<String> freshKeys = new ArrayList<>();
         for (int k = 0; k < parsed.length; k++) {
             if (parsed[k] == null) {
                 skipped++;
                 seen.remove(keys[todo.get(k)]);
+            } else if (perShape > 0 && shapes.getOrDefault(shape(parsed[k]), 0) >= perShape) {
+                // not kept, so not remembered either: seen.txt lines stay one per saved request
+                capped++;
+                seen.remove(keys[todo.get(k)]);
             } else {
+                shapes.merge(shape(parsed[k]), 1, Integer::sum);
                 parsed[k].item = base + added;
                 exchanges.add(parsed[k]);
                 fresh.add(parsed[k]);
@@ -206,12 +253,12 @@ public final class Session {
         }
         if (added == 0 && !fullRewrite && model != null) {
             // nothing new, so the model is unchanged: no rebuild. A send is still a build; live capture uses snapshot().
-            return new AddResult(0, dup, skipped, snapshot ? record(label) : null);
+            return new AddResult(0, dup, skipped, snapshot ? record(label) : null, capped);
         }
         pendingNew.addAll(fresh);
         pendingKeys.addAll(freshKeys);
         BuildInfo b = rebuild(label, skipped, snapshot);
-        return new AddResult(added, dup, skipped, b);
+        return new AddResult(added, dup, skipped, b, capped);
     }
 
     private static volatile java.util.concurrent.ForkJoinPool pool;
@@ -252,6 +299,7 @@ public final class Session {
 
     public synchronized void clear() throws IOException {
         exchanges.clear();
+        shapes.clear();
         roles = Set.of();
         seen.clear();
         builds.clear();
@@ -358,21 +406,13 @@ public final class Session {
         Path inputs = dir.resolve("inputs.jsonl.gz");
         Path seenFile = dir.resolve("seen.txt");
         if (fullRewrite || !Files.exists(inputs)) {
-            StringBuilder in = new StringBuilder();
-            for (Exchange e : exchanges) {
-                in.append(Json.write(e.toMap())).append('\n');
-            }
-            writeGz(inputs, in.toString());
+            writeAtomic(inputs, out -> writeLines(out, exchanges));
             // end with a newline: later batches are appended, and without it the next key would join this last one
             writeText(seenFile, seen.isEmpty() ? "" : String.join("\n", seen) + "\n");
             fullRewrite = false;
         } else if (!pendingNew.isEmpty()) {
-            StringBuilder in = new StringBuilder();
-            for (Exchange e : pendingNew) {
-                in.append(Json.write(e.toMap())).append('\n');
-            }
-            try (GZIPOutputStream out = new GZIPOutputStream(Files.newOutputStream(inputs, java.nio.file.StandardOpenOption.APPEND))) {
-                out.write(in.toString().getBytes(StandardCharsets.UTF_8));
+            try (var out = Files.newOutputStream(inputs, java.nio.file.StandardOpenOption.APPEND)) {
+                writeLines(out, pendingNew);
             }
             Files.writeString(seenFile, String.join("\n", pendingKeys) + "\n", StandardCharsets.UTF_8,
                     java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
@@ -381,8 +421,31 @@ public final class Session {
         pendingKeys.clear();
     }
 
+    /** One gzip member of JSON lines, written as it goes rather than built as one string first. */
+    private static void writeLines(java.io.OutputStream raw, List<Exchange> rows) throws IOException {
+        GZIPOutputStream gz = new GZIPOutputStream(new java.io.BufferedOutputStream(raw, 1 << 16), 1 << 16);
+        java.io.Writer w = new java.io.OutputStreamWriter(gz, StandardCharsets.UTF_8);
+        for (Exchange e : rows) {
+            w.write(Json.write(e.toMap()));
+            w.write('\n');
+        }
+        w.flush();
+        gz.finish();
+        gz.flush();
+    }
+
+    /**
+     * A build as saved: the whole model except the request and response panes, which the saved requests already
+     * hold. Diffs and history need only the nodes, edges and evidence ids, so a build costs kilobytes, not megabytes.
+     */
+    private Map<String, Object> buildFile() {
+        Map<String, Object> m = model.toMap();
+        m.put("evidence", model.evidenceLog.metas());
+        return m;
+    }
+
     private void save(BuildInfo info) throws IOException {
-        writeGz(dir.resolve("builds").resolve(info.id() + ".json.gz"), Json.write(model.toMap()));
+        writeGz(dir.resolve("builds").resolve(info.id() + ".json.gz"), Json.write(buildFile()));
         saveInputs();
         List<Object> list = new ArrayList<>();
         for (BuildInfo b : builds) {
@@ -463,6 +526,7 @@ public final class Session {
             }
         }
         readInputs();
+        countShapes();
         try {
             if (!exchanges.isEmpty()) {
                 // the working model may hold live-captured requests newer than the last build: rebuild it from the inputs
@@ -494,24 +558,23 @@ public final class Session {
             }
         }
         if (Files.exists(inputs)) {
-            GzText in = readGzTolerant(inputs);
-            int bad = 0;
+            int[] bad = {0};
+            int[] lineNo = {0};
             // seen.txt is written in the same order as the requests: line i is the key of request i
             List<Integer> readLines = new ArrayList<>();
-            int lineNo = 0;
-            for (String line : in.text().split("\n")) {
+            boolean torn = readGzLines(inputs, line -> {
                 if (line.isBlank()) {
-                    continue;
+                    return;
                 }
                 try {
                     exchanges.add(Exchange.fromMap((Map<String, Object>) Json.parse(line)));
-                    readLines.add(lineNo);
+                    readLines.add(lineNo[0]);
                 } catch (RuntimeException e) {
-                    bad++;
+                    bad[0]++;
                 }
-                lineNo++;
-            }
-            if (in.torn() || bad > 0) {
+                lineNo[0]++;
+            });
+            if (torn || bad[0] > 0) {
                 // forget the keys of requests that were lost, so sending them again adds them back
                 List<String> kept = new ArrayList<>();
                 for (int i : readLines) {
@@ -524,8 +587,8 @@ public final class Session {
                 String at = stamp();
                 Files.copy(inputs, dir.resolve("inputs.jsonl.gz.corrupt-" + at));
                 fullRewrite = true;
-                problems.add("the saved requests were damaged (" + (in.torn() ? "cut off at the end" : "") + (in.torn() && bad > 0 ? ", " : "")
-                        + (bad > 0 ? bad + " unreadable" : "") + "); " + exchanges.size() + " were read. The old file is kept as inputs.jsonl.gz.corrupt-" + at + ".");
+                problems.add("the saved requests were damaged (" + (torn ? "cut off at the end" : "") + (torn && bad[0] > 0 ? ", " : "")
+                        + (bad[0] > 0 ? bad[0] + " unreadable" : "") + "); " + exchanges.size() + " were read. The old file is kept as inputs.jsonl.gz.corrupt-" + at + ".");
             }
         }
         seen.addAll(keys);
@@ -538,10 +601,20 @@ public final class Session {
         return Instant.now().toString().replaceAll("[^0-9]", "").substring(0, 14);
     }
 
-    /** Write to a temporary file beside the target, then move it into place: a crash leaves the old file or the new one, never half of either. */
+    private interface Body {
+        void write(java.io.OutputStream out) throws IOException;
+    }
+
     private static void writeAtomic(Path p, byte[] data) throws IOException {
+        writeAtomic(p, out -> out.write(data));
+    }
+
+    /** Write to a temporary file beside the target, then move it into place: a crash leaves the old file or the new one, never half of either. */
+    private static void writeAtomic(Path p, Body body) throws IOException {
         Path tmp = p.resolveSibling(p.getFileName() + ".tmp");
-        Files.write(tmp, data);
+        try (var out = Files.newOutputStream(tmp)) {
+            body.write(out);
+        }
         try {
             Files.move(tmp, p, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         } catch (java.nio.file.AtomicMoveNotSupportedException e) {
@@ -569,25 +642,31 @@ public final class Session {
 
     record GzText(String text, boolean torn) {}
 
-    /**
-     * Read every gzip member of an appended file, member by member with exact byte accounting. Anything after the
-     * last complete member (a crash mid-append, however short) marks the file torn; the complete members are kept.
-     */
+    /** The whole text of a gzip file of appended members (tests and small files). */
     static GzText readGzTolerant(Path p) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        boolean torn = readGzLines(p, line -> sb.append(line).append('\n'));
+        return new GzText(sb.toString(), torn);
+    }
+
+    /**
+     * Hand each line of an appended gzip file to `sink`, member by member with exact byte accounting. A member's
+     * lines are handed over only once its checksum and length are confirmed. Anything after the last complete
+     * member (a crash mid-append, however short) makes the result true: torn.
+     */
+    static boolean readGzLines(Path p, java.util.function.Consumer<String> sink) throws IOException {
         byte[] f = Files.readAllBytes(p);
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         int pos = 0;
-        boolean torn = false;
         byte[] buf = new byte[64 * 1024];
+        java.io.ByteArrayOutputStream member = new java.io.ByteArrayOutputStream(1 << 16);
         while (pos < f.length) {
             int body = gzipHeaderEnd(f, pos);
             if (body < 0) {
-                torn = true;
-                break;
+                return true;
             }
             java.util.zip.Inflater inf = new java.util.zip.Inflater(true);
             java.util.zip.CRC32 crc = new java.util.zip.CRC32();
-            java.io.ByteArrayOutputStream member = new java.io.ByteArrayOutputStream();
+            member.reset();
             try {
                 inf.setInput(f, body, f.length - body);
                 while (!inf.finished()) {
@@ -599,24 +678,31 @@ public final class Session {
                     crc.update(buf, 0, n);
                 }
                 if (!inf.finished()) {
-                    torn = true;
-                    break;
+                    return true;
                 }
                 int trailer = f.length - inf.getRemaining();
                 if (trailer + 8 > f.length || le32(f, trailer) != (int) crc.getValue() || le32(f, trailer + 4) != (int) inf.getBytesWritten()) {
-                    torn = true;
-                    break;
+                    return true;
                 }
-                member.writeTo(out);
                 pos = trailer + 8;
             } catch (java.util.zip.DataFormatException e) {
-                torn = true;
-                break;
+                return true;
             } finally {
                 inf.end();
             }
+            byte[] b = member.toByteArray();
+            int start = 0;
+            for (int i = 0; i < b.length; i++) {
+                if (b[i] == '\n') {
+                    sink.accept(new String(b, start, i - start, StandardCharsets.UTF_8));
+                    start = i + 1;
+                }
+            }
+            if (start < b.length) {
+                sink.accept(new String(b, start, b.length - start, StandardCharsets.UTF_8));
+            }
         }
-        return new GzText(out.toString(StandardCharsets.UTF_8), torn);
+        return false;
     }
 
     private static int le32(byte[] b, int i) {
