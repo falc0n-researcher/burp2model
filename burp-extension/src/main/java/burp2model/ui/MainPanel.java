@@ -54,6 +54,13 @@ public final class MainPanel extends JPanel {
         void log(String line);
 
         Session session(String name) throws java.io.IOException;
+
+        /** Run slow work off the Swing thread; the extension tracks it so unloading waits for it. */
+        default void background(String name, Runnable task) {
+            Thread t = new Thread(null, task, name, 64L * 1024 * 1024);
+            t.setDaemon(true);
+            t.start();
+        }
     }
 
     private final Host host;
@@ -188,6 +195,24 @@ public final class MainPanel extends JPanel {
         replaceRole.addItemListener(e -> updateSettings());
         updateSettings();
         refresh();
+        reportProblems();
+    }
+
+    /** Say what could not be read when the model was opened; the damaged files are kept beside it. */
+    private void reportProblems() {
+        Session s = session;
+        if (s == null) {
+            return;
+        }
+        for (String p : s.problems()) {
+            host.log("burp2model (" + s.name + "): " + p);
+            say("burp2model: " + p);
+        }
+    }
+
+    /** Stop the map's timers; called when the extension unloads. */
+    public void dispose() {
+        graph.stop();
     }
 
     private static JTextArea textArea() {
@@ -1093,7 +1118,7 @@ public final class MainPanel extends JPanel {
             return;
         }
         reconStatus.setText("running…");
-        new Thread(() -> {
+        host.background("burp2model-recon", () -> {
             try {
                 Map<String, Object> r = Recon.run(h, s -> SwingUtilities.invokeLater(() -> reconStatus.setText("running: " + s)));
                 String text = Recon.format(r);
@@ -1108,7 +1133,7 @@ public final class MainPanel extends JPanel {
             } catch (Throwable t) {
                 SwingUtilities.invokeLater(() -> reconStatus.setText("failed: " + t.getMessage()));
             }
-        }, "burp2model-recon").start();
+        });
     }
 
     // ------------------------------------------------------------------ settings
@@ -1174,6 +1199,7 @@ public final class MainPanel extends JPanel {
             if (renamed) {
                 try {
                     session = host.session(n);
+                    reportProblems();
                 } catch (Exception ex) {
                     status.setText("could not open " + n + ": " + ex.getMessage());
                 }
@@ -1245,7 +1271,7 @@ public final class MainPanel extends JPanel {
         java.io.File f = fc.getSelectedFile();
         status.setText("importing " + f.getName() + "…");
         final Settings set = settings();
-        new Thread(null, () -> {
+        host.background("burp2model-import", () -> {
             try {
                 List<burp2model.engine.Parse.Raw> raws = burp2model.engine.Har.looksLike(f) ? burp2model.engine.Har.readRaw(f) : burp2model.engine.BurpXml.readRaw(f);
                 int unreadable = 0;
@@ -1266,7 +1292,7 @@ public final class MainPanel extends JPanel {
             } catch (Throwable t) {
                 say("could not import " + f.getName() + ": " + t.getMessage());
             }
-        }, "burp2model-import", 64L * 1024 * 1024).start();
+        });
     }
 
     private static int line(JPanel p, GridBagConstraints c, int row, String label, JTextField f, String hint) {

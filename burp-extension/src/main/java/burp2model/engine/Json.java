@@ -122,6 +122,11 @@ public final class Json {
                 default -> {
                     if (c < 0x20) {
                         sb.append(String.format("\\u%04x", (int) c));
+                    } else if (Character.isHighSurrogate(c) && i + 1 < s.length() && Character.isLowSurrogate(s.charAt(i + 1))) {
+                        sb.append(c).append(s.charAt(++i));
+                    } else if (Character.isSurrogate(c)) {
+                        // a lone surrogate has no UTF-8 form and would be saved as '?': keep it as an escape
+                        sb.append(String.format("\\u%04x", (int) c));
                     } else {
                         sb.append(c);
                     }
@@ -133,13 +138,24 @@ public final class Json {
 
     // ------------------------------------------------------------------ parse
 
+    /** Malformed or truncated JSON, with the offset where reading stopped. */
+    public static final class JsonError extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+        public final int offset;
+
+        JsonError(String what, int offset) {
+            super(what + " at " + offset);
+            this.offset = offset;
+        }
+    }
+
     public static Object parse(String s) {
         P p = new P(s);
         p.ws();
         Object v = p.value();
         p.ws();
         if (p.i != s.length()) {
-            throw new IllegalArgumentException("trailing data at " + p.i);
+            throw new JsonError("trailing data", p.i);
         }
         return v;
     }
@@ -158,10 +174,31 @@ public final class Json {
             }
         }
 
+        char peek() {
+            if (i >= s.length()) {
+                throw new JsonError("unexpected end", i);
+            }
+            return s.charAt(i);
+        }
+
+        char next() {
+            char c = peek();
+            i++;
+            return c;
+        }
+
+        void expect(char want) {
+            ws();
+            char c = next();
+            if (c != want) {
+                throw new JsonError("expected '" + want + "' but found '" + c + "'", i - 1);
+            }
+        }
+
         Object value() {
             ws();
             if (i >= s.length()) {
-                throw new IllegalArgumentException("unexpected end");
+                throw new JsonError("unexpected end", i);
             }
             char c = s.charAt(i);
             if (c == '{') {
@@ -192,20 +229,25 @@ public final class Json {
             Map<String, Object> m = new LinkedHashMap<>();
             i++;
             ws();
-            if (s.charAt(i) == '}') {
+            if (peek() == '}') {
                 i++;
                 return m;
             }
             while (true) {
                 ws();
+                if (peek() != '"') {
+                    throw new JsonError("expected a key", i);
+                }
                 String k = string();
-                ws();
-                i++; // :
+                expect(':');
                 m.put(k, value());
                 ws();
-                char c = s.charAt(i++);
+                char c = next();
                 if (c == '}') {
                     return m;
+                }
+                if (c != ',') {
+                    throw new JsonError("expected ',' or '}' but found '" + c + "'", i - 1);
                 }
             }
         }
@@ -214,16 +256,19 @@ public final class Json {
             List<Object> l = new ArrayList<>();
             i++;
             ws();
-            if (s.charAt(i) == ']') {
+            if (peek() == ']') {
                 i++;
                 return l;
             }
             while (true) {
                 l.add(value());
                 ws();
-                char c = s.charAt(i++);
+                char c = next();
                 if (c == ']') {
                     return l;
+                }
+                if (c != ',') {
+                    throw new JsonError("expected ',' or ']' but found '" + c + "'", i - 1);
                 }
             }
         }
@@ -232,12 +277,12 @@ public final class Json {
             StringBuilder sb = new StringBuilder();
             i++;
             while (true) {
-                char c = s.charAt(i++);
+                char c = next();
                 if (c == '"') {
                     return sb.toString();
                 }
                 if (c == '\\') {
-                    char e = s.charAt(i++);
+                    char e = next();
                     switch (e) {
                         case 'n' -> sb.append('\n');
                         case 'r' -> sb.append('\r');
@@ -245,7 +290,14 @@ public final class Json {
                         case 'b' -> sb.append('\b');
                         case 'f' -> sb.append('\f');
                         case 'u' -> {
-                            sb.append((char) Integer.parseInt(s.substring(i, i + 4), 16));
+                            if (i + 4 > s.length()) {
+                                throw new JsonError("unexpected end", s.length());
+                            }
+                            try {
+                                sb.append((char) Integer.parseInt(s.substring(i, i + 4), 16));
+                            } catch (NumberFormatException bad) {
+                                throw new JsonError("bad \\u escape", i);
+                            }
                             i += 4;
                         }
                         default -> sb.append(e);
@@ -263,12 +315,16 @@ public final class Json {
             }
             String t = s.substring(st, i);
             if (t.isEmpty()) {
-                throw new IllegalArgumentException("bad json at " + st);
+                throw new JsonError("bad json", st);
             }
-            if (t.contains(".") || t.contains("e") || t.contains("E")) {
-                return Double.parseDouble(t);
+            try {
+                if (t.contains(".") || t.contains("e") || t.contains("E")) {
+                    return Double.parseDouble(t);
+                }
+                return Long.parseLong(t);
+            } catch (NumberFormatException bad) {
+                throw new JsonError("bad number", st);
             }
-            return Long.parseLong(t);
         }
     }
 }

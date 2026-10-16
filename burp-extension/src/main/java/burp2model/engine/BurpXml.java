@@ -53,13 +53,25 @@ public final class BurpXml {
         void accept(Parse.Raw raw, int index);
     }
 
-    private static void forEach(File f, ItemSink sink) throws Exception {
+    /**
+     * Burp's export starts with an inline DOCTYPE, so DTDs stay allowed; nothing outside the file is ever loaded,
+     * and secure processing caps entity expansion (no billion laughs).
+     */
+    private static Document parse(File f) throws Exception {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        dbf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
         dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
         dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
         dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
         dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-        Document doc = dbf.newDocumentBuilder().parse(f);
+        dbf.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        dbf.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        dbf.setXIncludeAware(false);
+        return dbf.newDocumentBuilder().parse(f);
+    }
+
+    private static void forEach(File f, ItemSink sink) throws Exception {
+        Document doc = parse(f);
         NodeList items = doc.getElementsByTagName("item");
         for (int i = 0; i < items.getLength(); i++) {
             Element it = (Element) items.item(i);
@@ -81,42 +93,18 @@ public final class BurpXml {
     }
 
     public static List<Exchange> read(File f, String role) throws Exception {
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-        dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-        Document doc = dbf.newDocumentBuilder().parse(f);
-        NodeList items = doc.getElementsByTagName("item");
         List<Exchange> out = new ArrayList<>();
-        int idx = 1;
-        for (int i = 0; i < items.getLength(); i++) {
-            Element it = (Element) items.item(i);
-            String path = text(it, "path");
-            if (path == null || path.isBlank()) {
-                String url = text(it, "url");
-                String[] hp = url == null ? null : Extract.splitAbsolute(url);
-                String q = url != null && url.contains("?") ? url.substring(url.indexOf('?')) : "";
-                path = hp == null ? "/" : (hp[1].isEmpty() ? "/" : hp[1]) + q.split("#", 2)[0];
-            }
-            String st = text(it, "status");
-            Integer status = st != null && st.strip().matches("\\d+") ? Integer.parseInt(st.strip()) : null;
-            String port = text(it, "port");
-            Parse.Raw raw = new Parse.Raw(text(it, "method"), text(it, "host"),
-                    port != null && port.strip().matches("\\d+") ? Integer.parseInt(port.strip()) : 0, text(it, "protocol"),
-                    path, status, text(it, "mimetype"), blob(it, "request"), blob(it, "response"),
-                    it.getElementsByTagName("truncated").getLength() > 0);
+        forEach(f, (raw, i) -> {
             Exchange ex;
             try {
-                ex = Parse.item(idx, raw, role, f.getName(), i);
+                ex = Parse.item(out.size() + 1, raw, role, f.getName(), i);
             } catch (RuntimeException e) {
                 ex = null;
             }
             if (ex != null) {
                 out.add(ex);
-                idx++;
             }
-        }
+        });
         return out;
     }
 }
