@@ -56,6 +56,11 @@ final class QueryTab implements Tab {
         this.view = build();
     }
 
+    void focusField() {
+        queryField.requestFocusInWindow();
+        queryField.selectAll();
+    }
+
     /** Run a query as if it were typed. */
     void ask(String text) {
         queryField.setText(text);
@@ -76,7 +81,7 @@ final class QueryTab implements Tab {
         JPanel top = new JPanel(new BorderLayout(8, 0));
         top.setBorder(BorderFactory.createEmptyBorder(8, 10, 4, 10));
         queryField.setFont(Theme.mono(13f));
-        queryField.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.line()), BorderFactory.createEmptyBorder(5, 8, 5, 8)));
+        queryField.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.LINE), BorderFactory.createEmptyBorder(5, 8, 5, 8)));
         JButton run = new JButton("Run");
         run.setFont(Theme.font(12f, Font.BOLD));
         JButton help = new JButton("Help");
@@ -84,7 +89,6 @@ final class QueryTab implements Tab {
         JButton csv = new JButton("Save CSV…");
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         for (JButton b : new JButton[] {run, cancelQuery, help, copy, csv}) {
-            b.setFocusable(false);
             buttons.add(b);
         }
         cancelQuery.setVisible(false);
@@ -121,7 +125,6 @@ final class QueryTab implements Tab {
             b.setToolTipText(ex);
             b.setFont(Theme.font(11f, Font.PLAIN));
             b.setMargin(new Insets(1, 7, 1, 7));
-            b.setFocusable(false);
             b.addActionListener(e -> app.ask(ex));
             examples.add(b);
         }
@@ -207,7 +210,7 @@ final class QueryTab implements Tab {
     private void runQuery(String text) {
         Model m = app.model();
         if (m == null) {
-            queryNote.setForeground(Theme.muted());
+            queryNote.setForeground(Theme.MUTED);
             queryNote.setText("Nothing to query yet. Send some requests first.");
             return;
         }
@@ -246,7 +249,7 @@ final class QueryTab implements Tab {
         long deadline = System.currentTimeMillis() + QUERY_SECONDS * 1000L;
         q.stop = () -> stop.get() || System.currentTimeMillis() > deadline;
         int gen = ++queryGen;
-        queryNote.setForeground(Theme.muted());
+        queryNote.setForeground(Theme.MUTED);
         queryNote.setText("running…");
         cancelQuery.setVisible(true);
         app.async(null, () -> {
@@ -276,7 +279,7 @@ final class QueryTab implements Tab {
     /** Put a query's answer on screen (Swing thread). */
     private void showResult(Query.Result r) {
         lastResult = r;
-        queryNote.setForeground(Theme.muted());
+        queryNote.setForeground(Theme.MUTED);
         queryNote.setText(r.kind().equals("text") ? "text answer" : r.note());
         queryText.setText(r.kind().equals("text") ? r.note() : "");
         queryText.setCaretPosition(0);

@@ -60,7 +60,7 @@ final class Facts extends JPanel {
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
         scroll = new JScrollPane(body);
-        scroll.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, Theme.line()));
+        scroll.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, Theme.LINE));
         scroll.getVerticalScrollBar().setUnitIncrement(16);
         add(scroll, BorderLayout.CENTER);
         clear("Select something to see its facts.");
@@ -167,7 +167,7 @@ final class Facts extends JPanel {
             t.setFont(Theme.font(12f, Font.BOLD));
             JTextArea why = text(s.why());
             JTextArea next = text("Do next: " + s.next());
-            next.setForeground(Theme.muted());
+            next.setForeground(Theme.MUTED);
             JPanel col = new JPanel();
             col.setOpaque(false);
             col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
@@ -234,12 +234,12 @@ final class Facts extends JPanel {
         p.setOpaque(false);
         p.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel a = new JLabel(arrow);
-        a.setForeground(Theme.muted());
+        a.setForeground(Theme.MUTED);
         JLabel e = Widgets.muted(edge + (state.equals("OBSERVED") ? "" : " (" + state.toLowerCase() + ")"));
         JLabel dot = new JLabel("●");
         dot.setForeground(Theme.type(o.type));
         dot.setFont(Theme.font(9f, Font.PLAIN));
-        String hex = Theme.hex(Theme.BLUE);
+        String hex = Theme.hex(Theme.readable(Theme.BLUE, Theme.surface()));
         JLabel name = new JLabel("<html><font color='" + hex + "'><u>" + escape(o.label.length() > 60 ? o.label.substring(0, 59) + "…" : o.label) + "</u></font></html>");
         name.setFont(Theme.mono(11f));
         name.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));

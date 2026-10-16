@@ -53,7 +53,7 @@ final class Tables {
         t.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         t.setFillsViewportHeight(true);
         t.setAutoResizeMode(JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS);
-        t.setRowHeight(26);
+        t.setRowHeight(Theme.rowHeight(Theme.font(12f, java.awt.Font.PLAIN), 26));
         t.setShowGrid(false);
         t.setIntercellSpacing(new java.awt.Dimension(0, 0));
         t.setDefaultRenderer(Object.class, Renderers.text());
@@ -61,17 +61,17 @@ final class Tables {
         t.setDefaultRenderer(Integer.class, Renderers.ids());
         JTableHeader h = t.getTableHeader();
         h.setReorderingAllowed(true);
-        h.setPreferredSize(new java.awt.Dimension(10, 28));
+        h.setPreferredSize(new java.awt.Dimension(10, Theme.rowHeight(Theme.font(11f, java.awt.Font.BOLD), 28)));
         DefaultTableCellRenderer hr = new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable tb, Object v, boolean s, boolean f, int r, int c) {
                 JLabel l = (JLabel) super.getTableCellRendererComponent(tb, v, false, false, r, c);
                 l.setFont(Theme.font(11f, Font.BOLD));
-                l.setForeground(Theme.muted());
+                l.setForeground(Theme.MUTED);
                 l.setBackground(Theme.surface2());
                 l.setHorizontalAlignment(SwingConstants.LEFT);
                 l.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.line()), BorderFactory.createEmptyBorder(0, 8, 0, 4)));
+                        BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.LINE), BorderFactory.createEmptyBorder(0, 8, 0, 4)));
                 l.setText(v == null ? "" : String.valueOf(v).toUpperCase());
                 return l;
             }
