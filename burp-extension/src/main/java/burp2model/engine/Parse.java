@@ -406,7 +406,8 @@ public final class Parse {
 
     private record BodyScan(String full, List<Redact.Fingerprint> prints, List<Extract.Ref> refs, List<String[]> assetRefs, List<Stack.Hit> hits, String evText) {}
 
-    private static final java.util.concurrent.ConcurrentHashMap<String, BodyScan> SCANS = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Scans by content, least recently used dropped first once they hold SCAN_CACHE_CHARS (it used to stop caching when full). */
+    private static final java.util.LinkedHashMap<String, BodyScan> SCANS = new java.util.LinkedHashMap<>(256, 0.75f, true);
     private static final java.util.concurrent.atomic.AtomicLong SCAN_CHARS = new java.util.concurrent.atomic.AtomicLong();
     private static final long SCAN_CACHE_CHARS = 48L * 1024 * 1024;
 
@@ -415,11 +416,7 @@ public final class Parse {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
             md.update((byte) (js ? 1 : 0));
             md.update(b);
-            StringBuilder sb = new StringBuilder(b.length + ":");
-            for (byte x : md.digest()) {
-                sb.append(String.format("%02x", x));
-            }
-            return sb.toString();
+            return b.length + ":" + java.util.HexFormat.of().formatHex(md.digest());
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -428,7 +425,10 @@ public final class Parse {
     private static BodyScan scanBody(byte[] bytes, boolean js) {
         String key = bytes.length > 2048 ? contentKey(bytes, js) : null;
         if (key != null) {
-            BodyScan hit = SCANS.get(key);
+            BodyScan hit;
+            synchronized (SCANS) {
+                hit = SCANS.get(key);
+            }
             if (hit != null) {
                 return hit;
             }
@@ -439,17 +439,27 @@ public final class Parse {
         List<Extract.Ref> sorted = new ArrayList<>(refs);
         BodyScan scan = new BodyScan(full, red.prints(), sorted, js ? Extract.scriptAssetRefs(full) : List.of(), Stack.bodyHits(full),
                 Redact.redactNamed(trunc(trunc(full, js ? CODE_KEEP : BODY_KEEP), js ? CODE_KEEP : BODY_KEEP)));
-        if (key != null && SCAN_CHARS.get() < SCAN_CACHE_CHARS) {
-            SCAN_CHARS.addAndGet(full.length());
-            SCANS.put(key, scan);
+        if (key != null && full.length() < SCAN_CACHE_CHARS / 4) {
+            synchronized (SCANS) {
+                if (SCANS.put(key, scan) == null) {
+                    SCAN_CHARS.addAndGet(full.length());
+                }
+                var it = SCANS.entrySet().iterator();
+                while (SCAN_CHARS.get() > SCAN_CACHE_CHARS && it.hasNext()) {
+                    SCAN_CHARS.addAndGet(-it.next().getValue().full().length());
+                    it.remove();
+                }
+            }
         }
         return scan;
     }
 
     /** Drop the cached scans (when a session is cleared, so memory does not linger). */
     public static void clearCache() {
-        SCANS.clear();
-        SCAN_CHARS.set(0);
+        synchronized (SCANS) {
+            SCANS.clear();
+            SCAN_CHARS.set(0);
+        }
     }
 
     // ---- the item

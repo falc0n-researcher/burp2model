@@ -30,11 +30,13 @@ public final class Diff {
         return ORDER.getOrDefault(type, 99);
     }
 
+    private static final java.util.regex.Pattern INTEGER = java.util.regex.Pattern.compile("-?\\d+");
+
     @SuppressWarnings("unchecked")
     private static List<Object> sortedList(Object v) {
         List<Object> l = v instanceof List<?> x ? new ArrayList<>((List<Object>) x) : new ArrayList<>();
         l.sort(Comparator.comparing(String::valueOf, (a, b) -> {
-            boolean na = a.matches("-?\\d+"), nb = b.matches("-?\\d+");
+            boolean na = INTEGER.matcher(a).matches(), nb = INTEGER.matcher(b).matches();
             if (na && nb) {
                 return Long.compare(Long.parseLong(a), Long.parseLong(b));
             }
@@ -205,7 +207,8 @@ public final class Diff {
         return out;
     }
 
-    private static Map<String, Object> workflow(String kind, Model m, List<String> idsList, List<Model.Edge> edges, Model other) {
+    private static Map<String, Object> workflow(String kind, Model m, List<String> idsList, List<Model.Edge> edges, Map<String, List<Integer>> incident,
+                                                Model other) {
         Set<String> ids = new HashSet<>(idsList);
         List<Model.Node> nodes = new ArrayList<>();
         idsList.forEach(i -> nodes.add(m.nodes.get(i)));
@@ -242,7 +245,13 @@ public final class Diff {
             rest.add(r[1] + " " + r[0].replace('_', ' ') + (!r[1].equals("1") ? "s" : ""));
         }
         List<Object> links = new ArrayList<>();
-        for (Model.Edge e : edges) {
+        // only the edges touching this workflow, in list order (scanning every edge per workflow was n^2)
+        Set<Integer> touching = new TreeSet<>();
+        for (String id : idsList) {
+            touching.addAll(incident.getOrDefault(id, List.of()));
+        }
+        for (int at : touching) {
+            Model.Edge e = edges.get(at);
             boolean aIn = ids.contains(e.src);
             boolean bIn = ids.contains(e.dst);
             if (aIn != bIn) {
@@ -478,9 +487,17 @@ public final class Diff {
 
     private static void splitWorkflows(String kind, Model model, Set<String> ids, List<Model.Edge> edges, Model other,
                                        List<Map<String, Object>> wf, List<String> singles) {
+        Map<String, List<Integer>> incident = new HashMap<>();
+        for (int i = 0; i < edges.size(); i++) {
+            Model.Edge e = edges.get(i);
+            incident.computeIfAbsent(e.src, x -> new ArrayList<>()).add(i);
+            if (!e.dst.equals(e.src)) {
+                incident.computeIfAbsent(e.dst, x -> new ArrayList<>()).add(i);
+            }
+        }
         for (List<String> comp : components(ids, edges)) {
             if (comp.size() >= 2) {
-                wf.add(workflow(kind, model, comp, edges, other));
+                wf.add(workflow(kind, model, comp, edges, incident, other));
             } else {
                 singles.add(comp.get(0));
             }

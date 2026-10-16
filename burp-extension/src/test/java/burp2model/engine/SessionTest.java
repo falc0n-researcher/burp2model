@@ -173,6 +173,28 @@ class SessionTest {
     }
 
     @Test
+    void liveCaptureKeepsAFewSamplesOfEachShape() throws Exception {
+        Parse.Raw t = raws.get(0);
+        java.util.List<Parse.Raw> polls = new java.util.ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            // the same endpoint polled with a cache-buster: every request is different bytes, one shape
+            String p = "/api/status?_=" + (1000 + i);
+            byte[] req = ("GET " + p + " HTTP/1.1\r\nHost: " + t.host() + "\r\n\r\n").getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+            polls.add(new Parse.Raw("GET", t.host(), t.port(), t.protocol(), p, 200, "", req, t.response(), false));
+        }
+        Session s = new Session(home, "live");
+        Session.AddResult r = s.add(polls, null, "live capture", false, false, 10);
+        assertEquals(10, r.added());
+        assertEquals(15, r.capped());
+        assertEquals(0, s.add(polls, null, "live capture", false, false, 10).added(), "the shape is still full after more polls");
+
+        Session reopened = new Session(home, "live");
+        assertEquals(0, reopened.add(polls, null, "live capture", false, false, 10).added(), "shape counts are rebuilt on load");
+        assertEquals(5, reopened.add(polls.subList(0, 5), "other", "live capture", false, false, 10).added(), "another role is another shape");
+        assertEquals(15, reopened.add(polls, null, "sent", false).added(), "a manual send is never capped");
+    }
+
+    @Test
     void rolesComeFromTheRequests() throws Exception {
         Session s = new Session(home, "app");
         s.add(half(), "user", "u", false);

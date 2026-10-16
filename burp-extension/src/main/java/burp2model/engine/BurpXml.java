@@ -4,37 +4,31 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import javax.xml.parsers.DocumentBuilderFactory;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 
-/** Reads Burp's "Save items" XML. Used by the command-line tools and tests, never inside Burp itself. */
+/** Reads Burp's "Save items" XML: the extension's Import, the command-line tools and the tests. */
 public final class BurpXml {
     private BurpXml() {}
 
-    private static String text(Element item, String tag) {
-        NodeList l = item.getElementsByTagName(tag);
-        return l.getLength() == 0 ? null : l.item(0).getTextContent();
+    private static String text(java.util.Map<String, String> item, String tag) {
+        return item.get(tag);
     }
 
-    private static byte[] blob(Element item, String tag) {
-        NodeList l = item.getElementsByTagName(tag);
-        if (l.getLength() == 0) {
+    private static byte[] blob(java.util.Map<String, String> item, java.util.Set<String> base64, String tag) {
+        String t = item.get(tag);
+        if (t == null) {
             return new byte[0];
         }
-        Element e = (Element) l.item(0);
-        String t = e.getTextContent();
-        if ("true".equals(e.getAttribute("base64"))) {
+        if (base64.contains(tag)) {
             String s = t.replaceAll("\\s+", "");
             if (s.length() % 4 == 1) {
                 s = s.substring(0, s.length() - 1);
             }
-            while (s.length() % 4 != 0) {
-                s += "=";
+            StringBuilder pad = new StringBuilder(s);
+            while (pad.length() % 4 != 0) {
+                pad.append('=');
             }
             try {
-                return Base64.getDecoder().decode(s);
+                return Base64.getDecoder().decode(pad.toString());
             } catch (IllegalArgumentException ex) {
                 return t.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             }
@@ -54,42 +48,74 @@ public final class BurpXml {
     }
 
     /**
-     * Burp's export starts with an inline DOCTYPE, so DTDs stay allowed; nothing outside the file is ever loaded,
-     * and secure processing caps entity expansion (no billion laughs).
+     * Read the export one item at a time (StAX), so a large export never sits in memory as a document tree.
+     * Burp's inline DOCTYPE is skipped, not processed: no entity is ever expanded or fetched, so neither
+     * billion laughs nor external entities can do anything.
      */
-    private static Document parse(File f) throws Exception {
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-        dbf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
-        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-        dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-        dbf.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
-        dbf.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-        dbf.setXIncludeAware(false);
-        return dbf.newDocumentBuilder().parse(f);
+    private static void forEach(File f, ItemSink sink) throws Exception {
+        javax.xml.stream.XMLInputFactory xf = javax.xml.stream.XMLInputFactory.newFactory();
+        xf.setProperty(javax.xml.stream.XMLInputFactory.SUPPORT_DTD, false);
+        xf.setProperty(javax.xml.stream.XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        xf.setProperty(javax.xml.stream.XMLInputFactory.IS_COALESCING, true);
+        try (java.io.InputStream in = new java.io.BufferedInputStream(new java.io.FileInputStream(f), 1 << 16)) {
+            javax.xml.stream.XMLStreamReader r = xf.createXMLStreamReader(in);
+            try {
+                int index = 0;
+                while (r.hasNext()) {
+                    if (r.next() == javax.xml.stream.XMLStreamConstants.START_ELEMENT && r.getLocalName().equals("item")) {
+                        java.util.Map<String, String> it = new java.util.HashMap<>();
+                        java.util.Set<String> base64 = new java.util.HashSet<>();
+                        readItem(r, it, base64);
+                        sink.accept(toRaw(it, base64), index++);
+                    }
+                }
+            } finally {
+                r.close();
+            }
+        }
     }
 
-    private static void forEach(File f, ItemSink sink) throws Exception {
-        Document doc = parse(f);
-        NodeList items = doc.getElementsByTagName("item");
-        for (int i = 0; i < items.getLength(); i++) {
-            Element it = (Element) items.item(i);
-            String path = text(it, "path");
-            if (path == null || path.isBlank()) {
-                String url = text(it, "url");
-                String[] hp = url == null ? null : Extract.splitAbsolute(url);
-                String q = url != null && url.contains("?") ? url.substring(url.indexOf('?')) : "";
-                path = hp == null ? "/" : (hp[1].isEmpty() ? "/" : hp[1]) + q.split("#", 2)[0];
+    /** The first value of each element inside one item (what the DOM reader's getElementsByTagName(tag).item(0) gave). */
+    private static void readItem(javax.xml.stream.XMLStreamReader r, java.util.Map<String, String> it, java.util.Set<String> base64) throws Exception {
+        int depth = 1;
+        while (depth > 0 && r.hasNext()) {
+            int ev = r.next();
+            if (ev == javax.xml.stream.XMLStreamConstants.START_ELEMENT) {
+                String tag = r.getLocalName();
+                boolean b64 = "true".equals(r.getAttributeValue(null, "base64"));
+                String text;
+                try {
+                    text = r.getElementText();                 // consumes up to and including the end tag
+                } catch (javax.xml.stream.XMLStreamException nested) {
+                    depth++;                                   // an element with children: walk into it instead
+                    continue;
+                }
+                if (!it.containsKey(tag)) {
+                    it.put(tag, text);
+                    if (b64) {
+                        base64.add(tag);
+                    }
+                }
+            } else if (ev == javax.xml.stream.XMLStreamConstants.END_ELEMENT) {
+                depth--;
             }
-            String st = text(it, "status");
-            Integer status = st != null && st.strip().matches("\\d+") ? Integer.parseInt(st.strip()) : null;
-            String port = text(it, "port");
-            sink.accept(new Parse.Raw(text(it, "method"), text(it, "host"),
-                    port != null && port.strip().matches("\\d+") ? Integer.parseInt(port.strip()) : 0, text(it, "protocol"),
-                    path, status, text(it, "mimetype"), blob(it, "request"), blob(it, "response"),
-                    it.getElementsByTagName("truncated").getLength() > 0), i);
         }
+    }
+
+    private static Parse.Raw toRaw(java.util.Map<String, String> it, java.util.Set<String> base64) {
+        String path = text(it, "path");
+        if (path == null || path.isBlank()) {
+            String url = text(it, "url");
+            String[] hp = url == null ? null : Extract.splitAbsolute(url);
+            String q = url != null && url.contains("?") ? url.substring(url.indexOf('?')) : "";
+            path = hp == null ? "/" : (hp[1].isEmpty() ? "/" : hp[1]) + q.split("#", 2)[0];
+        }
+        String st = text(it, "status");
+        Integer status = st != null && st.strip().matches("\\d+") ? Integer.parseInt(st.strip()) : null;
+        String port = text(it, "port");
+        return new Parse.Raw(text(it, "method"), text(it, "host"),
+                port != null && port.strip().matches("\\d+") ? Integer.parseInt(port.strip()) : 0, text(it, "protocol"),
+                path, status, text(it, "mimetype"), blob(it, base64, "request"), blob(it, base64, "response"), it.containsKey("truncated"));
     }
 
     public static List<Exchange> read(File f, String role) throws Exception {
