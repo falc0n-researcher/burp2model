@@ -4,5 +4,5 @@ package burp2model.engine;
 public final class Version {
     private Version() {}
 
-    public static final String EXTENSION = "1.0.0";
+    public static final String EXTENSION = "1.1.0";
 }

@@ -1,6 +1,6 @@
 # Changelog: Burp extension
 
-## Unreleased
+## 1.1.0 — 2026-10-16
 
 - **Import HAR or Burp export** in Settings: add the requests from a HAR file (browser DevTools, Hetty, mitmproxy, ZAP) or a Burp "Save items" XML to the model.
 - Redaction matches the command line tool's new coverage (multipart parts, XML elements, quoted assignments in code and config, YAML, JSON arrays and encoded JSON, `cookie` / `credential` / `bearer` values), checked against it in `tests/test_java_parity.py`.
