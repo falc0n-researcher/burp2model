@@ -46,6 +46,57 @@ public final class Session {
     private final List<String> pendingKeys = new ArrayList<>();
     private boolean fullRewrite;
 
+    private java.nio.channels.FileChannel lockChannel;
+    private java.nio.channels.FileLock lock;
+
+    /**
+     * Hold the model's folder for this Burp: a second Burp (another process) opening the same model would
+     * interleave writes. Released by close().
+     */
+    public synchronized void lock() throws IOException {
+        if (lock != null) {
+            return;
+        }
+        var ch = java.nio.channels.FileChannel.open(dir.resolve(".lock"), java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
+        java.nio.channels.FileLock l;
+        try {
+            l = ch.tryLock();
+        } catch (java.nio.channels.OverlappingFileLockException e) {
+            l = null;
+        }
+        if (l == null) {
+            ch.close();
+            throw new IOException("the model '" + name + "' is open in another Burp; close it there or choose another model name");
+        }
+        lockChannel = ch;
+        lock = l;
+    }
+
+    public synchronized void close() {
+        try {
+            if (lock != null) {
+                lock.release();
+            }
+            if (lockChannel != null) {
+                lockChannel.close();
+            }
+        } catch (IOException ignored) {
+            // the process is going away or the file is gone; either way the lock is released
+        }
+        lock = null;
+        lockChannel = null;
+    }
+
+    /** Stop the parsing threads (the extension is unloading); the next large add starts them again. */
+    public static void shutdownPool() {
+        synchronized (Session.class) {
+            if (pool != null) {
+                pool.shutdown();
+                pool = null;
+            }
+        }
+    }
+
     public Session(Path home, String name) throws IOException {
         this.name = name;
         this.dir = home.resolve(name);
@@ -173,7 +224,8 @@ public final class Session {
             }
             return;
         }
-        if (pool == null) {
+        java.util.concurrent.ForkJoinPool fj = pool;
+        if (fj == null) {
             synchronized (Session.class) {
                 if (pool == null) {
                     pool = new java.util.concurrent.ForkJoinPool(Math.max(2, Runtime.getRuntime().availableProcessors() - 1),
@@ -183,10 +235,11 @@ public final class Session {
                                 return t;
                             }, null, false);
                 }
+                fj = pool;
             }
         }
         try {
-            pool.submit(() -> java.util.stream.IntStream.range(0, n).parallel().forEach(body)).get();
+            fj.submit(() -> java.util.stream.IntStream.range(0, n).parallel().forEach(body)).get();
         } catch (InterruptedException | java.util.concurrent.ExecutionException e) {
             throw new IllegalStateException(e);
         }
@@ -310,7 +363,8 @@ public final class Session {
                 in.append(Json.write(e.toMap())).append('\n');
             }
             writeGz(inputs, in.toString());
-            Files.writeString(seenFile, String.join("\n", seen), StandardCharsets.UTF_8);
+            // end with a newline: later batches are appended, and without it the next key would join this last one
+            writeText(seenFile, seen.isEmpty() ? "" : String.join("\n", seen) + "\n");
             fullRewrite = false;
         } else if (!pendingNew.isEmpty()) {
             StringBuilder in = new StringBuilder();
@@ -348,40 +402,68 @@ public final class Session {
         Map<String, Object> hist = new LinkedHashMap<>();
         nodeHistory.forEach((k, v) -> hist.put(k, List.of((long) v[0], (long) v[1])));
         meta.put("history", hist);
-        Files.writeString(dir.resolve("session.json"), Json.write(meta), StandardCharsets.UTF_8);
+        writeText(dir.resolve("session.json"), Json.write(meta));
     }
 
+    /** What went wrong reading the saved model, if anything; the damaged files were kept next to it as *.corrupt-<time>. */
+    public List<String> problems() {
+        return List.copyOf(problems);
+    }
+
+    private final List<String> problems = new ArrayList<>();
+
+    /**
+     * Read what can be read. Nothing is ever cleared because a file is damaged: a bad session.json or a torn
+     * inputs file is copied aside first, then the model carries on with everything that parsed.
+     */
     @SuppressWarnings("unchecked")
     private void load() throws IOException {
         Path meta = dir.resolve("session.json");
-        if (!Files.exists(meta)) {
-            loadInputsOnly();
-            return;
-        }
-        try {
-            Map<String, Object> m = (Map<String, Object>) Json.parse(Files.readString(meta, StandardCharsets.UTF_8));
-            scope = new ArrayList<>((List<String>) m.getOrDefault("scope", List.of()));
-            for (Object o : (List<Object>) m.get("builds")) {
-                Map<String, Object> b = (Map<String, Object>) o;
-                builds.add(new BuildInfo(((Number) b.get("id")).intValue(), (String) b.get("built_at"), (String) b.get("label"),
-                        ((Number) b.get("nodes")).intValue(), ((Number) b.get("edges")).intValue(), ((Number) b.get("requests")).intValue()));
-            }
-            // keep the builds up to the first one whose file is missing, so build ids stay 1..n
-            int kept = 0;
-            while (kept < builds.size() && kept + 1 == builds.get(kept).id()
-                    && Files.exists(dir.resolve("builds").resolve(builds.get(kept).id() + ".json.gz"))) {
-                kept++;
-            }
-            builds.subList(kept, builds.size()).clear();
-            final int last = kept;
-            ((Map<String, Object>) m.getOrDefault("history", Map.of())).forEach((k, v) -> {
-                List<Object> l = (List<Object>) v;
-                int first = ((Number) l.get(0)).intValue();
-                if (first <= last) {
-                    nodeHistory.put(k, new int[] {first, Math.min(last, ((Number) l.get(1)).intValue())});
+        if (Files.exists(meta)) {
+            try {
+                Map<String, Object> m = (Map<String, Object>) Json.parse(Files.readString(meta, StandardCharsets.UTF_8));
+                List<String> sc = new ArrayList<>((List<String>) m.getOrDefault("scope", List.of()));
+                List<BuildInfo> bs = new ArrayList<>();
+                for (Object o : (List<Object>) m.get("builds")) {
+                    Map<String, Object> b = (Map<String, Object>) o;
+                    bs.add(new BuildInfo(((Number) b.get("id")).intValue(), (String) b.get("built_at"), (String) b.get("label"),
+                            ((Number) b.get("nodes")).intValue(), ((Number) b.get("edges")).intValue(), ((Number) b.get("requests")).intValue()));
                 }
-            });
-            readInputs();
+                Map<String, int[]> hist = new LinkedHashMap<>();
+                ((Map<String, Object>) m.getOrDefault("history", Map.of())).forEach((k, v) -> {
+                    List<Object> l = (List<Object>) v;
+                    hist.put(k, new int[] {((Number) l.get(0)).intValue(), ((Number) l.get(1)).intValue()});
+                });
+                // keep the builds up to the first one whose file is missing, so build ids stay 1..n
+                int kept = 0;
+                while (kept < bs.size() && kept + 1 == bs.get(kept).id()
+                        && Files.exists(dir.resolve("builds").resolve(bs.get(kept).id() + ".json.gz"))) {
+                    kept++;
+                }
+                scope = sc;
+                builds.addAll(bs.subList(0, kept));
+                final int last = kept;
+                hist.forEach((k, v) -> {
+                    if (v[0] <= last) {
+                        nodeHistory.put(k, new int[] {v[0], Math.min(last, v[1])});
+                    }
+                });
+            } catch (RuntimeException e) {
+                // the build list is unreadable: keep it and the builds aside, and start the history again from the requests
+                String at = stamp();
+                Files.move(meta, dir.resolve("session.json.corrupt-" + at));
+                Path old = dir.resolve("builds");
+                if (Files.exists(old)) {
+                    Files.move(old, dir.resolve("builds.corrupt-" + at));
+                }
+                Files.createDirectories(dir.resolve("builds"));
+                builds.clear();
+                nodeHistory.clear();
+                problems.add("session.json could not be read (" + e.getMessage() + "); the build history starts again. The old files are kept as *.corrupt-" + at + ".");
+            }
+        }
+        readInputs();
+        try {
             if (!exchanges.isEmpty()) {
                 // the working model may hold live-captured requests newer than the last build: rebuild it from the inputs
                 rebuild(null, 0, false);
@@ -390,60 +472,182 @@ public final class Session {
             } else if (!builds.isEmpty()) {
                 model = buildModel(lastBuild().id());
             }
-        } catch (RuntimeException e) {
-            // an unreadable saved session starts over rather than blocking the tab
-            exchanges.clear();
-            seen.clear();
-            builds.clear();
-            nodeHistory.clear();
+        } catch (IOException | RuntimeException e) {
             model = null;
-        }
-    }
-
-    /** A folder with requests but no session.json (live capture that never recorded a build). */
-    private void loadInputsOnly() throws IOException {
-        try {
-            readInputs();
-            if (!exchanges.isEmpty()) {
-                rebuild(null, 0, false);
-            }
-        } catch (RuntimeException e) {
-            exchanges.clear();
-            seen.clear();
-            model = null;
+            problems.add("the saved model could not be rebuilt (" + e + "); the saved requests are untouched.");
         }
     }
 
     @SuppressWarnings("unchecked")
     private void readInputs() throws IOException {
         Path inputs = dir.resolve("inputs.jsonl.gz");
-        if (Files.exists(inputs)) {
-            for (String line : readGz(inputs).split("\n")) {
-                if (!line.isBlank()) {
-                    exchanges.add(Exchange.fromMap((Map<String, Object>) Json.parse(line)));
+        Path seenFile = dir.resolve("seen.txt");
+        List<String> keys = new ArrayList<>();
+        if (Files.exists(seenFile)) {
+            for (String line : Files.readString(seenFile, StandardCharsets.UTF_8).split("\n")) {
+                // models saved before 1.1.1 can have two keys on one line (the first save had no final newline)
+                for (String k : GLUED_KEY.split(line)) {
+                    if (!k.isBlank()) {
+                        keys.add(k);
+                    }
                 }
             }
         }
-        Path seenFile = dir.resolve("seen.txt");
-        if (Files.exists(seenFile)) {
-            for (String s : Files.readString(seenFile, StandardCharsets.UTF_8).split("\n")) {
-                if (!s.isBlank()) {
-                    seen.add(s);
+        if (Files.exists(inputs)) {
+            GzText in = readGzTolerant(inputs);
+            int bad = 0;
+            // seen.txt is written in the same order as the requests: line i is the key of request i
+            List<Integer> readLines = new ArrayList<>();
+            int lineNo = 0;
+            for (String line : in.text().split("\n")) {
+                if (line.isBlank()) {
+                    continue;
                 }
+                try {
+                    exchanges.add(Exchange.fromMap((Map<String, Object>) Json.parse(line)));
+                    readLines.add(lineNo);
+                } catch (RuntimeException e) {
+                    bad++;
+                }
+                lineNo++;
             }
+            if (in.torn() || bad > 0) {
+                // forget the keys of requests that were lost, so sending them again adds them back
+                List<String> kept = new ArrayList<>();
+                for (int i : readLines) {
+                    if (i < keys.size()) {
+                        kept.add(keys.get(i));
+                    }
+                }
+                keys = kept;
+                // keep the damaged file, and write a clean one on the next save: appending after a torn end would hide what follows
+                String at = stamp();
+                Files.copy(inputs, dir.resolve("inputs.jsonl.gz.corrupt-" + at));
+                fullRewrite = true;
+                problems.add("the saved requests were damaged (" + (in.torn() ? "cut off at the end" : "") + (in.torn() && bad > 0 ? ", " : "")
+                        + (bad > 0 ? bad + " unreadable" : "") + "); " + exchanges.size() + " were read. The old file is kept as inputs.jsonl.gz.corrupt-" + at + ".");
+            }
+        }
+        seen.addAll(keys);
+    }
+
+    /** A key is 64 hex digits, '@' and the role; a second key starting mid-line is split off. */
+    private static final java.util.regex.Pattern GLUED_KEY = java.util.regex.Pattern.compile("(?<=.)(?=[0-9a-f]{64}@)");
+
+    private static String stamp() {
+        return Instant.now().toString().replaceAll("[^0-9]", "").substring(0, 14);
+    }
+
+    /** Write to a temporary file beside the target, then move it into place: a crash leaves the old file or the new one, never half of either. */
+    private static void writeAtomic(Path p, byte[] data) throws IOException {
+        Path tmp = p.resolveSibling(p.getFileName() + ".tmp");
+        Files.write(tmp, data);
+        try {
+            Files.move(tmp, p, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            Files.move(tmp, p, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
+    private static void writeText(Path p, String text) throws IOException {
+        writeAtomic(p, text.getBytes(StandardCharsets.UTF_8));
+    }
+
     private static void writeGz(Path p, String text) throws IOException {
-        try (GZIPOutputStream out = new GZIPOutputStream(Files.newOutputStream(p))) {
+        java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+        try (GZIPOutputStream out = new GZIPOutputStream(buf)) {
             out.write(text.getBytes(StandardCharsets.UTF_8));
         }
+        writeAtomic(p, buf.toByteArray());
     }
 
     private static String readGz(Path p) throws IOException {
         try (GZIPInputStream in = new GZIPInputStream(Files.newInputStream(p))) {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    record GzText(String text, boolean torn) {}
+
+    /**
+     * Read every gzip member of an appended file, member by member with exact byte accounting. Anything after the
+     * last complete member (a crash mid-append, however short) marks the file torn; the complete members are kept.
+     */
+    static GzText readGzTolerant(Path p) throws IOException {
+        byte[] f = Files.readAllBytes(p);
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        int pos = 0;
+        boolean torn = false;
+        byte[] buf = new byte[64 * 1024];
+        while (pos < f.length) {
+            int body = gzipHeaderEnd(f, pos);
+            if (body < 0) {
+                torn = true;
+                break;
+            }
+            java.util.zip.Inflater inf = new java.util.zip.Inflater(true);
+            java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+            java.io.ByteArrayOutputStream member = new java.io.ByteArrayOutputStream();
+            try {
+                inf.setInput(f, body, f.length - body);
+                while (!inf.finished()) {
+                    int n = inf.inflate(buf);
+                    if (n == 0 && (inf.needsInput() || inf.needsDictionary())) {
+                        break;
+                    }
+                    member.write(buf, 0, n);
+                    crc.update(buf, 0, n);
+                }
+                if (!inf.finished()) {
+                    torn = true;
+                    break;
+                }
+                int trailer = f.length - inf.getRemaining();
+                if (trailer + 8 > f.length || le32(f, trailer) != (int) crc.getValue() || le32(f, trailer + 4) != (int) inf.getBytesWritten()) {
+                    torn = true;
+                    break;
+                }
+                member.writeTo(out);
+                pos = trailer + 8;
+            } catch (java.util.zip.DataFormatException e) {
+                torn = true;
+                break;
+            } finally {
+                inf.end();
+            }
+        }
+        return new GzText(out.toString(StandardCharsets.UTF_8), torn);
+    }
+
+    private static int le32(byte[] b, int i) {
+        return (b[i] & 0xff) | (b[i + 1] & 0xff) << 8 | (b[i + 2] & 0xff) << 16 | (b[i + 3] & 0xff) << 24;
+    }
+
+    /** Where a gzip member's deflate data starts, or -1 if no complete header is there. */
+    private static int gzipHeaderEnd(byte[] b, int pos) {
+        if (pos + 10 > b.length || (b[pos] & 0xff) != 0x1f || (b[pos + 1] & 0xff) != 0x8b || b[pos + 2] != 8) {
+            return -1;
+        }
+        int flags = b[pos + 3] & 0xff;
+        int i = pos + 10;
+        if ((flags & 4) != 0) {
+            if (i + 2 > b.length) {
+                return -1;
+            }
+            i += 2 + ((b[i] & 0xff) | (b[i + 1] & 0xff) << 8);
+        }
+        for (int bit : new int[] {8, 16}) {
+            if ((flags & bit) != 0) {
+                while (i < b.length && b[i] != 0) {
+                    i++;
+                }
+                i++;
+            }
+        }
+        if ((flags & 2) != 0) {
+            i += 2;
+        }
+        return i <= b.length ? i : -1;
     }
 
     @SuppressWarnings("unchecked")
