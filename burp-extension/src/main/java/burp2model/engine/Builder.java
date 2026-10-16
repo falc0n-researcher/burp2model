@@ -139,20 +139,37 @@ public final class Builder {
 
     private record Key(String host, String path) {}
 
+    private static final Object NOT_FOLDED = new Object();
+
+    /**
+     * The (host, path) an exchange contributes to folding, or null when it takes no part. Folding starts from the
+     * raw template on every rebuild, so the answer is kept on the exchange for as long as its template is the same.
+     */
+    private static Key siblingKey(Exchange ex) {
+        if (ex.siblingKeyFor != ex.pathTemplate) {
+            String last = ex.pathTemplate.substring(ex.pathTemplate.lastIndexOf('/') + 1);
+            boolean skip = ex.method.equals("OPTIONS") || isProbe(ex) || FILE_SEG.matcher(last).find();
+            int q = ex.pathTemplate.indexOf('?');
+            ex.siblingKey = skip ? NOT_FOLDED : new Key(ex.host, q < 0 ? ex.pathTemplate : ex.pathTemplate.substring(0, q));
+            ex.siblingKeyFor = ex.pathTemplate;
+        }
+        return ex.siblingKey == NOT_FOLDED ? null : (Key) ex.siblingKey;
+    }
+
     static int collapseSiblings(List<Exchange> exchanges) {
         Map<Key, Boolean> seen = new LinkedHashMap<>();
         for (Exchange ex : exchanges) {
-            String last = ex.pathTemplate.substring(ex.pathTemplate.lastIndexOf('/') + 1);
-            if (ex.method.equals("OPTIONS") || isProbe(ex) || FILE_SEG.matcher(last).find()) {
-                continue;
+            Key k = siblingKey(ex);
+            if (k != null) {
+                seen.putIfAbsent(k, true);
             }
-            seen.putIfAbsent(new Key(ex.host, ex.pathTemplate.split("\\?", 2)[0]), true);
         }
         Map<Key, List<String>> templates = new LinkedHashMap<>();
         int depth = 0;
         for (Key k : seen.keySet()) {
             List<String> segs = new ArrayList<>();
-            for (String x : k.path().replaceAll("^/+|/+$", "").split("/")) {
+            // leading and trailing slashes only make empty segments, which are skipped: no need to strip them first
+            for (String x : k.path().split("/")) {
                 if (!x.isEmpty()) {
                     segs.add(x);
                 }
@@ -323,6 +340,25 @@ public final class Builder {
         return "Authorization: " + cred;
     }
 
+    /** A secret seen again only bumps a count, so its map (with the rounded entropy) is built just once. */
+    private static void addSecret(Model m, Redact.Fingerprint f, int idx) {
+        Map<String, Object> ex = m.secretIndex.get(f.kind() + "\u0000" + f.hmac12());
+        if (ex != null) {
+            bumpSecret(ex, idx);
+            return;
+        }
+        addSecret(m, f.asMap(), idx);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void bumpSecret(Map<String, Object> ex, int idx) {
+        ex.put("count", ((Long) ex.get("count")) + 1);
+        List<Object> ev = (List<Object>) ex.get("evidence");
+        if (!ev.contains((long) idx) && ev.size() < 10) {
+            ev.add((long) idx);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static void addSecret(Model m, Map<String, Object> s, int idx) {
         String key = s.get("kind") + "\u0000" + s.get("hmac_12");
@@ -417,7 +453,7 @@ public final class Builder {
             ev.put("role", role);
             m.evidenceLog.add(ev, ex.evZ, ex.reqPath);
             for (Redact.Fingerprint s : ex.secrets) {
-                addSecret(m, s.asMap(), i);
+                addSecret(m, s, i);
             }
             if (isProbe(ex)) {
                 m.stats.merge("probe_requests", 1L, (a, b) -> (Long) a + 1);
@@ -580,11 +616,16 @@ public final class Builder {
         }
         if (!gone.isEmpty()) {
             Set<String> dead = new HashSet<>(gone);
-            m.edges = new ArrayList<>(m.edges.stream().filter(e -> !dead.contains(e.src) && !dead.contains(e.dst)).toList());
-            m.edgeIndex = new LinkedHashMap<>();
+            // drop only the edges that touch a removed node; the rest keep their order, in the list and the index
+            List<Model.Edge> kept = new ArrayList<>(m.edges.size());
             for (Model.Edge e : m.edges) {
-                m.edgeIndex.put(Model.edgeKey(e.src, e.dst, e.type), e);
+                if (dead.contains(e.src) || dead.contains(e.dst)) {
+                    m.edgeIndex.remove(Model.edgeKey(e.src, e.dst, e.type));
+                } else {
+                    kept.add(e);
+                }
             }
+            m.edges = kept;
             for (String k : new ArrayList<>(m.nodes.keySet())) {
                 // "param:<gone node id>:<name>": try each ':' as the end of the node id instead of every gone id
                 if (k.startsWith("param:")) {
