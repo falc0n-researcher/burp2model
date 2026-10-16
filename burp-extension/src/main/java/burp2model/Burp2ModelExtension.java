@@ -45,13 +45,9 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     /** Live capture waits here: at most 5,000 requests or 256 MB, whichever comes first. */
     private final LiveQueue live = new LiveQueue(5000, 256L * 1024 * 1024);
-    /** Live capture keeps this many requests of any one shape (method, host, path template, query names, status). */
-    static final int LIVE_SAMPLES_PER_SHAPE = 10;
-    private int cappedSinceSay;
+    private LiveCapture capture;
     private volatile boolean auto;
     private long autoCheckedAt;
-    private int sinceSnapshot;
-    private long lastSnapshot = System.currentTimeMillis();
     private ScheduledExecutorService flusher;
     /** Sends, imports and recon: tracked so unloading can wait for them instead of cutting a save short. */
     private final ExecutorService workers = Executors.newCachedThreadPool(r -> {
@@ -132,7 +128,24 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             t.setDaemon(true);
             return t;
         });
-        flusher.scheduleWithFixedDelay(this::flushLive, 5, 5, TimeUnit.SECONDS);
+        capture = new LiveCapture(live, () -> panel.session(), () -> panel.settings().role(), () -> panel.settings().scope(), System::currentTimeMillis,
+                new LiveCapture.Out() {
+                    @Override
+                    public void refresh() {
+                        panel.refresh();
+                    }
+
+                    @Override
+                    public void say(String text) {
+                        panel.say(text);
+                    }
+
+                    @Override
+                    public void error(String text) {
+                        api.logging().logToError(text);
+                    }
+                });
+        flusher.scheduleWithFixedDelay(capture::flush, 5, 5, TimeUnit.SECONDS);
         api.extension().registerUnloadingHandler(this::unload);
         api.logging().logToOutput("burp2model ready. Right-click requests and choose Send to burp2model; the model is in the burp2model tab.");
     }
@@ -150,7 +163,7 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
                 api.logging().logToError("burp2model: live capture was still saving after 15 seconds");
             }
             for (int i = 0; i < 10 && !live.isEmpty(); i++) {
-                flushLive();
+                capture.flush();
             }
             workers.shutdown();
             if (!workers.awaitTermination(15, TimeUnit.SECONDS)) {
@@ -223,44 +236,6 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             }
             return ResponseReceivedAction.continueWith(r);
         }
-    }
-
-    private void flushLive() {
-        try {
-            Session s = panel == null ? null : panel.session();
-            if (s == null || live.isEmpty()) {
-                return;
-            }
-            List<Parse.Raw> raws = live.drain(500);
-            MainPanel.Settings set = panel.settings();
-            s.scope = set.scope();
-            Session.AddResult res = s.add(raws, set.role(), "live capture", false, false, LIVE_SAMPLES_PER_SHAPE);
-            cappedSinceSay += res.capped();
-            int dropped = live.takeDropped();
-            if (dropped > 0) {
-                api.logging().logToError("burp2model live capture: the queue was full, " + dropped + " requests were not captured");
-            }
-            sinceSnapshot += res.added();
-            if (snapshotDue(sinceSnapshot, System.currentTimeMillis() - lastSnapshot)) {
-                s.snapshot("live capture");
-                sinceSnapshot = 0;
-                lastSnapshot = System.currentTimeMillis();
-            }
-            if (res.added() > 0 || dropped > 0) {
-                panel.refresh();
-                panel.say("burp2model live: +" + res.added() + " requests · " + s.requestCount() + " in the model"
-                        + (cappedSinceSay > 0 ? " · " + cappedSinceSay + " repeats of known shapes skipped" : "")
-                        + (dropped > 0 ? " · " + dropped + " not captured (queue full)" : ""));
-                cappedSinceSay = 0;
-            }
-        } catch (Throwable t) {
-            api.logging().logToError("burp2model live capture: " + t);
-        }
-    }
-
-    /** Live capture records a build every 40 new requests, or after three minutes once anything new arrived; duplicates never count. */
-    static boolean snapshotDue(int newSinceLast, long msSinceLast) {
-        return newSinceLast >= 40 || (newSinceLast > 0 && msSinceLast > 180_000);
     }
 
     // ------------------------------------------------------------------ menu

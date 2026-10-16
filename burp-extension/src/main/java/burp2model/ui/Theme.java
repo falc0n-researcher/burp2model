@@ -58,6 +58,11 @@ final class Theme {
         return c == null ? new Color(0x39, 0x6F, 0xD6) : c;
     }
 
+    /** #rrggbb, for colours inside HTML labels. */
+    static String hex(Color c) {
+        return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
+    }
+
     static Color shift(Color c, int d) {
         return new Color(clamp(c.getRed() + d), clamp(c.getGreen() + d), clamp(c.getBlue() + d));
     }

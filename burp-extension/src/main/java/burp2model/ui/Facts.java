@@ -239,7 +239,7 @@ final class Facts extends JPanel {
         JLabel dot = new JLabel("●");
         dot.setForeground(Theme.type(o.type));
         dot.setFont(Theme.font(9f, Font.PLAIN));
-        String hex = String.format("#%02x%02x%02x", Theme.BLUE.getRed(), Theme.BLUE.getGreen(), Theme.BLUE.getBlue());
+        String hex = Theme.hex(Theme.BLUE);
         JLabel name = new JLabel("<html><font color='" + hex + "'><u>" + escape(o.label.length() > 60 ? o.label.substring(0, 59) + "…" : o.label) + "</u></font></html>");
         name.setFont(Theme.mono(11f));
         name.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
