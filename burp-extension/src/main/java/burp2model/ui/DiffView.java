@@ -21,7 +21,7 @@ final class DiffView extends JPanel {
         pane.setFont(Theme.mono(12f));
         pane.setMargin(new java.awt.Insets(10, 14, 10, 14));
         JScrollPane sp = new JScrollPane(pane);
-        sp.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.line()));
+        sp.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.LINE));
         add(sp, BorderLayout.CENTER);
     }
 

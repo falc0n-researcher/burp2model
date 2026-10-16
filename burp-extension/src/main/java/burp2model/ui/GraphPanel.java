@@ -134,17 +134,14 @@ final class GraphPanel extends JPanel {
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 3));
         for (String[] g : GROUPS) {
             JCheckBox c = new JCheckBox(g[0], !g[0].equals("Parameters") && !g[0].equals("Tech"));
-            c.setFocusable(false);
             c.setFont(Theme.font(11f, Font.PLAIN));
             c.addActionListener(e -> rebuild(false));
             toggles.put(g[1], c);
             bar.add(c);
         }
-        codeOnly.setFocusable(false);
         codeOnly.setFont(Theme.font(11f, Font.PLAIN));
         codeOnly.setToolTipText("Show only endpoints the code names but nothing called, with what names them");
         codeOnly.addActionListener(e -> rebuild(false));
-        labelsBox.setFocusable(false);
         labelsBox.setFont(Theme.font(11f, Font.PLAIN));
         labelsBox.addActionListener(e -> canvas.repaint());
         bar.add(codeOnly);
@@ -153,7 +150,6 @@ final class GraphPanel extends JPanel {
         bg.add(networkBtn);
         bg.add(flowBtn);
         for (JToggleButton b : new JToggleButton[] {networkBtn, flowBtn}) {
-            b.setFocusable(false);
             b.setFont(Theme.font(11f, Font.PLAIN));
             b.setMargin(new java.awt.Insets(1, 8, 1, 8));
             bar.add(b);
@@ -191,10 +187,10 @@ final class GraphPanel extends JPanel {
             rebuild(true);
         }));
         bar.add(button("PNG", "Save the map as an image", this::savePng));
-        info.setForeground(Theme.muted());
+        info.setForeground(Theme.MUTED);
         info.setFont(Theme.font(11f, Font.PLAIN));
         info.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
-        bar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.line()));
+        bar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.LINE));
         add(bar, BorderLayout.NORTH);
         add(canvas, BorderLayout.CENTER);
         add(info, BorderLayout.SOUTH);
@@ -204,7 +200,6 @@ final class GraphPanel extends JPanel {
 
     private static JButton button(String text, String tip, Runnable r) {
         JButton b = new JButton(text);
-        b.setFocusable(false);
         b.setFont(Theme.font(11f, Font.PLAIN));
         b.setMargin(new java.awt.Insets(1, 8, 1, 8));
         b.setToolTipText(tip);
@@ -265,6 +260,9 @@ final class GraphPanel extends JPanel {
     }
 
     private void setFlow(boolean f) {
+        // the toggles always say which layout is drawn, however it was switched
+        networkBtn.setSelected(!f);
+        flowBtn.setSelected(f);
         if (flow == f) {
             return;
         }
@@ -757,6 +755,11 @@ final class GraphPanel extends JPanel {
             addKeyListener(new KeyAdapter() {
                 @Override
                 public void keyPressed(KeyEvent e) {
+                    if (e.getKeyChar() == '/') {
+                        search.requestFocusInWindow();          // '/' jumps to Find, as in many viewers
+                        search.selectAll();
+                        return;
+                    }
                     switch (e.getKeyCode()) {
                         case KeyEvent.VK_F -> fitAnimated();
                         case KeyEvent.VK_ESCAPE -> {
@@ -1007,11 +1010,12 @@ final class GraphPanel extends JPanel {
                 g.setColor(c);
                 g.fill(shape);
             });
-            float rw = (float) (1.6 / Math.sqrt(scale));
-            g.setStroke(fast ? new BasicStroke(rw) : new BasicStroke(rw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {3f, 2.5f}, 0f));
-            g.setColor(Theme.alpha(Theme.ACCENT, 70));
+            // code-only rings: present but quiet, so a map of mostly code-only endpoints still shows its structure
+            float rw = (float) (1.1 / Math.sqrt(scale));
+            g.setStroke(fast ? new BasicStroke(rw) : new BasicStroke(rw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {2.5f, 3f}, 0f));
+            g.setColor(Theme.alpha(Theme.ACCENT, 40));
             g.draw(dimRings);
-            g.setColor(Theme.ACCENT);
+            g.setColor(Theme.alpha(Theme.ACCENT, 150));
             g.draw(rings);
             for (V v : marked) {
                 g.setColor(v.pinned && v != selected ? Theme.muted() : Theme.fg());
@@ -1026,7 +1030,8 @@ final class GraphPanel extends JPanel {
             if (!labelsBox.isSelected()) {
                 return;
             }
-            g.setFont(Theme.font((float) Math.max(9.5, 11.5 / Math.sqrt(scale)), Font.PLAIN));
+            // labels are drawn in map space: keep them at least 10 px on screen however far the map is zoomed out
+            g.setFont(Theme.font((float) Math.max(Math.max(9.5, 11.5 / Math.sqrt(scale)), 10.5 / scale), Font.PLAIN));
             FontMetrics fm = g.getFontMetrics();
             String q = search.getText().strip().toLowerCase();
             List<V> cand = new ArrayList<>();

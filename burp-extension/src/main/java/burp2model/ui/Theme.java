@@ -75,9 +75,96 @@ final class Theme {
         return new Color(c.getRed(), c.getGreen(), c.getBlue(), a);
     }
 
+    /** Burp's UI font at `size` (sizes are written for Burp's default; a larger font setting scales them all). */
     static Font font(float size, int style) {
         Font base = UIManager.getFont("Label.font");
-        return (base == null ? new Font(Font.SANS_SERIF, Font.PLAIN, 12) : base).deriveFont(style, size);
+        return (base == null ? new Font(Font.SANS_SERIF, Font.PLAIN, 12) : base).deriveFont(style, size * uiScale());
+    }
+
+    /** A row tall enough for `f` with breathing room, never below `min` (also scaled). */
+    static int rowHeight(Font f, int min) {
+        java.awt.FontMetrics fm = new java.awt.Canvas().getFontMetrics(f);
+        return Math.max(Math.round(min * uiScale()), fm.getHeight() + 8);
+    }
+
+    // ------------------------------------------------------------------ colours that follow a theme switch
+
+    /**
+     * A colour looked up each time it is used. Burp can switch between light and dark while the extension is loaded;
+     * a border or label given Theme.line() at startup would keep the old theme's colour, one given LINE does not.
+     */
+    private static final class Live extends Color {
+        private static final long serialVersionUID = 1L;
+        private final transient java.util.function.Supplier<Color> of;
+
+        Live(java.util.function.Supplier<Color> of) {
+            super(0, true);
+            this.of = of;
+        }
+
+        @Override
+        public int getRGB() {
+            return of.get().getRGB();
+        }
+
+        @Override
+        public int getRed() {
+            return of.get().getRed();
+        }
+
+        @Override
+        public int getGreen() {
+            return of.get().getGreen();
+        }
+
+        @Override
+        public int getBlue() {
+            return of.get().getBlue();
+        }
+
+        @Override
+        public int getAlpha() {
+            return of.get().getAlpha();
+        }
+
+        @Override
+        public int getTransparency() {
+            return of.get().getTransparency();
+        }
+    }
+
+    static final Color LINE = new Live(Theme::line);
+    static final Color MUTED = new Live(Theme::muted);
+    static final Color SURFACE = new Live(Theme::surface);
+
+    // ------------------------------------------------------------------ contrast
+
+    /** WCAG relative luminance. */
+    private static double luminance(Color c) {
+        double[] ch = {c.getRed() / 255.0, c.getGreen() / 255.0, c.getBlue() / 255.0};
+        for (int i = 0; i < 3; i++) {
+            ch[i] = ch[i] <= 0.03928 ? ch[i] / 12.92 : Math.pow((ch[i] + 0.055) / 1.055, 2.4);
+        }
+        return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+    }
+
+    static double contrast(Color a, Color b) {
+        double la = luminance(a);
+        double lb = luminance(b);
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+
+    /**
+     * `c` darkened (on a light background) or lightened (on a dark one) just enough for text in it to reach 4.5:1:
+     * the accent colours as text, readable in both themes.
+     */
+    static Color readable(Color c, Color bg) {
+        Color out = new Color(c.getRed(), c.getGreen(), c.getBlue());
+        boolean darken = luminance(bg) > 0.4;
+        for (int i = 0; i < 40 && contrast(out, bg) < 4.5; i++) {
+            out = darken ? shift(out, -8) : shift(out, 8);
+        }
+        return out;
     }
 
     // ------------------------------------------------------------------ pixel type (the welcome page)
@@ -145,7 +232,7 @@ final class Theme {
     }
 
     static Font mono(float size) {
-        return new Font(Font.MONOSPACED, Font.PLAIN, Math.round(size));
+        return new Font(Font.MONOSPACED, Font.PLAIN, Math.round(size * uiScale()));
     }
 
     // ------------------------------------------------------------ meaning to colour

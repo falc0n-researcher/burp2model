@@ -54,13 +54,13 @@ final class Widgets {
             number.setForeground(accent == null ? Theme.fg() : accent);
             label.setText(text);
             label.setFont(Theme.font(11f, Font.PLAIN));
-            label.setForeground(Theme.muted());
+            label.setForeground(Theme.MUTED);
             JPanel box = new JPanel(new BorderLayout());
             box.setOpaque(false);
             box.add(number, BorderLayout.CENTER);
             box.add(label, BorderLayout.SOUTH);
             add(box, BorderLayout.CENTER);
-            setPreferredSize(new Dimension(150, 76));
+            setPreferredSize(new Dimension(Math.round(150 * Theme.uiScale()), Math.round(76 * Theme.uiScale())));
         }
 
         void set(Object value) {
@@ -86,7 +86,7 @@ final class Widgets {
         private List<Seg> segs = List.of();
 
         Bar() {
-            setPreferredSize(new Dimension(300, 64));
+            setPreferredSize(new Dimension(Math.round(300 * Theme.uiScale()), Math.round(64 * Theme.uiScale())));
         }
 
         void set(List<Seg> s) {
@@ -148,7 +148,7 @@ final class Widgets {
             this.color = color;
             setFont(Theme.font(12f, Font.PLAIN));
             FontMetrics fm = getFontMetrics(getFont());
-            setPreferredSize(new Dimension(fm.stringWidth(text) + 30, 24));
+            setPreferredSize(new Dimension(fm.stringWidth(text) + 30, fm.getHeight() + 8));
         }
 
         @Override
@@ -185,7 +185,7 @@ final class Widgets {
     static JLabel muted(String text) {
         JLabel l = new JLabel(text);
         l.setFont(Theme.font(11f, Font.PLAIN));
-        l.setForeground(Theme.muted());
+        l.setForeground(Theme.MUTED);
         return l;
     }
 }

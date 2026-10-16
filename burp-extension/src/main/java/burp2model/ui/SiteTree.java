@@ -31,7 +31,7 @@ final class SiteTree extends JPanel {
     SiteTree() {
         super(new BorderLayout());
         tree.setRootVisible(false);
-        tree.setRowHeight(24);
+        tree.setRowHeight(Theme.rowHeight(Theme.mono(12f), 24));
         tree.setShowsRootHandles(true);
         tree.setCellRenderer(new DefaultTreeCellRenderer() {
             @Override
@@ -68,7 +68,7 @@ final class SiteTree extends JPanel {
             }
         });
         JScrollPane sp = new JScrollPane(tree);
-        sp.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.line()));
+        sp.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.LINE));
         add(sp, BorderLayout.CENTER);
     }
 

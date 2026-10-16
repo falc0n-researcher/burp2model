@@ -40,8 +40,6 @@ final class ChangesTab implements Tab {
         JPanel top = toolbar();
         JButton prev = new JButton("What changed since the previous build");
         JButton sel = new JButton("Compare the selected build with the latest");
-        prev.setFocusable(false);
-        sel.setFocusable(false);
         top.add(prev);
         top.add(sel);
         top.add(Widgets.muted("Every send is a build. Drift is a change in the surface to understand, never a finding."));

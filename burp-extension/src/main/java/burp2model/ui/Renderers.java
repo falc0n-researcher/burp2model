@@ -50,12 +50,13 @@ final class Renderers {
             g.fillRect(0, 0, getWidth(), getHeight());
             if (color != null) {
                 g.setFont(getFont());
-                int h = 17;
+                int h = g.getFontMetrics().getHeight() + 3;
                 int w = g.getFontMetrics().stringWidth(getText()) + 14;
                 int y = (getHeight() - h) / 2;
                 g.setColor(Theme.alpha(color, selected ? 90 : 48));
                 g.fill(new RoundRectangle2D.Float(4, y, w, h, h, h));
-                g.setColor(selected ? getForeground() : color);
+                // the badge's own colour as text, shaded until it reads at 4.5:1 on the tinted pill
+                g.setColor(selected ? getForeground() : Theme.readable(color, getBackground()));
                 g.drawString(getText(), 11, y + (h + g.getFontMetrics().getAscent() - g.getFontMetrics().getDescent()) / 2);
             }
             g.dispose();
@@ -90,7 +91,7 @@ final class Renderers {
                 super.getTableCellRendererComponent(t, v, sel, focus, r, c);
                 setFont(Theme.mono(11f));
                 if (!sel) {
-                    setForeground(Theme.muted());
+                    setForeground(Theme.MUTED);
                 }
                 setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 8, 0, 4));
                 return this;
