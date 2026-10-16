@@ -73,6 +73,45 @@ class MainPanelSettingsTest {
         assertTrue(now.replaceRole());
     }
 
+    @Test
+    void theTabIsBuiltBeforeTheModelFinishesOpening() throws Exception {
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        MainPanel[] panel = new MainPanel[1];
+        // the model cannot open until `release`; if building the tab waited for it, the build would never finish
+        Thread builder = new Thread(() -> {
+            try {
+                SwingUtilities.invokeAndWait(() -> panel[0] = new MainPanel(new MainPanel.Host() {
+                    public String get(String k, String d) {
+                        return d;
+                    }
+
+                    public void set(String k, String v) {
+                    }
+
+                    public void log(String l) {
+                    }
+
+                    public Session session(String name) throws java.io.IOException {
+                        try {
+                            release.await();                            // a model that takes a while to open
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                        return new Session(home, name);
+                    }
+                }));
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        builder.start();
+        builder.join(60_000);
+        assertTrue(!builder.isAlive() && panel[0] != null, "the tab is built while the model is still opening");
+        assertNull(panel[0].session(), "still opening");
+        release.countDown();
+        assertTrue(panel[0].awaitSession(10_000) != null, "then it opens");
+    }
+
     @SuppressWarnings("unchecked")
     private static <T> T field(MainPanel p, String name) throws Exception {
         var f = MainPanel.class.getDeclaredField(name);

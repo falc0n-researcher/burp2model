@@ -73,7 +73,7 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         } catch (Exception e) {
             api.logging().logToError("burp2model: could not prepare " + home + " (" + e.getMessage() + ")");
         }
-        panel = new MainPanel(new MainPanel.Host() {
+        MainPanel.Host host = new MainPanel.Host() {
             @Override
             public String get(String key, String def) {
                 String v = prefs.getString(key);
@@ -112,7 +112,17 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             public void background(String name, Runnable task) {
                 workers.execute(task);
             }
-        });
+        };
+        // Swing components belong on the Swing thread; the model itself opens in the background
+        try {
+            if (javax.swing.SwingUtilities.isEventDispatchThread()) {
+                panel = new MainPanel(host);
+            } else {
+                javax.swing.SwingUtilities.invokeAndWait(() -> panel = new MainPanel(host));
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("burp2model: could not build the tab", e);
+        }
         api.userInterface().applyThemeToComponent(panel);
         api.userInterface().registerSuiteTab("burp2model", panel);
         api.userInterface().registerContextMenuItemsProvider(this);
@@ -274,12 +284,12 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
     }
 
     private void send(List<HttpRequestResponse> picked) {
-        Session s = panel.session();
+        Session s = panel.awaitSession(60_000);
         if (s == null) {
             api.logging().raiseErrorEvent("burp2model: no model is open; check the burp2model tab's Settings.");
             return;
         }
-        panel.say("burp2model: building from " + picked.size() + " request(s)…");
+        panel.working("burp2model: building from " + picked.size() + " request(s)…");
         try {
             List<Parse.Raw> raws = new ArrayList<>();
             for (HttpRequestResponse rr : picked) {
@@ -296,7 +306,9 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             panel.say(msg);
         } catch (Throwable t) {
             api.logging().raiseErrorEvent("burp2model: " + t);
-            panel.say("burp2model: failed: " + t);
+            panel.sayError("burp2model: failed: " + t);
+        } finally {
+            panel.idle();
         }
     }
 

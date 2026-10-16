@@ -68,12 +68,15 @@ final class GraphPanel extends JPanel {
         final List<E> edges = new ArrayList<>();
         Color color;
         String shortLabel;
+        /** The label lowercased once, for search highlighting on every frame. */
+        final String lower;
 
         V(Model.Node n) {
             this.node = n;
             this.color = Theme.type(n.type);
             String l = n.label;
             this.shortLabel = l.length() > 44 ? l.substring(0, 43) + "…" : l;
+            this.lower = l.toLowerCase();
         }
     }
 
@@ -83,6 +86,8 @@ final class GraphPanel extends JPanel {
         {"Hosts", "host"}, {"Pages", "route"}, {"Scripts", "script"}, {"Endpoints", "endpoint,operation"}, {"Parameters", "parameter"},
         {"Third parties", "third_party"}, {"Trust", "cookie,auth,role"}, {"Tech", "tech"}};
     private static final int BIG = 1500;
+    /** Above this many nodes, frames drawn while the map moves skip dashes and labels. */
+    private static final int FAST_PAINT = 600;
 
     private final Canvas canvas = new Canvas();
     private final Map<String, JCheckBox> toggles = new LinkedHashMap<>();
@@ -159,20 +164,26 @@ final class GraphPanel extends JPanel {
         flowBtn.addActionListener(e -> setFlow(true));
         search.setToolTipText("Find a node (Enter for the next match)");
         search.putClientProperty("JTextField.placeholderText", "Find…");
+        // finding selects the match, which loads its facts and request: wait until typing pauses
+        findLater.setRepeats(false);
         search.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                find(true);
+                findLater.restart();
             }
 
             public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                find(true);
+                findLater.restart();
             }
 
             public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                find(true);
+                findLater.restart();
             }
         });
-        search.addActionListener(e -> find(false));
+        search.addActionListener(e -> {
+            boolean pending = findLater.isRunning();
+            findLater.stop();
+            find(pending);
+        });
         bar.add(search);
         bar.add(button("Fit", "Fit everything on screen (F)", this::fitAnimated));
         bar.add(button("Re-layout", "Forget positions and lay the map out again", () -> {
@@ -324,21 +335,75 @@ final class GraphPanel extends JPanel {
         for (V v : vs) {
             v.r = 4 + Math.min(10, Math.sqrt(v.degree) * 1.6);
         }
-        place();
         maxSteps = vs.size() > 900 ? 160 : 320;
-        if (!flow) {
-            relax(vs.size() > BIG ? 40 : 140, true);
+        int gen = ++layoutGen;
+        if (!flow && vs.size() > ASYNC_LAYOUT) {
+            // a big map lays out on a background thread; the canvas says so meanwhile instead of freezing Burp
+            List<V> lv = new ArrayList<>(vs);
+            List<E> le = new ArrayList<>(es);
+            Map<String, double[]> mem = new HashMap<>(memory);
+            int n = vs.size() > BIG ? 40 : 140;
+            int max = maxSteps;
+            int st = steps;
+            layingOut = true;
+            LAYOUT.execute(() -> {
+                boolean allNew = placeAll(lv, mem);
+                relax(lv, le, n, true, allNew ? 0 : st, max);
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    if (gen != layoutGen) {
+                        return;                                 // a newer model arrived meanwhile
+                    }
+                    layingOut = false;
+                    if (allNew) {
+                        steps = 0;
+                    }
+                    fitted = false;
+                    steps = 140;
+                    sim.start();
+                    canvas.repaint();
+                });
+            });
+        } else {
+            layingOut = false;
+            place();
+            if (!flow) {
+                relax(vs.size() > BIG ? 40 : 140, true);
+            }
         }
         info.setText(vs.size() + " nodes · " + es.size() + " edges   ·   solid: seen in traffic · dashed: found in code   ·   scroll to zoom · drag to pan or move · double-click to focus · right-click for more"
                 + (cap > BIG ? "   ·   a large map: turn groups off to see less" : ""));
         if (refit || !fitted) {
             fitted = false;
         }
-        if (!flow && !vs.isEmpty()) {
+        if (!flow && !vs.isEmpty() && !layingOut) {
             steps = 140;
             sim.start();
         }
         canvas.repaint();
+    }
+
+    /** Above this many nodes the first layout runs off the Swing thread. */
+    static final int ASYNC_LAYOUT = 200;
+    private static final java.util.concurrent.ThreadPoolExecutor LAYOUT = new java.util.concurrent.ThreadPoolExecutor(1, 1, 2, java.util.concurrent.TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(), r -> {
+                Thread t = new Thread(r, "burp2model-map-layout");
+                t.setDaemon(true);
+                return t;
+            });
+
+    static {
+        LAYOUT.allowCoreThreadTimeOut(true);                    // no thread left behind once the map is idle
+    }
+
+    private int layoutGen;
+    private volatile boolean layingOut;
+
+    /** For tests: wait until a background layout has been applied. */
+    void awaitLayout(long ms) throws InterruptedException {
+        long end = System.currentTimeMillis() + ms;
+        while (layingOut && System.currentTimeMillis() < end) {
+            Thread.sleep(10);
+        }
     }
 
     // ------------------------------------------------------------------ layout
@@ -356,6 +421,13 @@ final class GraphPanel extends JPanel {
             layoutFlow();
             return;
         }
+        if (placeAll(vs, memory)) {
+            steps = 0;
+        }
+    }
+
+    /** Seed positions: remembered ones, or beside placed neighbours, or on a ring by layer. True when every node is new. */
+    private static boolean placeAll(List<V> vs, Map<String, double[]> memory) {
         int n = Math.max(1, vs.size());
         double rad = 90 + 11 * Math.sqrt(n) * 3;
         List<V> fresh = new ArrayList<>();
@@ -392,9 +464,7 @@ final class GraphPanel extends JPanel {
                 v.y = Math.sin(a) * layerR;
             }
         }
-        if (fresh.size() == vs.size()) {
-            steps = 0;
-        }
+        return fresh.size() == vs.size();
     }
 
     private static int column(Model.Node n) {
@@ -476,6 +546,7 @@ final class GraphPanel extends JPanel {
     private void tick() {
         if (vs.isEmpty() || steps >= maxSteps) {
             sim.stop();
+            canvas.repaint();                                   // one full-quality frame once the map settles
             remember();
             if (!fitted) {
                 fitAnimated();
@@ -487,17 +558,28 @@ final class GraphPanel extends JPanel {
         if (!fitted && steps % 40 == 0) {
             fit();
         }
-        canvas.repaint();
+        // a big map takes longer to draw than to step: draw every third step so the Swing thread keeps up with input
+        if (vs.size() <= FAST_PAINT || steps % 3 == 0) {
+            canvas.repaint();
+        }
     }
 
     /** Run this many layout steps right away, so the map is already arranged when first drawn. */
     private void relax(int n, boolean cool) {
+        relax(vs, es, n, cool, steps, maxSteps);
+    }
+
+    private static void relax(List<V> vs, List<E> es, int n, boolean cool, int steps, int maxSteps) {
         for (int i = 0; i < n && !vs.isEmpty(); i++) {
-            step(cool ? Math.max(0.04, 1.0 - (steps + i) / (double) maxSteps) : 0.3);
+            step(vs, es, cool ? Math.max(0.04, 1.0 - (steps + i) / (double) maxSteps) : 0.3);
         }
     }
 
     private void step(double temp) {
+        step(vs, es, temp);
+    }
+
+    private static void step(List<V> vs, List<E> es, double temp) {
         double cell = 80;
         Map<Long, List<V>> grid = new HashMap<>();
         for (V v : vs) {
@@ -661,6 +743,8 @@ final class GraphPanel extends JPanel {
 
     // ------------------------------------------------------------------ search and selection
 
+    private final Timer findLater = new Timer(200, e -> find(true));
+
     private void find(boolean fromTyping) {
         String q = search.getText().strip().toLowerCase();
         if (fromTyping) {
@@ -668,7 +752,7 @@ final class GraphPanel extends JPanel {
             matchAt = -1;
             if (!q.isEmpty()) {
                 for (V v : vs) {
-                    if (v.node.label.toLowerCase().contains(q)) {
+                    if (v.lower.contains(q)) {
                         matches.add(v);
                     }
                 }
@@ -740,6 +824,25 @@ final class GraphPanel extends JPanel {
         private V dragging;
         private Point last;
         private boolean moved;
+        private boolean fast;
+        private double vx0;
+        private double vy0;
+        private double vx1;
+        private double vy1;
+
+        /** A big map while it moves (layout running, camera animating, being dragged) is drawn the cheap way. */
+        private boolean moving() {
+            return vs.size() > FAST_PAINT && (sim.isRunning() || anim.isRunning() || (last != null && moved));
+        }
+
+        private boolean inView(V v) {
+            return v.x >= vx0 && v.x <= vx1 && v.y >= vy0 && v.y <= vy1;
+        }
+
+        /** An edge is skipped only when its bounding box misses the screen (flow curves stay inside it too). */
+        private boolean inView(E e) {
+            return Math.max(e.a.x, e.b.x) >= vx0 && Math.min(e.a.x, e.b.x) <= vx1 && Math.max(e.a.y, e.b.y) >= vy0 && Math.min(e.a.y, e.b.y) <= vy1;
+        }
 
         Canvas() {
             setOpaque(true);
@@ -748,6 +851,9 @@ final class GraphPanel extends JPanel {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     requestFocusInWindow();
+                    if (layingOut) {
+                        return;
+                    }
                     if (e.isPopupTrigger()) {
                         popup(e);
                         return;
@@ -795,6 +901,10 @@ final class GraphPanel extends JPanel {
                         select(pick(e.getPoint()));
                     }
                     dragging = null;
+                    if (moved && fast) {
+                        repaint();                              // the full-quality frame after a drag
+                    }
+                    last = null;
                 }
 
                 @Override
@@ -812,12 +922,19 @@ final class GraphPanel extends JPanel {
                 @Override
                 public void mouseMoved(MouseEvent e) {
                     mouse = e.getPoint();
+                    if (layingOut) {
+                        return;
+                    }
                     V h = pick(e.getPoint());
-                    if (h != hover) {
+                    boolean changed = h != hover;
+                    if (changed) {
                         hover = h;
                         setCursor(Cursor.getPredefinedCursor(h == null ? Cursor.DEFAULT_CURSOR : Cursor.HAND_CURSOR));
                     }
-                    repaint();
+                    // the tooltip follows the mouse over a node; over empty canvas nothing changes, so nothing is redrawn
+                    if (changed || h != null) {
+                        repaint();
+                    }
                 }
 
                 @Override
@@ -948,10 +1065,26 @@ final class GraphPanel extends JPanel {
             }
             Graphics2D g = (Graphics2D) g0.create();
             Theme.quality(g);
-            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+            fast = moving();
+            // a big map in motion is drawn without dashes and labels (they come back when it stops); antialiasing stays
+            // on, since Java2D's plain renderer is slower than Marlin on large paths
+            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, fast ? RenderingHints.VALUE_STROKE_NORMALIZE : RenderingHints.VALUE_STROKE_PURE);
             Color bg = Theme.dark() ? Theme.shift(Theme.bg(), -8) : Theme.surface();
             g.setColor(bg);
             g.fillRect(0, 0, getWidth(), getHeight());
+            if (layingOut) {
+                g.setColor(Theme.muted());
+                g.setFont(Theme.font(13f, Font.PLAIN));
+                g.drawString("Laying out " + vs.size() + " nodes…", 24, 36);
+                g.dispose();
+                return;
+            }
+            // what is on screen, in map coordinates, with a margin for node sizes and rings
+            double pad = 30 / scale + 20;
+            vx0 = -ox / scale - pad;
+            vy0 = -oy / scale - pad;
+            vx1 = (getWidth() - ox) / scale + pad;
+            vy1 = (getHeight() - oy) / scale + pad;
             if (vs.isEmpty()) {
                 g.setColor(Theme.muted());
                 g.setFont(Theme.font(13f, Font.PLAIN));
@@ -988,6 +1121,9 @@ final class GraphPanel extends JPanel {
             List<E> hot = new ArrayList<>();
             for (E e : es) {
                 if (e.a.hidden || e.b.hidden || (focus != null && !(visible(e.a) && visible(e.b)))) {
+                    continue;
+                }
+                if (!inView(e)) {
                     continue;
                 }
                 boolean on = selected != null ? (e.a == selected || e.b == selected) : hover != null && (e.a == hover || e.b == hover);
@@ -1039,6 +1175,9 @@ final class GraphPanel extends JPanel {
         }
 
         private BasicStroke strokeFor(String state, float w) {
+            if (fast) {
+                return new BasicStroke(w);
+            }
             return switch (state) {
                 case "INFERRED" -> new BasicStroke(w, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {6f * w, 5f * w}, 0f);
                 case "EXTERNAL" -> new BasicStroke(w, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {1.5f * w, 4f * w}, 0f);
@@ -1048,26 +1187,41 @@ final class GraphPanel extends JPanel {
 
         private void drawNodes(Graphics2D g, Set<V> lit, boolean dimming) {
             String q = search.getText().strip().toLowerCase();
+            // nodes of one colour are filled as one shape, and the code-only rings stroked as one: a few draw calls, not thousands
+            Map<Color, Path2D.Double> fills = new LinkedHashMap<>();
+            Path2D.Double rings = new Path2D.Double();
+            Path2D.Double dimRings = new Path2D.Double();
+            List<V> marked = new ArrayList<>();
             for (V v : vs) {
-                if (v.hidden || (focus != null && !visible(v))) {
+                if (v.hidden || (focus != null && !visible(v)) || !inView(v)) {
                     continue;
                 }
                 boolean dim = dimming && !lit.contains(v);
-                g.setColor(dim ? Theme.alpha(v.color, 60) : v.color);
-                g.fill(new java.awt.geom.Ellipse2D.Double(v.x - v.r, v.y - v.r, v.r * 2, v.r * 2));
+                fills.computeIfAbsent(dim ? Theme.alpha(v.color, 60) : v.color, k -> new Path2D.Double())
+                        .append(new java.awt.geom.Ellipse2D.Double(v.x - v.r, v.y - v.r, v.r * 2, v.r * 2), false);
                 if ("STATIC_ONLY".equals(v.node.attrs.get("api_state"))) {
-                    g.setColor(dim ? Theme.alpha(Theme.ACCENT, 70) : Theme.ACCENT);
-                    g.setStroke(new BasicStroke((float) (1.6 / Math.sqrt(scale)), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {3f, 2.5f}, 0f));
-                    g.draw(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 2.5, v.y - v.r - 2.5, v.r * 2 + 5, v.r * 2 + 5));
+                    (dim ? dimRings : rings).append(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 2.5, v.y - v.r - 2.5, v.r * 2 + 5, v.r * 2 + 5), false);
                 }
-                boolean match = !q.isEmpty() && v.node.label.toLowerCase().contains(q);
-                if (v == selected || v == hover || match || v.pinned) {
-                    g.setColor(v.pinned && v != selected ? Theme.muted() : Theme.fg());
-                    g.setStroke(new BasicStroke((float) ((v == selected ? 2.4 : 1.6) / Math.sqrt(scale))));
-                    g.draw(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 3, v.y - v.r - 3, v.r * 2 + 6, v.r * 2 + 6));
+                if (v == selected || v == hover || v.pinned || (!q.isEmpty() && v.lower.contains(q))) {
+                    marked.add(v);
                 }
-                g.setStroke(new BasicStroke(1f));
             }
+            fills.forEach((c, shape) -> {
+                g.setColor(c);
+                g.fill(shape);
+            });
+            float rw = (float) (1.6 / Math.sqrt(scale));
+            g.setStroke(fast ? new BasicStroke(rw) : new BasicStroke(rw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {3f, 2.5f}, 0f));
+            g.setColor(Theme.alpha(Theme.ACCENT, 70));
+            g.draw(dimRings);
+            g.setColor(Theme.ACCENT);
+            g.draw(rings);
+            for (V v : marked) {
+                g.setColor(v.pinned && v != selected ? Theme.muted() : Theme.fg());
+                g.setStroke(new BasicStroke((float) ((v == selected ? 2.4 : 1.6) / Math.sqrt(scale))));
+                g.draw(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 3, v.y - v.r - 3, v.r * 2 + 6, v.r * 2 + 6));
+            }
+            g.setStroke(new BasicStroke(1f));
         }
 
         /** Labels are placed in priority order and skipped where they would overlap one already drawn. */
@@ -1080,10 +1234,13 @@ final class GraphPanel extends JPanel {
             String q = search.getText().strip().toLowerCase();
             List<V> cand = new ArrayList<>();
             for (V v : vs) {
-                if (v.hidden || (focus != null && !visible(v))) {
+                if (v.hidden || (focus != null && !visible(v)) || !inView(v)) {
                     continue;
                 }
-                boolean match = !q.isEmpty() && v.node.label.toLowerCase().contains(q);
+                if (fast && v != selected && v != hover) {
+                    continue;                                   // labels come back in the full-quality frame
+                }
+                boolean match = !q.isEmpty() && v.lower.contains(q);
                 if (v == selected || v == hover || match || (selected != null && lit.contains(v) && scale > 0.4)
                         || (flow && scale > 0.3) || (!flow && v.degree >= 5 && scale > 0.35) || scale > 1.6) {
                     cand.add(v);
