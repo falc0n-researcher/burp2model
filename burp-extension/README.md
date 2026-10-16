@@ -57,6 +57,6 @@ Sending the same request twice adds it once. Every rebuild starts from the same 
 
 ## Build the jar
 
-Java 17: `gradle jar` in this folder (writes `build/libs/burp2model-1.0.0.jar`), or see the `extension` job in `.github/workflows/ci.yml` for the plain `javac` steps. The Java engine is checked against the Python one in `tests/test_java_parity.py` (same model, query answers and diff on the bundled samples), and `src/test/java/burp2model/Smoke.java` exercises the engine and the tab end to end.
+Java 17: `gradle jar` in this folder (writes `build/libs/burp2model-<version>.jar`), `gradle test` for the unit tests, or see the `extension` job in `.github/workflows/ci.yml` for the plain `javac` steps. The Java engine is checked against the Python one in `tests/test_java_parity.py` (same model, query answers and diff on the bundled samples), and `src/test/java/burp2model/Smoke.java` exercises the engine and the tab end to end.
 
 Requires Burp 2023.x or later (Montoya API). Only capture traffic you are allowed to test.

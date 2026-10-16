@@ -37,7 +37,6 @@ final class Dashboard extends JPanel {
     private final JPanel content = new JPanel();
     private final JScrollPane scroll;
     private Consumer<Analysis.Lead> onLead = l -> { };
-    private Runnable onSend = () -> { };
 
     Dashboard() {
         super(new BorderLayout());
@@ -336,9 +335,5 @@ final class Dashboard extends JPanel {
         content.add(card);
         content.revalidate();
         content.repaint();
-    }
-
-    void onSend(Runnable r) {
-        onSend = r;
     }
 }

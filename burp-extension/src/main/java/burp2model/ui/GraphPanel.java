@@ -98,7 +98,6 @@ final class GraphPanel extends JPanel {
     private final Map<String, V> byId = new HashMap<>();
     /** Where each node was last drawn, kept across rebuilds so a growing model does not scramble. */
     private final Map<String, double[]> memory = new HashMap<>();
-    private final Set<String> hiddenTypes = new HashSet<>();
     private V selected;
     private V hover;
     private V focus;
@@ -252,7 +251,6 @@ final class GraphPanel extends JPanel {
                 }
             }
         });
-        types.removeAll(hiddenTypes);
         boolean only = codeOnly.isSelected();
         Set<String> keep = null;
         if (only) {
@@ -1178,9 +1176,5 @@ final class GraphPanel extends JPanel {
                 ty += fm.getHeight() + 1;
             }
         }
-    }
-
-    static JComponent unused() {
-        return new JLabel();
     }
 }
