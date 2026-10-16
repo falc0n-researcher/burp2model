@@ -663,6 +663,12 @@ final class GraphPanel extends JPanel {
     }
 
     /** Select a node by id (from another tab). */
+    /** Stop the layout and camera timers (the extension is unloading). */
+    void stop() {
+        sim.stop();
+        anim.stop();
+    }
+
     void showNode(String id) {
         V v = byId.get(id);
         if (v != null) {

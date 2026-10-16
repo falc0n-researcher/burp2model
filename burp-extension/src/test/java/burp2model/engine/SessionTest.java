@@ -148,6 +148,31 @@ class SessionTest {
     }
 
     @Test
+    void nothingIsAddedTwiceAfterAReload() throws Exception {
+        Session s = new Session(home, "app");
+        s.add(half(), null, "live", false, false);
+        s.add(raws, null, "live", false, false);
+        int n = s.requestCount();
+        Session reopened = new Session(home, "app");
+        assertEquals(0, reopened.add(raws, null, "again", false).added(), "every request sent before the reload is still known");
+        assertEquals(n, reopened.requestCount());
+    }
+
+    @Test
+    void keysGluedTogetherByAnOlderVersionAreSplit() throws Exception {
+        Session s = new Session(home, "app");
+        s.add(half(), null, "live", false, false);
+        s.add(raws, null, "live", false, false);
+        // what 1.1.0 wrote: the first batch's last key and the next batch's first key on one line
+        Path seen = s.dir().resolve("seen.txt");
+        List<String> lines = new java.util.ArrayList<>(Files.readAllLines(seen));
+        int at = half().size() - 1;
+        lines.set(at, lines.get(at) + lines.remove(at + 1));
+        Files.write(seen, lines);
+        assertEquals(0, new Session(home, "app").add(raws, null, "again", false).added());
+    }
+
+    @Test
     void rolesComeFromTheRequests() throws Exception {
         Session s = new Session(home, "app");
         s.add(half(), "user", "u", false);

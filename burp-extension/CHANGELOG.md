@@ -8,6 +8,12 @@
 - Fix: while live capture was on, every refresh reset the Settings fields, wiping a role or scope you were typing.
 - Fix: live capture no longer records a build when only duplicates arrived, and its every-40-requests trigger counts new requests rather than everything in the batch. A build is recorded from the model already built, without building it twice.
 - Sending, importing and live capture read the Settings from a copy kept up to date as you type, instead of reading the Swing fields from a background thread; the build history can be read while requests are being added.
+- Fix: the dedupe list (`seen.txt`) was first written without a final newline, so the next batch's first key joined the previous last key on one line. After a restart, those two requests could be added again. New saves end with a newline, and lines already joined in existing models are split when read.
+- **Saved models survive crashes and damaged files.** Every file is written to a temporary file and moved into place. The appended requests file is read one gzip member at a time: if the last append was cut off, the complete requests are kept and the next save writes a clean file. An unreadable request line skips only that line. An unreadable `session.json` restarts the build history but keeps every saved request. Nothing is cleared because a file is damaged any more; damaged files are kept as `*.corrupt-<time>`, and what happened shows in the status bar and the extension output.
+- **Clean unload.** Unloading waits for a save in progress instead of interrupting it, adds what live capture still holds, waits for sends and imports, and stops the parsing threads, the map's timers and the caches, so a reload no longer leaks the previous copy.
+- A model folder is locked while Burp has it open; a second Burp opening the same model is told so instead of writing over it. The same model name always reuses its open model.
+- Burp XML import turns on secure processing (entity expansion is capped) and never reads external entities or DTDs.
+- The JSON reader rejects malformed or cut-off input with the position, and the writer keeps lone surrogates as escapes instead of saving them as `?`.
 - Unit tests for the extension (`gradle test`, JUnit 5, test-only: the jar still has no dependencies), run in CI.
 
 ## 1.1.0 — 2026-10-16
