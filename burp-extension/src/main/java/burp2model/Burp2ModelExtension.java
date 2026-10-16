@@ -21,7 +21,6 @@ import burp2model.ui.MainPanel;
 
 import javax.swing.JMenuItem;
 import java.awt.Component;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
@@ -164,16 +163,14 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             if (s == null || live.isEmpty()) {
                 return;
             }
-            List<Parse.Raw> raws = new ArrayList<>();
-            Parse.Raw r;
-            while ((r = live.poll()) != null && raws.size() < 500) {
-                raws.add(r);
-            }
-            s.scope = panel.scope();
-            boolean snap = sinceSnapshot + raws.size() >= 40 || System.currentTimeMillis() - lastSnapshot > 180_000;
-            Session.AddResult res = s.add(raws, panel.role(), "live capture", false, snap);
-            sinceSnapshot = snap ? 0 : sinceSnapshot + res.added();
-            if (snap) {
+            List<Parse.Raw> raws = drain(live, 500);
+            MainPanel.Settings set = panel.settings();
+            s.scope = set.scope();
+            Session.AddResult res = s.add(raws, set.role(), "live capture", false, false);
+            sinceSnapshot += res.added();
+            if (snapshotDue(sinceSnapshot, System.currentTimeMillis() - lastSnapshot)) {
+                s.snapshot("live capture");
+                sinceSnapshot = 0;
                 lastSnapshot = System.currentTimeMillis();
             }
             if (res.added() > 0) {
@@ -183,6 +180,21 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         } catch (Throwable t) {
             api.logging().logToError("burp2model live capture: " + t);
         }
+    }
+
+    /** Take up to max items off the queue; the size is checked before polling, so nothing is taken and then dropped. */
+    static <T> List<T> drain(java.util.Queue<T> q, int max) {
+        List<T> out = new ArrayList<>();
+        T r;
+        while (out.size() < max && (r = q.poll()) != null) {
+            out.add(r);
+        }
+        return out;
+    }
+
+    /** Live capture records a build every 40 new requests, or after three minutes once anything new arrived; duplicates never count. */
+    static boolean snapshotDue(int newSinceLast, long msSinceLast) {
+        return newSinceLast >= 40 || (newSinceLast > 0 && msSinceLast > 180_000);
     }
 
     // ------------------------------------------------------------------ menu
@@ -213,12 +225,13 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             for (HttpRequestResponse rr : picked) {
                 raws.add(toRaw(rr));
             }
-            s.scope = panel.scope();
-            Session.AddResult r = s.add(raws, panel.role(), null, panel.replaceRoleOnSend());
+            MainPanel.Settings set = panel.settings();
+            s.scope = set.scope();
+            Session.AddResult r = s.add(raws, set.role(), null, set.replaceRole());
             panel.refresh();
             String msg = "burp2model: added " + r.added() + (r.duplicates() > 0 ? ", " + r.duplicates() + " already in the model" : "")
-                    + (r.skipped() > 0 ? ", " + r.skipped() + " could not be read" : "") + " · build " + r.build().id() + ": "
-                    + r.build().nodes() + " nodes, " + r.build().edges() + " edges.";
+                    + (r.skipped() > 0 ? ", " + r.skipped() + " could not be read" : "")
+                    + (r.build() == null ? "." : " · build " + r.build().id() + ": " + r.build().nodes() + " nodes, " + r.build().edges() + " edges.");
             api.logging().logToOutput(msg);
             panel.say(msg);
         } catch (Throwable t) {
@@ -233,9 +246,5 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         return new Parse.Raw(rq.method(), rq.httpService().host(), rq.httpService().port(), rq.httpService().secure() ? "https" : "http",
                 rq.path(), rs == null ? null : (int) rs.statusCode(), "", rq.toByteArray().getBytes(),
                 rs == null ? new byte[0] : rs.toByteArray().getBytes(), false);
-    }
-
-    static String unused() {
-        return new String(new byte[0], StandardCharsets.UTF_8);
     }
 }

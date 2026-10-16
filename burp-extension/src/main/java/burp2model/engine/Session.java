@@ -7,12 +7,15 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -29,11 +32,15 @@ public final class Session {
     public List<String> scope = new ArrayList<>();
     private final List<Exchange> exchanges = new ArrayList<>();
     private final Set<String> seen = new LinkedHashSet<>();
-    private final List<BuildInfo> builds = new ArrayList<>();
-    private final Map<Integer, Model> cache = new LinkedHashMap<>();
+    // read by the Swing thread while a background add writes them: copy-on-write, concurrent, or synchronized
+    private final List<BuildInfo> builds = new CopyOnWriteArrayList<>();
+    private final Map<Integer, Model> cache = new ConcurrentHashMap<>();
     /** node id -> {first build, last build}. */
-    private final Map<String, int[]> nodeHistory = new LinkedHashMap<>();
-    private Model model;
+    private final Map<String, int[]> nodeHistory = Collections.synchronizedMap(new LinkedHashMap<>());
+    private volatile Model model;
+    private volatile Set<String> roles = Set.of();
+    /** The working model holds requests no recorded build has. */
+    private boolean dirty;
     /** Exchanges and keys not yet appended to disk; a role replacement rewrites the whole file instead. */
     private final List<Exchange> pendingNew = new ArrayList<>();
     private final List<String> pendingKeys = new ArrayList<>();
@@ -50,8 +57,13 @@ public final class Session {
         return model;
     }
 
+    /** The builds so far; safe to iterate while requests are being added. */
     public List<BuildInfo> builds() {
-        return builds;
+        return Collections.unmodifiableList(builds);
+    }
+
+    private BuildInfo lastBuild() {
+        return builds.isEmpty() ? null : builds.get(builds.size() - 1);
     }
 
     public int requestCount() {
@@ -141,8 +153,9 @@ public final class Session {
                 added++;
             }
         }
-        if (added == 0 && !fullRewrite && !snapshot) {
-            return new AddResult(0, dup, skipped, null);
+        if (added == 0 && !fullRewrite && model != null) {
+            // nothing new, so the model is unchanged: no rebuild. A send is still a build; live capture uses snapshot().
+            return new AddResult(0, dup, skipped, snapshot ? record(label) : null);
         }
         pendingNew.addAll(fresh);
         pendingKeys.addAll(freshKeys);
@@ -179,8 +192,14 @@ public final class Session {
         }
     }
 
+    /** Record the working model as a build, if it holds requests no build has yet; null when there is nothing new. */
+    public synchronized BuildInfo snapshot(String label) throws IOException {
+        return dirty && model != null ? record(label) : null;
+    }
+
     public synchronized void clear() throws IOException {
         exchanges.clear();
+        roles = Set.of();
         seen.clear();
         builds.clear();
         cache.clear();
@@ -193,9 +212,12 @@ public final class Session {
         }
         Files.deleteIfExists(dir.resolve("inputs.jsonl.gz"));
         Files.deleteIfExists(dir.resolve("seen.txt"));
+        // session.json lists the builds just deleted; left behind, the model could not be opened again
+        Files.deleteIfExists(dir.resolve("session.json"));
         pendingNew.clear();
         pendingKeys.clear();
         fullRewrite = false;
+        dirty = false;
         Parse.clearCache();
     }
 
@@ -215,10 +237,23 @@ public final class Session {
         stats.put("skipped", (long) skipped);
         List<Exchange> copy = new ArrayList<>(exchanges);
         model = Builder.build(copy, name, null, scope.isEmpty() ? null : scope, stats);
+        Set<String> r = new TreeSet<>();
+        for (Exchange e : exchanges) {
+            if (e.role != null) {
+                r.add(e.role);
+            }
+        }
+        roles = Collections.unmodifiableSet(r);
+        dirty = true;
         if (!snapshot) {
             saveInputs();
             return null;
         }
+        return record(label);
+    }
+
+    /** Keep the current model as the next build. */
+    private BuildInfo record(String label) throws IOException {
         int id = builds.size() + 1;
         BuildInfo info = new BuildInfo(id, Instant.now().toString().substring(0, 19) + "Z",
                 label == null || label.isBlank() ? "build " + id : label, model.nodes.size(), model.edges.size(), model.evidenceLog.size());
@@ -233,6 +268,7 @@ public final class Session {
             }
         }
         save(info);
+        dirty = false;
         return info;
     }
 
@@ -319,6 +355,7 @@ public final class Session {
     private void load() throws IOException {
         Path meta = dir.resolve("session.json");
         if (!Files.exists(meta)) {
+            loadInputsOnly();
             return;
         }
         try {
@@ -329,31 +366,29 @@ public final class Session {
                 builds.add(new BuildInfo(((Number) b.get("id")).intValue(), (String) b.get("built_at"), (String) b.get("label"),
                         ((Number) b.get("nodes")).intValue(), ((Number) b.get("edges")).intValue(), ((Number) b.get("requests")).intValue()));
             }
+            // keep the builds up to the first one whose file is missing, so build ids stay 1..n
+            int kept = 0;
+            while (kept < builds.size() && kept + 1 == builds.get(kept).id()
+                    && Files.exists(dir.resolve("builds").resolve(builds.get(kept).id() + ".json.gz"))) {
+                kept++;
+            }
+            builds.subList(kept, builds.size()).clear();
+            final int last = kept;
             ((Map<String, Object>) m.getOrDefault("history", Map.of())).forEach((k, v) -> {
                 List<Object> l = (List<Object>) v;
-                nodeHistory.put(k, new int[] {((Number) l.get(0)).intValue(), ((Number) l.get(1)).intValue()});
+                int first = ((Number) l.get(0)).intValue();
+                if (first <= last) {
+                    nodeHistory.put(k, new int[] {first, Math.min(last, ((Number) l.get(1)).intValue())});
+                }
             });
-            Path inputs = dir.resolve("inputs.jsonl.gz");
-            if (Files.exists(inputs)) {
-                for (String line : readGz(inputs).split("\n")) {
-                    if (!line.isBlank()) {
-                        exchanges.add(Exchange.fromMap((Map<String, Object>) Json.parse(line)));
-                    }
-                }
-            }
-            Path seenFile = dir.resolve("seen.txt");
-            if (Files.exists(seenFile)) {
-                for (String s : Files.readString(seenFile, StandardCharsets.UTF_8).split("\n")) {
-                    if (!s.isBlank()) {
-                        seen.add(s);
-                    }
-                }
-            }
+            readInputs();
             if (!exchanges.isEmpty()) {
                 // the working model may hold live-captured requests newer than the last build: rebuild it from the inputs
                 rebuild(null, 0, false);
+                BuildInfo b = lastBuild();
+                dirty = b == null || b.requests() != exchanges.size();
             } else if (!builds.isEmpty()) {
-                model = buildModel(builds.get(builds.size() - 1).id());
+                model = buildModel(lastBuild().id());
             }
         } catch (RuntimeException e) {
             // an unreadable saved session starts over rather than blocking the tab
@@ -362,6 +397,40 @@ public final class Session {
             builds.clear();
             nodeHistory.clear();
             model = null;
+        }
+    }
+
+    /** A folder with requests but no session.json (live capture that never recorded a build). */
+    private void loadInputsOnly() throws IOException {
+        try {
+            readInputs();
+            if (!exchanges.isEmpty()) {
+                rebuild(null, 0, false);
+            }
+        } catch (RuntimeException e) {
+            exchanges.clear();
+            seen.clear();
+            model = null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void readInputs() throws IOException {
+        Path inputs = dir.resolve("inputs.jsonl.gz");
+        if (Files.exists(inputs)) {
+            for (String line : readGz(inputs).split("\n")) {
+                if (!line.isBlank()) {
+                    exchanges.add(Exchange.fromMap((Map<String, Object>) Json.parse(line)));
+                }
+            }
+        }
+        Path seenFile = dir.resolve("seen.txt");
+        if (Files.exists(seenFile)) {
+            for (String s : Files.readString(seenFile, StandardCharsets.UTF_8).split("\n")) {
+                if (!s.isBlank()) {
+                    seen.add(s);
+                }
+            }
         }
     }
 
@@ -383,12 +452,6 @@ public final class Session {
     }
 
     public Set<String> roles() {
-        Set<String> r = new TreeSet<>();
-        exchanges.forEach(e -> {
-            if (e.role != null) {
-                r.add(e.role);
-            }
-        });
-        return r;
+        return roles;
     }
 }

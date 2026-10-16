@@ -6,7 +6,6 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.geom.RoundRectangle2D;
-import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -123,9 +122,5 @@ final class Renderers {
                 return this;
             }
         };
-    }
-
-    static void unused(JLabel l, Graphics g) {
-        // keeps the imports honest if a renderer is removed
     }
 }

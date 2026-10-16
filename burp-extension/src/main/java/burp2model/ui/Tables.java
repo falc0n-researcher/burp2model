@@ -1,6 +1,5 @@
 package burp2model.ui;
 
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
 import java.awt.datatransfer.StringSelection;
@@ -194,9 +193,5 @@ final class Tables {
     static int selected(JTable t) {
         int v = t.getSelectedRow();
         return v < 0 ? -1 : t.convertRowIndexToModel(v);
-    }
-
-    static Color unused() {
-        return Color.BLACK;
     }
 }
