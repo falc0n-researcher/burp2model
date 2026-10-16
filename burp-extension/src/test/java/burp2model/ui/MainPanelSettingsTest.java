@@ -73,6 +73,38 @@ class MainPanelSettingsTest {
         assertTrue(now.replaceRole());
     }
 
+    @Test
+    void theTabIsBuiltBeforeTheModelFinishesOpening() throws Exception {
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        MainPanel[] panel = new MainPanel[1];
+        long t0 = System.nanoTime();
+        SwingUtilities.invokeAndWait(() -> panel[0] = new MainPanel(new MainPanel.Host() {
+            public String get(String k, String d) {
+                return d;
+            }
+
+            public void set(String k, String v) {
+            }
+
+            public void log(String l) {
+            }
+
+            public Session session(String name) throws java.io.IOException {
+                try {
+                    release.await();                            // a model that takes a while to open
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return new Session(home, name);
+            }
+        }));
+        long built = (System.nanoTime() - t0) / 1_000_000;
+        assertTrue(built < 2000, "the Swing thread did not wait for the model (" + built + " ms)");
+        assertNull(panel[0].session(), "still opening");
+        release.countDown();
+        assertTrue(panel[0].awaitSession(10_000) != null, "then it opens");
+    }
+
     @SuppressWarnings("unchecked")
     private static <T> T field(MainPanel p, String name) throws Exception {
         var f = MainPanel.class.getDeclaredField(name);

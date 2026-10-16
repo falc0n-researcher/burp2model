@@ -37,6 +37,23 @@
   The model itself is unchanged: the same export gives byte-identical output, checked against the previous engine.
 - **Live capture is bounded.** The queue holds at most 5,000 requests or 256 MB, and responses beyond what is scanned (10 MB) are cut before queueing. Requests that do not fit are counted and reported instead of silently dropped. Live capture keeps at most 10 requests of any one shape (method, host, path template, query names, status, role), so polling and cache-busters no longer grow the model without end; a manual send is never capped.
 - While another Burp tab is in front, live capture no longer refreshes the burp2model tab; it catches up when shown. The map keeps its layout, selection and view when new requests add nothing to draw.
+- **Burp never waits on the tab.** The longest the Swing thread is busy, measured on a 20,000-request model (`EdtBench`):
+
+  | | before | now |
+  |---|---|---|
+  | opening the model | 1.1 s | 8 ms |
+  | a body regex query | 351 ms | 12 ms |
+  | showing Changes | 108 ms | 3 ms |
+  | showing the Map | 86 ms | 3 ms |
+
+  - The tab is built on the Swing thread and the model opens in the background ("Opening the model…"); a send right after Burp starts waits for it.
+  - Queries, comparing builds, Copy for AI, exporting the model or a summary, switching models and clearing all run in the background, with a progress indicator in the status line.
+  - A query can be cancelled, and stops by itself after 20 seconds, so a regex that backtracks badly cannot hang Burp.
+  - The status line marks errors in red and returns to the model summary after a few seconds.
+  - Maps over 200 nodes are laid out in the background ("Laying out N nodes…").
+  - A large map draws only what is on screen, fills its nodes in a few batches, and while it moves leaves out dashes and labels (they come back when it stops). Moving the mouse over empty canvas no longer redraws it.
+  - The map's Find and the Surface and Requests filters wait for a pause in typing instead of running on every keystroke.
+  - The site map counts each folder once per model instead of on every row it paints, and a node's facts no longer scan every edge.
 - Unit tests for the extension (`gradle test`, JUnit 5, test-only: the jar still has no dependencies), run in CI.
 
 ## 1.1.0 — 2026-10-16

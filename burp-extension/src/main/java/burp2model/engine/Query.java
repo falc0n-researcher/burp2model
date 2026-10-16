@@ -46,6 +46,52 @@ public final class Query {
         throw new QueryError("no build history yet");
     };
 
+    /**
+     * Checked while a regex runs over request and response text: return true to stop the query (the user pressed
+     * Cancel, or it ran too long). A pattern that backtracks badly can otherwise run for minutes.
+     */
+    public volatile java.util.function.BooleanSupplier stop = () -> false;
+
+    /** The query was stopped through `stop`. */
+    public static final class Stopped extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        Stopped() {
+            super("stopped");
+        }
+    }
+
+    /** Text a regex reads through, checking `stop` every few thousand characters it looks at. */
+    private CharSequence guarded(String text) {
+        java.util.function.BooleanSupplier st = stop;
+        return new CharSequence() {
+            private int reads;
+
+            @Override
+            public char charAt(int i) {
+                if ((++reads & 0xFFF) == 0 && st.getAsBoolean()) {
+                    throw new Stopped();
+                }
+                return text.charAt(i);
+            }
+
+            @Override
+            public int length() {
+                return text.length();
+            }
+
+            @Override
+            public CharSequence subSequence(int a, int b) {
+                return text.subSequence(a, b);
+            }
+
+            @Override
+            public String toString() {
+                return text;
+            }
+        };
+    }
+
     public Query(Model m) {
         this.m = m;
         for (Model.Edge e : m.edges) {
@@ -483,7 +529,7 @@ public final class Query {
                 Pattern re = Pattern.compile(sb.append("$").toString(), Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
                 return r -> {
                     Object x = g.get(r);
-                    return x != null && re.matcher(asText(x)).find();
+                    return x != null && re.matcher(guarded(asText(x))).find();
                 };
             }
             default: {
@@ -495,7 +541,7 @@ public final class Query {
                 }
                 return r -> {
                     Object x = g.get(r);
-                    return x != null && re.matcher(asText(x)).find();
+                    return x != null && re.matcher(guarded(asText(x))).find();
                 };
             }
         }
