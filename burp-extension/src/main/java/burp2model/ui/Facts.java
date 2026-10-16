@@ -82,10 +82,7 @@ final class Facts extends JPanel {
     @SuppressWarnings("unchecked")
     void show(Model.Node n, Model m) {
         body.removeAll();
-        JLabel title = new JLabel("<html>" + escape(n.label) + "</html>");
-        title.setFont(Theme.mono(13f).deriveFont(Font.BOLD));
-        title.setAlignmentX(Component.LEFT_ALIGNMENT);
-        body.add(title);
+        body.add(Widgets.wrapText(n.label, Theme.mono(13f).deriveFont(Font.BOLD), Theme.fg()));
         body.add(Box.createVerticalStrut(6));
         JPanel chips = Widgets.flow(4);
         chips.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -152,10 +149,7 @@ final class Facts extends JPanel {
 
     void showLead(Analysis.Lead l) {
         body.removeAll();
-        JLabel title = new JLabel("<html>" + escape(l.endpoint().label) + "</html>");
-        title.setFont(Theme.mono(13f).deriveFont(Font.BOLD));
-        title.setAlignmentX(Component.LEFT_ALIGNMENT);
-        body.add(title);
+        body.add(Widgets.wrapText(l.endpoint().label, Theme.mono(13f).deriveFont(Font.BOLD), Theme.fg()));
         body.add(Box.createVerticalStrut(8));
         for (Analysis.Signal s : l.signals()) {
             JPanel card = new JPanel(new BorderLayout());
@@ -239,10 +233,7 @@ final class Facts extends JPanel {
         JLabel dot = new JLabel("●");
         dot.setForeground(Theme.type(o.type));
         dot.setFont(Theme.font(9f, Font.PLAIN));
-        String hex = Theme.hex(Theme.readable(Theme.BLUE, Theme.surface()));
-        JLabel name = new JLabel("<html><font color='" + hex + "'><u>" + escape(o.label.length() > 60 ? o.label.substring(0, 59) + "…" : o.label) + "</u></font></html>");
-        name.setFont(Theme.mono(11f));
-        name.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+        JLabel name = Widgets.link(o.label.length() > 60 ? o.label.substring(0, 59) + "…" : o.label, Theme.mono(11f));
         name.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent ev) {
@@ -257,9 +248,6 @@ final class Facts extends JPanel {
         return p;
     }
 
-    private static String escape(String s) {
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-    }
 
 
     private Model indexed;

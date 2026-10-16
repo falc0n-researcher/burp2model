@@ -147,6 +147,32 @@ class WelcomeTest {
     }
 
     @Test
+    void withoutAChoiceTheSampleOpensFull() throws Exception {
+        Map<String, String> prefs = new HashMap<>();
+        MainPanel p = open(prefs);
+        assertEquals("sample", p.session().name, "no 'burp' model any more: the sample is the default");
+        assertTrue(p.session().requestCount() > 10, "and it is filled before it is shown");
+        assertTrue(showing(p), "a first run still starts on the welcome page");
+    }
+
+    @Test
+    void anEmptyModelFromTheOldDefaultGivesWayToTheSample() throws Exception {
+        new Session(home, "burp");
+        Map<String, String> prefs = new HashMap<>(Map.of("app", "burp", "welcome.seen", "1"));
+        MainPanel p = open(prefs);
+        assertEquals("sample", p.session().name);
+        assertEquals("sample", prefs.get("app"));
+    }
+
+    @Test
+    void aBurpModelWithRequestsIsKept() throws Exception {
+        new Session(home, "burp").add(BurpXml.readRaw(new File(System.getProperty("burp2model.samples", "../samples"), "burp-history-sample.xml")),
+                null, "one", false);
+        MainPanel p = open(new HashMap<>(Map.of("app", "burp", "welcome.seen", "1")));
+        assertEquals("burp", p.session().name, "the user's own requests are never set aside");
+    }
+
+    @Test
     void theDisplayFontIsInTheJar() {
         assertTrue(Theme.display(20f).getFamily().contains("IBM Plex Mono"), Theme.display(20f).getFamily());
         assertTrue(Theme.displayMedium(14f).getFontName().contains("SemiBold"), Theme.displayMedium(14f).getFontName());
