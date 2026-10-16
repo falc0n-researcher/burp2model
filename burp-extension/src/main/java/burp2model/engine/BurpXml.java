@@ -38,8 +38,15 @@ public final class BurpXml {
 
     /** The raw items of an export, as they would arrive from Burp's API. */
     public static List<Parse.Raw> readRaw(File f) throws Exception {
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            return readRaw(in);
+        }
+    }
+
+    /** The same, from a stream (the extension's bundled sample is a resource, not a file). */
+    public static List<Parse.Raw> readRaw(java.io.InputStream in) throws Exception {
         List<Parse.Raw> out = new ArrayList<>();
-        forEach(f, (raw, i) -> out.add(raw));
+        forEach(in, (raw, i) -> out.add(raw));
         return out;
     }
 
@@ -53,25 +60,29 @@ public final class BurpXml {
      * billion laughs nor external entities can do anything.
      */
     private static void forEach(File f, ItemSink sink) throws Exception {
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            forEach(in, sink);
+        }
+    }
+
+    private static void forEach(java.io.InputStream raw, ItemSink sink) throws Exception {
         javax.xml.stream.XMLInputFactory xf = javax.xml.stream.XMLInputFactory.newFactory();
         xf.setProperty(javax.xml.stream.XMLInputFactory.SUPPORT_DTD, false);
         xf.setProperty(javax.xml.stream.XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
         xf.setProperty(javax.xml.stream.XMLInputFactory.IS_COALESCING, true);
-        try (java.io.InputStream in = new java.io.BufferedInputStream(new java.io.FileInputStream(f), 1 << 16)) {
-            javax.xml.stream.XMLStreamReader r = xf.createXMLStreamReader(in);
-            try {
-                int index = 0;
-                while (r.hasNext()) {
-                    if (r.next() == javax.xml.stream.XMLStreamConstants.START_ELEMENT && r.getLocalName().equals("item")) {
-                        java.util.Map<String, String> it = new java.util.HashMap<>();
-                        java.util.Set<String> base64 = new java.util.HashSet<>();
-                        readItem(r, it, base64);
-                        sink.accept(toRaw(it, base64), index++);
-                    }
+        javax.xml.stream.XMLStreamReader r = xf.createXMLStreamReader(new java.io.BufferedInputStream(raw, 1 << 16));
+        try {
+            int index = 0;
+            while (r.hasNext()) {
+                if (r.next() == javax.xml.stream.XMLStreamConstants.START_ELEMENT && r.getLocalName().equals("item")) {
+                    java.util.Map<String, String> it = new java.util.HashMap<>();
+                    java.util.Set<String> base64 = new java.util.HashSet<>();
+                    readItem(r, it, base64);
+                    sink.accept(toRaw(it, base64), index++);
                 }
-            } finally {
-                r.close();
             }
+        } finally {
+            r.close();
         }
     }
 
