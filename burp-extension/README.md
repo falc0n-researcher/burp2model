@@ -24,16 +24,16 @@ Or turn on **Capture proxied traffic automatically** in Settings: in-scope Proxy
 | --- | --- |
 | Overview | Counts, code vs runtime, response mix, technology stack, cookie and credential facts, the first leads |
 | To check | Ranked leads with the reason and the request behind each, and the open questions ranked by value |
-| Map | The model as a map you can read: a network layout or a left-to-right flow, both stable (the same model always draws the same way, and new requests keep what was placed). Zoom, drag, search, hover for details, click to see a node's neighbours, double-click to focus, right-click for more; solid lines were seen in traffic, dashed ones found in code |
+| Map | The model as a map you can read: a network layout or a left-to-right flow that holds still (each layout is computed once, the same model always draws the same way, and new requests keep what was placed). Roles, cookies and credentials (Trust) are off at first; tick them to add them. Zoom, drag, search, hover for details, click to see a node's neighbours, double-click to focus, right-click for more; solid lines were seen in traffic, dashed ones found in code |
 | Surface | Endpoints, pages, scripts, third parties, cookies, credentials and more, as a list or a site map by path, with each thing's facts and connections |
 | Requests | Every captured request, with its masked request and response, coloured and pretty-printed |
 | Query | Plain questions and BQL filters and verbs, offline; every row cites evidence; copy or save results |
 | Changes | Each send or snapshot is a build; see what changed between any two |
 | Roles | Send each account under its own role, then compare what they reached |
 | Recon | Light, passive recon on a host you are authorised to test: DNS, TLS, headers, robots.txt, security.txt, mail policy (only when you press the button) |
-| Settings | Model name, role for the next send, scope, live capture, import a HAR or Burp export, export the model or a Markdown summary |
+| Settings | Cards for the model (name), the next send (role, scope, replace), live capture, data (import a HAR or Burp export, export the model or a Markdown summary, clear or delete the model, the welcome page) and about |
 
-The header shows the open model (switch to another, or make a new one) and a **Live** button for live capture; ⋯ holds import, export and Settings.
+The header shows the open model (switch to another, or make a new one) and a **Live** button that turns live capture on and off; ⋯ holds import, export, **Delete this model…** and Settings. With no model chosen, the tab opens the sample model.
 
 Keyboard, while focus is in the tab: **Cmd/Ctrl+1–9, 0** switch tabs, **Cmd/Ctrl+F** searches, **Cmd/Ctrl+L** goes to the query box, **Cmd/Ctrl+Shift+C** copies the whole model for AI, **Alt+←** goes back after a jump, and **/** on the map jumps to Find.
 
