@@ -98,10 +98,12 @@ jobs:
         run: |
           curl -sLo montoya.jar https://repo1.maven.org/maven2/net/portswigger/burp/extensions/montoya-api/2025.5/montoya-api-2025.5.jar
           mkdir -p classes burp-extension/build/libs
-          javac --release 17 -Xlint:all -cp montoya.jar -d classes $(find burp-extension/src -name '*.java')
+          javac --release 17 -Xlint:all -cp montoya.jar -d classes $(find burp-extension/src -name '*.java' ! -name '*Test.java')
           jar --create --file burp-extension/build/libs/burp2model.jar -C classes . -C burp-extension/src/main/resources .
       - name: The Gradle build works too
         run: gradle -p burp-extension jar --no-daemon -q
+      - name: Unit tests
+        run: gradle -p burp-extension test --no-daemon -q
       - name: The tab and the engine work end to end
         run: java -Djava.awt.headless=true -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.Smoke samples/burp-history-sample.xml
       - name: The map is stable
