@@ -106,6 +106,21 @@ final class RolesTab implements Tab {
         rolesNote.setText(n + " things to compare. Each is a hypothesis to verify, not a finding.");
     }
 
+    /** How privileged a role name sounds: anonymous and guests lowest, administrators highest, anything else between. */
+    static int rank(String role) {
+        String r = role.toLowerCase(java.util.Locale.ROOT);
+        if (r.matches(".*(anon|guest|public|visitor|unauth|none).*")) {
+            return 0;
+        }
+        if (r.matches(".*(root|super|admin|owner|staff|internal|ops|manager|moderator|support).*")) {
+            return 3;
+        }
+        if (r.matches(".*(user|member|customer|client|basic|viewer|reader|free).*")) {
+            return 1;
+        }
+        return 2;
+    }
+
     private void fillRoles(Model m) {
         Object low = lowBox.getSelectedItem();
         Object high = highBox.getSelectedItem();
@@ -116,13 +131,15 @@ final class RolesTab implements Tab {
                 lowBox.addItem(r);
                 highBox.addItem(r);
             }
-            if (low != null) {
+            if (low != null && high != null) {
                 lowBox.setSelectedItem(low);
-            }
-            if (high != null) {
                 highBox.setSelectedItem(high);
-            } else if (highBox.getItemCount() > 1) {
-                highBox.setSelectedIndex(highBox.getItemCount() - 1);
+            } else if (m.roles.size() > 1) {
+                // first time: guess which is the lower role from its name (guest < user < admin), not the alphabet
+                List<String> byRank = new ArrayList<>(m.roles);
+                byRank.sort(java.util.Comparator.comparingInt(RolesTab::rank).thenComparing(r -> r));
+                lowBox.setSelectedItem(byRank.get(0));
+                highBox.setSelectedItem(byRank.get(byRank.size() - 1));
             }
         }
         if (m == null || m.roles.size() < 2) {

@@ -57,6 +57,14 @@ class PolishTest {
     }
 
     @Test
+    void rolesAreRankedByWhatTheirNamesSay() {
+        assertTrue(RolesTab.rank("guest") < RolesTab.rank("user"));
+        assertTrue(RolesTab.rank("user") < RolesTab.rank("admin"));
+        assertTrue(RolesTab.rank("customer") < RolesTab.rank("support-staff"));
+        assertTrue(RolesTab.rank("anonymous") < RolesTab.rank("tenant-b"));
+    }
+
+    @Test
     void theOverviewReflowsWithTheWidth() throws Exception {
         var m = Dashboard.class.getDeclaredMethod("columnsFor", int.class);
         m.setAccessible(true);

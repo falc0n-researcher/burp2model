@@ -105,6 +105,31 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             }
 
             @Override
+            public boolean hasModel(String name) {
+                return Files.isDirectory(home.resolve(name));
+            }
+
+            @Override
+            public void deleteModel(String name) throws java.io.IOException {
+                Session s = sessions.remove(name);
+                if (s != null) {
+                    s.clear();
+                    s.close();
+                }
+                Path dir = home.resolve(name).normalize();
+                if (!dir.startsWith(home) || dir.equals(home)) {
+                    throw new java.io.IOException("not a model folder: " + name);
+                }
+                if (Files.exists(dir)) {
+                    try (var walk = Files.walk(dir)) {
+                        for (Path p : (Iterable<Path>) walk.sorted(java.util.Comparator.reverseOrder())::iterator) {
+                            Files.deleteIfExists(p);
+                        }
+                    }
+                }
+            }
+
+            @Override
             public void background(String name, Runnable task) {
                 workers.execute(task);
             }

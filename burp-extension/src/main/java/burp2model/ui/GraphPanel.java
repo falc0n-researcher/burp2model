@@ -133,7 +133,9 @@ final class GraphPanel extends JPanel {
         super(new BorderLayout());
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 3));
         for (String[] g : GROUPS) {
-            JCheckBox c = new JCheckBox(g[0], !g[0].equals("Parameters") && !g[0].equals("Tech"));
+            // parameters, tech and trust (roles, cookies, credentials) are off at first: each links to most of the map
+            // and turns it into a ball of lines; one click brings any of them back
+            JCheckBox c = new JCheckBox(g[0], !g[0].equals("Parameters") && !g[0].equals("Tech") && !g[0].equals("Trust"));
             c.setFont(Theme.font(11f, Font.PLAIN));
             c.addActionListener(e -> rebuild(false));
             toggles.put(g[1], c);
@@ -346,30 +348,29 @@ final class GraphPanel extends JPanel {
         int gen = ++layoutGen;
         String infoText = vs.size() + " nodes · " + es.size() + " edges   ·   solid: seen in traffic · dashed: found in code   ·   scroll to zoom · drag to pan or move · double-click to focus · right-click for more"
                 + (cap > BIG ? "   ·   a large map: turn groups off to see less" : "");
+        // The map never animates: the layout is computed to the end and shown once. Nodes already placed keep their
+        // place (they are fixed while new ones settle among them), so a refresh only adds; Re-layout starts over.
         if (!flow && vs.size() > ASYNC_LAYOUT) {
-            // a big map lays out on a background thread while the current one stays on screen; the camera moves only
-            // when asked to (the first map, a new layout, Fit), never because requests arrived
+            // a big map lays out on a background thread while the current one stays on screen
             Map<String, double[]> mem = new HashMap<>(memory);
-            int n = vs.size() > BIG ? 40 : 140;
             int max = maxSteps;
-            int st = steps;
             boolean firstMap = this.vs.isEmpty();
             layingOut = true;
             LAYOUT.execute(() -> {
-                boolean allNew = MapLayout.placeAll(vs, mem);
-                MapLayout.relax(vs, es, n, true, allNew ? 0 : st, max);
+                MapLayout.placeAll(vs, mem);
+                MapLayout.relax(vs, es, max, true, 0, max);
                 javax.swing.SwingUtilities.invokeLater(() -> {
                     if (gen != layoutGen) {
                         return;                                 // a newer model arrived meanwhile
                     }
                     install(vs, es, byId);
                     layingOut = false;
+                    steps = maxSteps;
+                    remember();
                     info.setText(infoText);
                     if (refit || firstMap) {
                         fitted = false;
                     }
-                    steps = 140;                                // the background steps already cooled it: settle, don't re-heat
-                    sim.start();
                     canvas.repaint();
                 });
             });
@@ -379,15 +380,13 @@ final class GraphPanel extends JPanel {
         layingOut = false;
         place();
         if (!flow) {
-            relax(vs.size() > BIG ? 40 : 140, true);
+            MapLayout.relax(vs, es, maxSteps, true, 0, maxSteps);
+            remember();
         }
+        steps = maxSteps;
         info.setText(infoText);
         if (refit) {
             fitted = false;
-        }
-        if (!flow && !vs.isEmpty()) {
-            steps = 140;
-            sim.start();
         }
         canvas.repaint();
     }
@@ -1066,7 +1065,8 @@ final class GraphPanel extends JPanel {
                 }
                 boolean match = !q.isEmpty() && v.lower.contains(q);
                 if (v == selected || v == hover || match || (selected != null && lit.contains(v) && scale > 0.4)
-                        || (flow && scale > 0.3) || (!flow && v.degree >= 5 && scale > 0.35) || scale > 1.6) {
+                        || (flow && scale > 0.3) || (!flow && v.degree >= 5 && scale > 0.35) || scale > 1.6
+                        || vs.size() <= 80) {                           // a small map names everything that fits
                     cand.add(v);
                 }
             }
