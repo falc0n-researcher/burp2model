@@ -43,6 +43,9 @@ public final class Exchange {
     public byte[] evZ = new byte[0];
     /** The path in the request line (redacted), for tables. */
     public String reqPath = "";
+    /** Builder's cached folding key for `siblingKeyFor` (the template it was worked out from); never saved. */
+    transient Object siblingKey;
+    transient String siblingKeyFor;
 
     public void setEv(Map<String, Object> ev) {
         evZ = EvidenceLog.pack(ev);
