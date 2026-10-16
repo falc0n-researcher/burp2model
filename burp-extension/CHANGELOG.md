@@ -14,6 +14,29 @@
 - A model folder is locked while Burp has it open; a second Burp opening the same model is told so instead of writing over it. The same model name always reuses its open model.
 - Burp XML import turns on secure processing (entity expansion is capped) and never reads external entities or DTDs.
 - The JSON reader rejects malformed or cut-off input with the position, and the writer keeps lone surrogates as escapes instead of saving them as `?`.
+- **Faster and lighter on large models.** Measured at 20,000 requests with ten live-capture builds (`ScaleBench`):
+
+  | | before | now |
+  |---|---|---|
+  | live-capture tick | 275 ms | 130 ms |
+  | recording a build | 675 ms | 113 ms |
+  | diff between two builds | 5.2 s | 0.31 s |
+  | heap after the run | 567 MB | 293 MB |
+  | disk (builds) | 80 MB | 8 MB |
+  | reopening the model | 1.0 s | 0.74 s |
+
+  The changes:
+  - A saved build no longer repeats every request and response; the saved requests already hold them, and diffs need only the nodes, edges and evidence ids. Older builds still open.
+  - Only the last three builds read back for diffs are kept in memory.
+  - Saving and loading stream the requests line by line instead of building one large string.
+  - Path folding, the workflow grouping in diffs and the cleanup of removed endpoints no longer compare every path with every other.
+  - Technology detection skips most signatures with a cheap text check before running their pattern over a page.
+  - The content cache keeps the most recently used scans rather than stopping once full.
+  - Burp XML import reads the export one item at a time instead of loading it as a document; checking a `.json` file for HAR reads only its first 4 KB.
+
+  The model itself is unchanged: the same export gives byte-identical output, checked against the previous engine.
+- **Live capture is bounded.** The queue holds at most 5,000 requests or 256 MB, and responses beyond what is scanned (10 MB) are cut before queueing. Requests that do not fit are counted and reported instead of silently dropped. Live capture keeps at most 10 requests of any one shape (method, host, path template, query names, status, role), so polling and cache-busters no longer grow the model without end; a manual send is never capped.
+- While another Burp tab is in front, live capture no longer refreshes the burp2model tab; it catches up when shown. The map keeps its layout, selection and view when new requests add nothing to draw.
 - Unit tests for the extension (`gradle test`, JUnit 5, test-only: the jar still has no dependencies), run in CI.
 
 ## 1.1.0 — 2026-10-16

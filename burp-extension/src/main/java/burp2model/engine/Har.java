@@ -146,8 +146,11 @@ public final class Har {
             return false;
         }
         try {
-            byte[] head = Files.readAllBytes(f.toPath());
-            String s = new String(head, 0, Math.min(head.length, 4096), StandardCharsets.UTF_8).stripLeading();
+            byte[] head;
+            try (var in = Files.newInputStream(f.toPath())) {
+                head = in.readNBytes(4096);                     // the start is enough; a HAR can be hundreds of MB
+            }
+            String s = new String(head, StandardCharsets.UTF_8).stripLeading();
             return s.startsWith("{") && s.contains("\"log\"");
         } catch (Exception e) {
             return false;

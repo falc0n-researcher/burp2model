@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -44,7 +43,11 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
     private MainPanel panel;
     private Path home;
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
-    private final ConcurrentLinkedQueue<Parse.Raw> live = new ConcurrentLinkedQueue<>();
+    /** Live capture waits here: at most 5,000 requests or 256 MB, whichever comes first. */
+    private final LiveQueue live = new LiveQueue(5000, 256L * 1024 * 1024);
+    /** Live capture keeps this many requests of any one shape (method, host, path template, query names, status). */
+    static final int LIVE_SAMPLES_PER_SHAPE = 10;
+    private int cappedSinceSay;
     private volatile boolean auto;
     private long autoCheckedAt;
     private int sinceSnapshot;
@@ -194,10 +197,15 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         @Override
         public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived r) {
             try {
-                if (!unloading && autoOn() && r.toolSource().isFromTool(ToolType.PROXY) && api.scope().isInScope(r.initiatingRequest().url())
-                        && !STATIC.matcher(r.initiatingRequest().path().split("\\?", 2)[0]).find() && live.size() < 5000) {
-                    HttpRequest rq = r.initiatingRequest();
-                    live.add(new Parse.Raw(rq.method(), rq.httpService().host(), rq.httpService().port(), rq.httpService().secure() ? "https" : "http",
+                if (unloading || !autoOn() || !r.toolSource().isFromTool(ToolType.PROXY)) {
+                    return ResponseReceivedAction.continueWith(r);
+                }
+                HttpRequest rq = r.initiatingRequest();
+                String path = rq.path();
+                int q = path.indexOf('?');
+                // the cheap checks first: static assets are most of the traffic, the scope lookup is not free
+                if (!STATIC.matcher(q < 0 ? path : path.substring(0, q)).find() && api.scope().isInScope(rq.url())) {
+                    live.offer(new Parse.Raw(rq.method(), rq.httpService().host(), rq.httpService().port(), rq.httpService().secure() ? "https" : "http",
                             rq.path(), (int) r.statusCode(), "", rq.toByteArray().getBytes(), r.toByteArray().getBytes(), false));
                 }
             } catch (Throwable ignored) {
@@ -213,33 +221,31 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             if (s == null || live.isEmpty()) {
                 return;
             }
-            List<Parse.Raw> raws = drain(live, 500);
+            List<Parse.Raw> raws = live.drain(500);
             MainPanel.Settings set = panel.settings();
             s.scope = set.scope();
-            Session.AddResult res = s.add(raws, set.role(), "live capture", false, false);
+            Session.AddResult res = s.add(raws, set.role(), "live capture", false, false, LIVE_SAMPLES_PER_SHAPE);
+            cappedSinceSay += res.capped();
+            int dropped = live.takeDropped();
+            if (dropped > 0) {
+                api.logging().logToError("burp2model live capture: the queue was full, " + dropped + " requests were not captured");
+            }
             sinceSnapshot += res.added();
             if (snapshotDue(sinceSnapshot, System.currentTimeMillis() - lastSnapshot)) {
                 s.snapshot("live capture");
                 sinceSnapshot = 0;
                 lastSnapshot = System.currentTimeMillis();
             }
-            if (res.added() > 0) {
+            if (res.added() > 0 || dropped > 0) {
                 panel.refresh();
-                panel.say("burp2model live: +" + res.added() + " requests · " + s.requestCount() + " in the model");
+                panel.say("burp2model live: +" + res.added() + " requests · " + s.requestCount() + " in the model"
+                        + (cappedSinceSay > 0 ? " · " + cappedSinceSay + " repeats of known shapes skipped" : "")
+                        + (dropped > 0 ? " · " + dropped + " not captured (queue full)" : ""));
+                cappedSinceSay = 0;
             }
         } catch (Throwable t) {
             api.logging().logToError("burp2model live capture: " + t);
         }
-    }
-
-    /** Take up to max items off the queue; the size is checked before polling, so nothing is taken and then dropped. */
-    static <T> List<T> drain(java.util.Queue<T> q, int max) {
-        List<T> out = new ArrayList<>();
-        T r;
-        while (out.size() < max && (r = q.poll()) != null) {
-            out.add(r);
-        }
-        return out;
     }
 
     /** Live capture records a build every 40 new requests, or after three minutes once anything new arrived; duplicates never count. */
