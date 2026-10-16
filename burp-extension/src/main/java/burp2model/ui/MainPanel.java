@@ -194,6 +194,12 @@ public final class MainPanel extends JPanel {
         scopeField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
         replaceRole.addItemListener(e -> updateSettings());
         updateSettings();
+        addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing() && refreshPending) {
+                refreshPending = false;
+                refreshNow();
+            }
+        });
         refresh();
         reportProblems();
     }
@@ -231,8 +237,18 @@ public final class MainPanel extends JPanel {
 
     // ------------------------------------------------------------------ public
 
+    /** Set when a refresh arrived while the tab was hidden; done when it is shown again. */
+    private boolean refreshPending;
+
     public void refresh() {
-        SwingUtilities.invokeLater(this::refreshNow);
+        SwingUtilities.invokeLater(() -> {
+            // live capture refreshes every few seconds; while another Burp tab is in front, wait until this one is shown
+            if (isDisplayable() && !isShowing()) {
+                refreshPending = true;
+            } else {
+                refreshNow();
+            }
+        });
     }
 
     public Session session() {
