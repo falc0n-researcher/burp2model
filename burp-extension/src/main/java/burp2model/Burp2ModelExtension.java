@@ -25,9 +25,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,13 +43,20 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
     private Preferences prefs;
     private MainPanel panel;
     private Path home;
-    private final Map<String, Session> sessions = new HashMap<>();
+    private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final ConcurrentLinkedQueue<Parse.Raw> live = new ConcurrentLinkedQueue<>();
     private volatile boolean auto;
     private long autoCheckedAt;
     private int sinceSnapshot;
     private long lastSnapshot = System.currentTimeMillis();
     private ScheduledExecutorService flusher;
+    /** Sends, imports and recon: tracked so unloading can wait for them instead of cutting a save short. */
+    private final ExecutorService workers = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(null, r, "burp2model-work", 64L * 1024 * 1024);
+        t.setDaemon(true);
+        return t;
+    });
+    private volatile boolean unloading;
 
     @Override
     public void initialize(MontoyaApi api) {
@@ -81,12 +89,25 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
 
             @Override
             public Session session(String name) throws java.io.IOException {
-                Session s = sessions.get(name);
-                if (s == null) {
-                    s = new Session(home, name);
-                    sessions.put(name, s);
+                try {
+                    // one Session per model folder, however often the name is switched back and forth
+                    return sessions.computeIfAbsent(name, n -> {
+                        try {
+                            Session s = new Session(home, n);
+                            s.lock();
+                            return s;
+                        } catch (java.io.IOException e) {
+                            throw new java.io.UncheckedIOException(e);
+                        }
+                    });
+                } catch (java.io.UncheckedIOException e) {
+                    throw e.getCause();
                 }
-                return s;
+            }
+
+            @Override
+            public void background(String name, Runnable task) {
+                workers.execute(task);
             }
         });
         api.userInterface().applyThemeToComponent(panel);
@@ -99,8 +120,37 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             return t;
         });
         flusher.scheduleWithFixedDelay(this::flushLive, 5, 5, TimeUnit.SECONDS);
-        api.extension().registerUnloadingHandler(() -> flusher.shutdownNow());
+        api.extension().registerUnloadingHandler(this::unload);
         api.logging().logToOutput("burp2model ready. Right-click requests and choose Send to burp2model; the model is in the burp2model tab.");
+    }
+
+    /**
+     * Burp is unloading the extension: let a running save finish (never interrupt it), add what live capture
+     * still holds, wait for sends and imports, then release the threads, timers, locks and caches so nothing
+     * keeps the old extension in memory.
+     */
+    private void unload() {
+        unloading = true;
+        flusher.shutdown();
+        try {
+            if (!flusher.awaitTermination(15, TimeUnit.SECONDS)) {
+                api.logging().logToError("burp2model: live capture was still saving after 15 seconds");
+            }
+            for (int i = 0; i < 10 && !live.isEmpty(); i++) {
+                flushLive();
+            }
+            workers.shutdown();
+            if (!workers.awaitTermination(15, TimeUnit.SECONDS)) {
+                api.logging().logToError("burp2model: a send or import was still running after 15 seconds");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        live.clear();
+        javax.swing.SwingUtilities.invokeLater(panel::dispose);
+        sessions.values().forEach(Session::close);
+        Session.shutdownPool();
+        Parse.clearCache();
     }
 
     /** One random key per user, kept outside the models: fingerprints of the same value stay comparable across sessions. */
@@ -144,7 +194,7 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
         @Override
         public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived r) {
             try {
-                if (autoOn() && r.toolSource().isFromTool(ToolType.PROXY) && api.scope().isInScope(r.initiatingRequest().url())
+                if (!unloading && autoOn() && r.toolSource().isFromTool(ToolType.PROXY) && api.scope().isInScope(r.initiatingRequest().url())
                         && !STATIC.matcher(r.initiatingRequest().path().split("\\?", 2)[0]).find() && live.size() < 5000) {
                     HttpRequest rq = r.initiatingRequest();
                     live.add(new Parse.Raw(rq.method(), rq.httpService().host(), rq.httpService().port(), rq.httpService().secure() ? "https" : "http",
@@ -209,7 +259,11 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             return List.of();
         }
         JMenuItem add = new JMenuItem("Send " + picked.size() + " to burp2model");
-        add.addActionListener(e -> new Thread(null, () -> send(picked), "burp2model-send", 64L * 1024 * 1024).start());
+        add.addActionListener(e -> {
+            if (!unloading) {
+                workers.execute(() -> send(picked));
+            }
+        });
         return List.of(add);
     }
 
