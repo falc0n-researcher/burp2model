@@ -122,11 +122,9 @@ final class Facts extends JPanel {
             body.add(h);
             int shown = 0;
             int total = 0;
-            for (Model.Edge e : m.edges) {
+            for (int at : incident(m, n.id)) {
+                Model.Edge e = m.edges.get(at);
                 boolean out = e.src.equals(n.id);
-                if (!out && !e.dst.equals(n.id)) {
-                    continue;
-                }
                 total++;
                 if (shown >= 24) {
                     continue;
@@ -263,4 +261,24 @@ final class Facts extends JPanel {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
+
+    private Model indexed;
+    private Map<String, List<Integer>> byNode = Map.of();
+
+    /** The positions of the edges touching a node, in edge order; indexed once per model instead of scanning every edge per click. */
+    private List<Integer> incident(Model m, String id) {
+        if (indexed != m) {
+            Map<String, List<Integer>> idx = new java.util.HashMap<>();
+            for (int i = 0; i < m.edges.size(); i++) {
+                Model.Edge e = m.edges.get(i);
+                idx.computeIfAbsent(e.src, k -> new java.util.ArrayList<>()).add(i);
+                if (!e.dst.equals(e.src)) {
+                    idx.computeIfAbsent(e.dst, k -> new java.util.ArrayList<>()).add(i);
+                }
+            }
+            byNode = idx;
+            indexed = m;
+        }
+        return byNode.getOrDefault(id, List.of());
+    }
 }

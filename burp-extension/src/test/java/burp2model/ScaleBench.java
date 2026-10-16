@@ -20,7 +20,7 @@ import java.util.stream.Stream;
 public final class ScaleBench {
     private ScaleBench() {}
 
-    static List<Parse.Raw> replicate(List<Parse.Raw> base, int n, String prefix) {
+    public static List<Parse.Raw> replicate(List<Parse.Raw> base, int n, String prefix) {
         List<Parse.Raw> all = new ArrayList<>(n);
         int k = 0;
         while (all.size() < n) {
