@@ -18,6 +18,7 @@ module, so no raw secret ever reaches the model or the report.
 from __future__ import annotations
 
 import base64
+import codecs
 import json
 import os
 import re
@@ -409,23 +410,55 @@ def _text(elem) -> str | None:
     return elem.text if elem is not None else None
 
 
+_XML_ENCODING = re.compile(rb"""^<\?xml[^>]*?\bencoding\s*=\s*["']([A-Za-z0-9._-]+)["']""")
+# encodings in which `<!ENTITY` is the same bytes as in ASCII, so the raw file can be scanned as is
+_ASCII_SAFE = {"utf-8", "ascii", "latin-1", "iso8859-1", "cp1252"}
+
+
+def _xml_encoding(head: bytes) -> str:
+    """The encoding the XML parser will read the file in: its byte-order mark, its first bytes, or its declaration."""
+    for bom, name in ((codecs.BOM_UTF32_LE, "utf-32-le"), (codecs.BOM_UTF32_BE, "utf-32-be"),
+                      (codecs.BOM_UTF8, "utf-8"), (codecs.BOM_UTF16_LE, "utf-16-le"),
+                      (codecs.BOM_UTF16_BE, "utf-16-be")):
+        if head.startswith(bom):
+            return name
+    if head.startswith(b"<\0?\0"):
+        return "utf-16-le"
+    if head.startswith(b"\0<\0?"):
+        return "utf-16-be"
+    m = _XML_ENCODING.match(head)
+    return m.group(1).decode("ascii") if m else "utf-8"
+
+
 def _check_no_entities(path: str) -> None:
     """Refuse exports that declare XML entities (billion-laughs / XXE shapes).
 
     Burp's own exports declare elements and attributes, never entities. The
     whole file is scanned in chunks, so a declaration cannot hide past a
     header-only check. `<!ENTITY` cannot occur inside Burp's base64 payloads.
+    A file in UTF-16 or another encoding the parser accepts is decoded first,
+    so the declaration cannot hide in bytes that are not ASCII.
     """
     with open(path, "rb") as f:
-        tail = b""
+        head = f.read(1024)
+        name = _xml_encoding(head)
+        try:
+            codec = codecs.lookup(name)
+        except LookupError:
+            raise ValueError(f"{path}: unknown XML encoding {name!r}")
+        decode = (None if codec.name in _ASCII_SAFE
+                  else codecs.getincrementaldecoder(codec.name)(errors="replace").decode)
+        f.seek(0)
+        needle, tail = (b"<!ENTITY", b"") if decode is None else ("<!ENTITY", "")
         while True:
             chunk = f.read(1 << 20)
-            if not chunk:
-                break
-            if b"<!ENTITY" in (tail + chunk).upper():
+            text = chunk if decode is None else decode(chunk, final=not chunk)
+            if needle in (tail + text).upper():
                 raise ValueError(
                     f"{path}: XML entity declarations are not allowed in a Burp export")
-            tail = chunk[-8:]
+            if not chunk:
+                break
+            tail = (tail + text)[-8:]
 
 
 def parse_items(path: str, role: str | None = None, stats: dict | None = None,
@@ -502,6 +535,15 @@ def _csv_rows(path: str):
             raise ValueError(f"not a Logger++ CSV export (missing columns: {', '.join(missing)})")
         idx = {h: i for i, h in enumerate(header)}
         pending: dict | None = None
+        spill: list[str] = []            # continuation cells, joined once (adding them one by one is n^2)
+
+        def done(row: dict) -> dict:
+            if spill:
+                field = "Response" if row["Response"] else "Request"
+                row[field] = row[field] + "".join(spill)
+                spill.clear()
+            return row
+
         for row in reader:
             if not any(c.strip() for c in row):
                 continue
@@ -510,16 +552,15 @@ def _csv_rows(path: str):
             rest_empty = not any(c.strip() for c in row[1:])
             # a continuation: only the first cell is filled, and it is not a numeric request id
             if pending is not None and rest_empty and first and not first.isdigit():
-                field = "Response" if pending["Response"] else "Request"
-                pending[field] += first
+                spill.append(first)       # to the Response, or to the Request when the Response cell is empty
                 pending["_spilled"] = True
                 continue
             if pending is not None:
-                yield pending
+                yield done(pending)
             pending = {h: row[i] for h, i in idx.items()}
             pending["_spilled"] = False
         if pending is not None:
-            yield pending
+            yield done(pending)
 
 
 def _b64_text(value: str) -> tuple[str, bool]:
@@ -655,19 +696,141 @@ def _har_item(entry: dict):
     return item
 
 
-def _parse_har(path, role, stats):
-    """A HAR file (browser DevTools, Hetty, mitmproxy, ZAP, Charles ...), read as if it were a Burp export."""
-    source = os.path.basename(path)
-    with open(path, encoding="utf-8", errors="replace") as f:
-        try:
-            doc = json.load(f)
-        except ValueError as e:
-            raise ValueError(f"not a HAR file (not valid JSON: {e})")
-    entries = (doc.get("log") or {}).get("entries") if isinstance(doc, dict) else None
-    if not isinstance(entries, list):
+class _JsonStream:
+    """One JSON document read value by value, so only the value being read is ever in memory.
+
+    A HAR keeps every response body inline; `json.load` would hold the whole capture (and then its
+    parsed copy) at once. This walks the outer objects and hands out `log.entries` one entry at a time.
+    """
+
+    _WS = " \t\r\n"
+
+    def __init__(self, f, chunk: int = 1 << 20):
+        self.f, self.chunk = f, chunk
+        self.buf, self.pos, self.eof = "", 0, False
+        self.dec = json.JSONDecoder()
+
+    def _more(self, want: int = 0) -> bool:
+        if self.eof:
+            return False
+        if self.pos >= self.chunk:                   # drop what has been read
+            self.buf, self.pos = self.buf[self.pos:], 0
+        data = self.f.read(max(self.chunk, want))   # at least what is pending: a big value takes log(n) retries
+        if not data:
+            self.eof = True
+            return False
+        self.buf += data
+        return True
+
+    def peek(self) -> str:
+        while True:
+            while self.pos < len(self.buf) and self.buf[self.pos] in self._WS:
+                self.pos += 1
+            if self.pos < len(self.buf):
+                return self.buf[self.pos]
+            if not self._more():
+                return ""
+
+    def take(self, ch: str) -> None:
+        got = self.peek()
+        if got != ch:
+            raise ValueError(f"expected {ch!r}, found {got or 'the end of the file'!r}")
+        self.pos += 1
+
+    def value(self):
+        self.peek()
+        while True:
+            try:
+                v, end = self.dec.raw_decode(self.buf, self.pos)
+            except ValueError:
+                if self._more(len(self.buf) - self.pos):
+                    continue
+                raise
+            if end == len(self.buf) and self._more():  # a number may go on in the next chunk
+                continue
+            self.pos = end
+            return v
+
+    def keys(self):
+        """The keys of an object; the caller reads each key's value before asking for the next."""
+        self.take("{")
+        if self.peek() == "}":
+            self.pos += 1
+            return
+        while True:
+            k = self.value()
+            if not isinstance(k, str):
+                raise ValueError("expected an object key")
+            self.take(":")
+            yield k
+            if self.peek() == ",":
+                self.pos += 1
+                continue
+            self.take("}")
+            return
+
+    def items(self):
+        self.take("[")
+        if self.peek() == "]":
+            self.pos += 1
+            return
+        while True:
+            yield self.value()
+            if self.peek() == ",":
+                self.pos += 1
+                continue
+            self.take("]")
+            return
+
+    def end(self) -> None:
+        if self.peek():
+            raise ValueError("extra data after the JSON document")
+
+
+def _har_entries(f, chunk: int = 1 << 20):
+    """`log.entries` of a HAR, one at a time. The rest of the file is read past, and checked to be JSON."""
+    js = _JsonStream(f, chunk)
+    found = False
+    if js.peek() != "{":
+        js.value()
+        js.end()
         raise ValueError("not a HAR file (no log.entries)")
+    for key in js.keys():
+        if key == "log" and not found and js.peek() == "{":
+            for k in js.keys():
+                if k == "entries" and not found and js.peek() == "[":
+                    found = True
+                    yield from js.items()
+                else:
+                    js.value()
+        else:
+            js.value()
+    js.end()
+    if not found:
+        raise ValueError("not a HAR file (no log.entries)")
+
+
+def _parse_har(path, role, stats):
+    """A HAR file (browser DevTools, Hetty, mitmproxy, ZAP, Charles ...), read as if it were a Burp export.
+
+    Streamed: entries are read and turned into exchanges one at a time, never the whole file at once.
+    """
+    source = os.path.basename(path)
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        yield from _har_exchanges(_har_entries(f), source, role, stats)
+
+
+def _har_exchanges(entries, source, role, stats):
     idx = 1
-    for item_no, entry in enumerate(entries):
+    item_no = -1
+    while True:
+        try:
+            entry = next(entries)
+        except StopIteration:
+            return
+        except ValueError as e:
+            raise ValueError(str(e) if str(e).startswith("not a HAR") else f"not a HAR file (not valid JSON: {e})")
+        item_no += 1
         stats["items"] += 1
         try:
             item = _har_item(entry) if isinstance(entry, dict) else None
