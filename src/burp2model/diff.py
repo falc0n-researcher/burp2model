@@ -110,7 +110,17 @@ def _label(m: Model, nid: str) -> str:
     return n.label if n else nid.split(":", 1)[-1]
 
 
-def _workflow(kind: str, m: Model, ids: list[str], edges, other: Model, hist=None) -> dict:
+def _incident(edges) -> dict[str, list[int]]:
+    """Positions in `edges` of the edges touching each node."""
+    at: dict[str, list[int]] = {}
+    for i, e in enumerate(edges):
+        at.setdefault(e.src, []).append(i)
+        if e.dst != e.src:
+            at.setdefault(e.dst, []).append(i)
+    return at
+
+
+def _workflow(kind: str, m: Model, ids: list[str], edges, other: Model, hist=None, incident=None) -> dict:
     nodes = sorted((m.nodes[i] for i in ids), key=lambda n: (_ORDER.get(n.type, 99), n.label))
     head = next((n for t in _HEAD for n in nodes if n.type == t), nodes[0])
     counts: dict[str, int] = {}
@@ -119,8 +129,11 @@ def _workflow(kind: str, m: Model, ids: list[str], edges, other: Model, hist=Non
     rest = [f"{c} {t.replace('_', ' ')}{'s' if c != 1 else ''}" for t, c in
             sorted(((t, c) for t, c in counts.items() if t != head.type or c > 1), key=lambda x: _ORDER.get(x[0], 99))]
     links = []
-    for e in edges:
-        a_in, b_in = e.src in ids, e.dst in ids
+    # only the edges touching this workflow, in list order (scanning every edge per workflow was n^2)
+    incident = _incident(edges) if incident is None else incident
+    members = set(ids)
+    for e in (edges[i] for i in sorted({i for nid in ids for i in incident.get(nid, ())})):
+        a_in, b_in = e.src in members, e.dst in members
         if a_in != b_in:
             outside = e.dst if a_in else e.src
             if (outside in other.nodes or outside in m.nodes) and \
@@ -201,9 +214,10 @@ def diff_models(old: Model, new: Model, old_meta: dict | None = None, new_meta: 
 
     def workflows(kind, model, ids, edges, other):
         wf, singles = [], []
+        incident = _incident(edges)
         for comp in _components(set(ids), edges):
             if len(comp) >= 2:
-                wf.append(_workflow(kind, model, comp, edges, other))
+                wf.append(_workflow(kind, model, comp, edges, other, incident=incident))
             else:
                 singles.append(comp[0])
         wf.sort(key=lambda w: (-len(w["nodes"]), w["title"]))

@@ -28,8 +28,10 @@ import json
 import os
 import re
 import sqlite3
+import zlib
 from datetime import datetime, timezone
 
+from .atomic import keep_aside
 from .model import Model, dump_model
 
 DB_SCHEMA_VERSION = 2
@@ -122,13 +124,34 @@ def _init(conn: sqlite3.Connection) -> None:
         conn.execute("UPDATE meta SET value=? WHERE key='schema'", (str(DB_SCHEMA_VERSION),))
 
 
+def is_damaged(e: BaseException) -> bool:
+    """True for SQLite's "not a database" and "disk image is malformed", not for a locked or busy file."""
+    return type(e) is sqlite3.DatabaseError
+
+
 def open_db(path: str) -> sqlite3.Connection:
-    """Open an existing graph.db read-only-ish (creates nothing)."""
+    """Open an existing graph.db read-only-ish (creates nothing). A damaged file is refused, never rewritten."""
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     conn = connect(path)
-    _init(conn)
+    try:
+        _init(conn)
+    except sqlite3.DatabaseError as e:
+        conn.close()
+        if is_damaged(e):
+            raise ValueError(f"{path} is damaged ({e}); the next build keeps it aside "
+                             f"and starts a new one") from e
+        raise
     return conn
+
+
+def _set_aside(path: str) -> str:
+    """Move a damaged graph.db, with any journal SQLite left beside it, out of the way. Returns where it went."""
+    aside = keep_aside(path)
+    for ext in ("-journal", "-wal", "-shm"):
+        if os.path.exists(path + ext):
+            os.replace(path + ext, aside + ext)    # a stale journal must never be replayed into the new file
+    return aside
 
 
 def _req_path(line: str) -> str:
@@ -143,7 +166,24 @@ def _headers_text(headers) -> str:
 # ------------------------------------------------------------------ write ----
 
 def write_db(m: Model, path: str, osint: dict | None = None, label: str | None = None) -> dict:
-    """(Re)build graph.db from a Model, folding in OSINT. Returns a summary."""
+    """(Re)build graph.db from a Model, folding in OSINT. Returns a summary.
+
+    Each build is one transaction, so a crash leaves the previous build in place. A file SQLite
+    reports as damaged is kept aside as graph.db.damaged-<time> (named in the summary's
+    `damaged`) and a new graph.db is started; its build history is never silently deleted.
+    """
+    try:
+        return _write_db(m, path, osint, label)
+    except sqlite3.DatabaseError as e:
+        if not is_damaged(e) or not os.path.exists(path):
+            raise
+        aside = _set_aside(path)
+    out = _write_db(m, path, osint, label)
+    out["damaged"] = aside
+    return out
+
+
+def _write_db(m: Model, path: str, osint: dict | None, label: str | None) -> dict:
     conn = connect(path)
     try:
         _init(conn)
@@ -440,7 +480,13 @@ def load_build(conn: sqlite3.Connection, build_id: int | None = None) -> dict | 
     q = ("SELECT model_gz FROM builds WHERE id=?" if build_id is not None
          else "SELECT model_gz FROM builds ORDER BY id DESC LIMIT 1")
     row = conn.execute(q, (build_id,) if build_id is not None else ()).fetchone()
-    return json.loads(gzip.decompress(row[0])) if row else None
+    if not row:
+        return None
+    try:
+        return json.loads(gzip.decompress(row[0]))
+    except (OSError, EOFError, zlib.error, ValueError, TypeError) as e:
+        raise ValueError(f"the stored snapshot of build {'#' + str(build_id) if build_id else 'latest'} "
+                         f"is damaged ({e})") from e
 
 
 def table_names(conn: sqlite3.Connection) -> list[str]:
