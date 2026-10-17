@@ -23,6 +23,7 @@ import os
 import time
 
 from . import __version__
+from .atomic import atomic_write
 from .context import context_package
 from .methodology import METHODOLOGY_PROMPT, investigation_plan
 from .model import PRIV_RE, TELEMETRY_RE, Model, to_dict
@@ -335,7 +336,7 @@ def write_html_report(m: Model, path: str, osint: dict | None = None,
             .replace("__MAPCSS__", MAP_CSS).replace("__TYPECSS__", TYPE_CSS).replace("__FONTCSS__", font_css()).replace("__MAPJS__", MAP_JS))
     head, _, tail = html.partition("__DATA__")
     # stream the data in pieces: a large capture never exists as one more full-size string
-    with open(path, "w", encoding="utf-8") as f:
+    with atomic_write(path) as f:
         f.write(head)
         marker = json.dumps(_EVIDENCE)
         for piece in json.JSONEncoder(ensure_ascii=False).iterencode(payload):

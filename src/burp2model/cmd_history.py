@@ -9,6 +9,7 @@ import sys
 
 from . import diff as diffmod
 from . import store
+from .atomic import atomic_write, keep_aside
 from .model import from_dict
 
 
@@ -60,25 +61,28 @@ def cmd_watch(args) -> int:
     pats = [p.strip() for p in args.pattern.split(",") if p.strip()]
     outdir = os.path.join(args.out, args.webapp)
     state_path = os.path.join(outdir, "watch.json")
-    try:
-        with open(state_path, encoding="utf-8") as f:
-            done = json.load(f)
-    except (OSError, ValueError):
-        done = {}
+    done = _load_watch_state(state_path)
+
+    def stat(fn):
+        try:
+            st = os.stat(os.path.join(folder, fn))
+        except OSError:                             # gone between the listing and the look
+            return None
+        return (st.st_mtime_ns, fn, st.st_size) if os.path.isfile(os.path.join(folder, fn)) else None
 
     def listing():
-        found = []
-        for fn in os.listdir(folder):
-            p = os.path.join(folder, fn)
-            if os.path.isfile(p) and any(fnmatch.fnmatch(fn.lower(), x.lower()) for x in pats):
-                st = os.stat(p)
-                found.append((st.st_mtime_ns, fn, st.st_size))
-        return sorted(found)
+        try:
+            names = os.listdir(folder)
+        except OSError as e:
+            print(f"watch: cannot list {folder} ({e}); will look again", file=sys.stderr)
+            return []
+        found = [stat(fn) for fn in names if any(fnmatch.fnmatch(fn.lower(), x.lower()) for x in pats)]
+        return sorted(t for t in found if t)
 
     sig = lambda t: [t[0], t[2]]                    # noqa: E731
     if args.skip_existing and not done:
         done = {fn: sig((m, fn, sz)) for m, fn, sz in listing()}
-    sizes: dict[str, int] = {}
+    last: dict[str, list] = {}
     built = 0
     print(f"watch: {folder}  ({', '.join(pats)}) → {args.webapp}"
           + ("" if args.once else f"  every {args.interval:g}s, Ctrl-C to stop"), file=sys.stderr)
@@ -87,8 +91,9 @@ def cmd_watch(args) -> int:
             for mtime, fn, size in listing():
                 if done.get(fn) == sig((mtime, fn, size)) or size == 0:
                     continue
-                if not args.once and sizes.get(fn) != size:      # still being written: look again next time
-                    sizes[fn] = size
+                # still being written (or copied): the size and the time must hold still for one interval
+                if not args.once and last.get(fn) != sig((mtime, fn, size)):
+                    last[fn] = sig((mtime, fn, size))
                     continue
                 label = os.path.splitext(fn)[0]
                 argv = ["build", os.path.join(folder, fn), "-w", args.webapp, "--out", args.out, "--label", label]
@@ -100,20 +105,31 @@ def cmd_watch(args) -> int:
                 if args.osint:
                     argv.append("--osint")
                 print(f"\nwatch: new export {fn}", file=sys.stderr)
-                if _main(argv) != 0:
+                rc = _main(argv)
+                after = stat(fn)
+                if after is None or sig(after) != sig((mtime, fn, size)):
+                    # the file moved under the build: what was read may be part of it. Build it again once it settles.
+                    print(f"watch: {fn} changed while it was being read; will build it again once it settles",
+                          file=sys.stderr)
+                    last.pop(fn, None)
+                    continue
+                if rc != 0:
                     print(f"watch: could not build from {fn}; will try again if it changes", file=sys.stderr)
                     done[fn] = sig((mtime, fn, size))
                     continue
                 done[fn] = sig((mtime, fn, size))
                 built += 1
                 os.makedirs(outdir, exist_ok=True)
-                with open(state_path, "w", encoding="utf-8") as f:
+                with atomic_write(state_path) as f:
                     json.dump(done, f, indent=1, sort_keys=True)
-                conn = store.open_db(os.path.join(outdir, store.DB_NAME))
                 try:
-                    n = len(store.list_builds(conn))
-                finally:
-                    conn.close()
+                    conn = store.open_db(os.path.join(outdir, store.DB_NAME))
+                    try:
+                        n = len(store.list_builds(conn))
+                    finally:
+                        conn.close()
+                except (OSError, ValueError, sqlite3.Error):
+                    n = 0
                 if n > 1:
                     print("", file=sys.stderr)
                     _main(["diff", args.webapp, "--out", args.out])
@@ -127,15 +143,40 @@ def cmd_watch(args) -> int:
     return 0
 
 
+def _load_watch_state(path: str) -> dict:
+    """Which exports were already built. A damaged state file is kept aside rather than read as "nothing
+    built yet", which would rebuild every export in the folder as a new build."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            done = json.load(f)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        done = e
+    if isinstance(done, dict):
+        return done
+    try:
+        aside = keep_aside(path)
+        print(f"watch: {path} was unreadable; kept it aside as {aside}. Exports already built "
+              f"will be built again (use --skip-existing to skip them)", file=sys.stderr)
+    except OSError:
+        pass
+    return {}
+
+
 def cmd_builds(args) -> int:
     dbp = _db_path(args)
     if dbp is None:
         return 2
-    conn = store.open_db(dbp)
     try:
-        rows = store.list_builds(conn)
-    finally:
-        conn.close()
+        conn = store.open_db(dbp)
+        try:
+            rows = store.list_builds(conn)
+        finally:
+            conn.close()
+    except (ValueError, sqlite3.Error) as e:
+        print(f"could not read {dbp}: {e}", file=sys.stderr)
+        return 2
     print(f"{args.webapp}: {len(rows)} build(s) kept in graph.db")
     print(f"  {'id':>3}  {'built (UTC)':<20} {'nodes':>6} {'edges':>6} {'requests':>8}  label")
     for r in rows:
@@ -149,7 +190,11 @@ def cmd_diff(args) -> int:
     dbp = _db_path(args)
     if dbp is None:
         return 2
-    conn = store.open_db(dbp)
+    try:
+        conn = store.open_db(dbp)
+    except (ValueError, sqlite3.Error) as e:
+        print(f"could not diff: {e}", file=sys.stderr)
+        return 2
     try:
         b_ref = args.b if args.b is not None else "latest"
         a_ref = args.a if args.a is not None else "previous"

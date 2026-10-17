@@ -17,6 +17,7 @@ from __future__ import annotations
 import sys
 import time
 
+from .atomic import atomic_write
 from .model import Model
 
 # brand
@@ -158,5 +159,5 @@ def render_svg(m: Model) -> str:
 
 
 def write_svg(m: Model, path: str) -> None:
-    with open(path, "w", encoding="utf-8") as f:
+    with atomic_write(path) as f:
         f.write(render_svg(m))
