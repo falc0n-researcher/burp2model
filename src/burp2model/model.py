@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 
 from .domains import registrable_domain  # noqa: F401  (re-exported)
@@ -310,10 +310,16 @@ def collapse_siblings(exchanges: list[Exchange]) -> int:
     cur = {k: list(v) for k, v in templates.items()}
     for d in range(depth):
         groups: dict[tuple, set] = {}
+        # the paths in each group: a group's prefix (segments before d) is fixed while depth d is
+        # folded, so looking a value's paths up here is the same as scanning every path, without the n^2
+        paths_in: dict[tuple, list] = {}
         for k, segs in cur.items():
             if len(segs) > d:
-                groups.setdefault((k[0], tuple(segs[:d])), set()).add(segs[d])
-        for (host, prefix), values in groups.items():
+                gk = (k[0], tuple(segs[:d]))
+                groups.setdefault(gk, set()).add(segs[d])
+                paths_in.setdefault(gk, []).append(segs)
+        for gk, values in groups.items():
+            in_group = paths_in[gk]
             plain = {v for v in values if "{" not in v and not _FILE_SEG.search(v)}
             if len(plain) < SIBLING_STEM:
                 continue
@@ -328,21 +334,22 @@ def collapse_siblings(exchanges: list[Exchange]) -> int:
                         fold[v] = st + "{slug}"
             rest = plain - set(fold)
             if len(rest) >= SIBLING_SHAPE:
-                kids = {v: frozenset(segs[d + 1] for segs in cur.values()
-                                     if len(segs) > d + 1 and segs[d] == v and tuple(segs[:d]) == prefix
-                                     for _ in [0] if True)
-                        for v in rest}
-                shaped = {v: ks for v, ks in kids.items() if ks}
+                kids_of: dict[str, set] = {}
+                for segs in in_group:
+                    if len(segs) > d + 1 and segs[d] in rest:
+                        kids_of.setdefault(segs[d], set()).add(segs[d + 1])
+                shaped = {v: frozenset(kids_of[v]) for v in rest if v in kids_of}
                 if shaped:
-                    modal = max(set(shaped.values()), key=list(shaped.values()).count)
+                    # the most common set of children (a tie cannot pass the 80% test below either way)
+                    modal = Counter(shaped.values()).most_common(1)[0][0]
                     same = [v for v, ks in shaped.items() if ks == modal]
                     if len(same) >= SIBLING_SHAPE and len(same) >= 0.8 * len(shaped):
                         for v in same:
                             fold[v] = "{slug}"
             if not fold:
                 continue
-            for k, segs in cur.items():
-                if k[0] == host and len(segs) > d and tuple(segs[:d]) == prefix and segs[d] in fold:
+            for segs in in_group:
+                if segs[d] in fold:
                     segs[d] = fold[segs[d]]
     mapping = {}
     for k, segs in cur.items():
@@ -365,6 +372,17 @@ def collapse_siblings(exchanges: list[Exchange]) -> int:
         if ex.referer_host and ex.referer_path:
             ex.referer_path = rewrite(ex.referer_host, ex.referer_path)
     return len(mapping)
+
+
+def _param_of(pid: str, dead: set) -> bool:
+    """Whether `param:<node id>:<name>` belongs to a dropped node. Node ids hold ':' too, so each one is
+    tried as the end of the id: a lookup per ':' instead of a scan of every dropped id."""
+    c = pid.find(":", 6)
+    while c > 0:
+        if pid[6:c] in dead:
+            return True
+        c = pid.find(":", c + 1)
+    return False
 
 
 def build(exchanges: list[Exchange], name: str, seed_host: str | None = None,
@@ -545,7 +563,7 @@ def build(exchanges: list[Exchange], name: str, seed_host: str | None = None,
         dead = set(gone)
         m.edges = [e for e in m.edges if e.src not in dead and e.dst not in dead]
         m._edge_index = {(e.src, e.dst, e.type): e for e in m.edges}
-        for nid in [k for k in m.nodes if k.startswith("param:") and any(k.startswith(f"param:{g}:") for g in dead)]:
+        for nid in [k for k in m.nodes if k.startswith("param:") and _param_of(k, dead)]:
             del m.nodes[nid]
         for key in [k for k, v in route_of_page.items() if v in dead]:
             del route_of_page[key]

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Crash-safe outputs.** model.json, report.html, context.json, graph.json, graph.graphml, build.svg, osint.json, the saved inputs, watch.json and the fingerprint key are written to a temporary file and renamed into place, so a crash, a full disk or Ctrl-C leaves the previous file whole instead of half of a new one. A rebuild puts the new input in place before clearing the old ones.
+- **A damaged graph.db is kept, never wiped.** If SQLite reports graph.db as not a database or malformed, the next build moves it (and any journal beside it) to `graph.db.damaged-<time>`, says so, and starts a new one. `builds`, `diff` and `q` refuse a damaged file with a clear message and leave it untouched. A damaged build snapshot is reported instead of crashing `diff`, `changes` and `changed-since`. A damaged watch.json is kept aside too.
+- **HAR is streamed.** A HAR is read entry by entry instead of loading the whole file (and a parsed copy) into memory. A half-copied or invalid HAR is still refused. A HAR with a byte-order mark is accepted.
+- **The XML entity check cannot be dodged by re-encoding.** An export in UTF-16, UTF-32 or another declared encoding is decoded before it is scanned for `<!ENTITY`.
+- **`watch` never keeps a half-copied export.** An export must hold its size and modification time for a whole interval before it is built, and one that changes while it is being read is built again once it settles. A file that disappears mid-scan no longer stops the watcher.
+- **Faster on large exports.** Slug folding, the diff's workflow grouping and dropping 404-only paths no longer compare every path or edge with every other one (the same fixes as the Burp extension's 1.x performance work). Logger++ cells spilled over many rows are joined in one pass. Model output is byte-identical on every bundled sample.
+
 ## 1.2.0 — 2026-10-16
 
 - **HAR input.** `burp2model session.har -w app` builds from a HAR file (browser DevTools, Hetty, mitmproxy, ZAP, Charles), through the same masking as a Burp export. `watch` picks up `*.har` too.

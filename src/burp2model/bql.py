@@ -570,7 +570,10 @@ def _changed_since(conn, ref: str) -> Result:
         raise BQLError(f"build #{old} is the latest; nothing to compare yet")
     snaps = []
     for bid in (old, new):
-        snap = store.load_build(conn, bid)
+        try:
+            snap = store.load_build(conn, bid)
+        except ValueError as e:
+            raise BQLError(str(e))
         row = conn.execute("SELECT built_at, label FROM builds WHERE id=?", (bid,)).fetchone()
         snaps.append((from_dict(snap), {"id": bid, "built_at": row["built_at"], "label": row["label"] or ""}))
     d = diffmod.diff_models(snaps[0][0], snaps[1][0], snaps[0][1], snaps[1][1],

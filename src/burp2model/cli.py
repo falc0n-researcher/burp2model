@@ -10,6 +10,7 @@ import sqlite3
 import sys
 
 from . import shot
+from .atomic import atomic_write, keep_aside
 from . import __version__
 from .parse import Exchange, parse_items
 from .model import build, dump_model, from_dict, cross_role
@@ -56,8 +57,7 @@ def _init_key() -> None:
         if not os.path.exists(path) or os.path.getsize(path) < 16:
             # never run with a missing, empty or truncated key
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "wb") as f:
+            with atomic_write(path, "wb", perms=0o600) as f:      # whole or absent, never half a key
                 f.write(os.urandom(32))
         with open(path, "rb") as f:
             set_fingerprint_key(f.read())
@@ -78,7 +78,7 @@ INPUTS_VERSION = 1
 def _save_input(outdir: str, key: str, exchanges: list[Exchange], stats: dict) -> None:
     d = _inputs_dir(outdir)
     os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, key + ".jsonl"), "w", encoding="utf-8") as f:
+    with atomic_write(os.path.join(d, key + ".jsonl")) as f:
         f.write(json.dumps({"_stats": stats, "_version": INPUTS_VERSION}) + "\n")
         for ex in exchanges:
             f.write(json.dumps(ex.to_record()) + "\n")
@@ -113,12 +113,12 @@ def _drop_if_empty(outdir: str) -> None:
             pass
 
 
-def _clear_inputs(outdir: str, only: str | None = None) -> None:
+def _clear_inputs(outdir: str, only: str | None = None, keep: str | None = None) -> None:
     d = _inputs_dir(outdir)
     if not os.path.isdir(d):
         return
     for fn in os.listdir(d):
-        if fn.endswith(".jsonl") and (only is None or fn == only + ".jsonl"):
+        if fn.endswith(".jsonl") and (only is None or fn == only + ".jsonl") and fn != f"{keep}.jsonl":
             os.remove(os.path.join(d, fn))
 
 
@@ -231,15 +231,17 @@ def _build_from(args, exchanges: list, stats: dict, staged: str | None = None) -
     outdir = os.path.join(args.out, args.webapp)
     os.makedirs(outdir, exist_ok=True)
 
-    # A role build adds to (or replaces) that role's input; anything else starts over.
-    if args.role is None or args.fresh:
-        _clear_inputs(outdir)
-    else:
-        _clear_inputs(outdir, only=DEFAULT_INPUT)
+    # A role build adds to (or replaces) that role's input; anything else starts over. The new input
+    # is in place before the old ones go, so a crash in between never leaves the folder with neither.
+    key = args.role or DEFAULT_INPUT
     if staged:
-        os.replace(staged, os.path.join(_inputs_dir(outdir), (args.role or DEFAULT_INPUT) + ".jsonl"))
+        os.replace(staged, os.path.join(_inputs_dir(outdir), key + ".jsonl"))
     else:
-        _save_input(outdir, args.role or DEFAULT_INPUT, exchanges, stats)
+        _save_input(outdir, key, exchanges, stats)
+    if args.role is None or args.fresh:
+        _clear_inputs(outdir, keep=key)
+    else:
+        _clear_inputs(outdir, only=DEFAULT_INPUT, keep=key)
     exchanges.clear()                   # the saved input is the source from here; free the copy
     all_ex, all_stats, merged = _load_inputs(outdir)
 
@@ -258,26 +260,29 @@ def _build_from(args, exchanges: list, stats: dict, staged: str | None = None) -
         return 2
 
     try:
-        with open(os.path.join(outdir, "model.json"), "w", encoding="utf-8") as f:
+        with atomic_write(os.path.join(outdir, "model.json")) as f:
             f.writelines(dump_model(m, indent=2))
         db_path = os.path.join(outdir, store.DB_NAME)
         dbs = store.write_db(m, db_path, osint=osint_data, label=getattr(args, "label", None))
+        if dbs.get("damaged"):
+            print(f"warning: {db_path} was damaged; kept it aside as {dbs['damaged']} and started a "
+                  "new graph.db (earlier builds are in the kept file)", file=sys.stderr)
         write_html_report(m, os.path.join(outdir, "report.html"),
                           osint=osint_data, lens=args.lens, db_path=db_path, screenshot=picture,
                           changes=_changes_since_previous(db_path, dbs.get("build")))
         if picture:
-            with open(os.path.join(outdir, shot.filename(picture[0])), "wb") as f:
+            with atomic_write(os.path.join(outdir, shot.filename(picture[0])), "wb") as f:
                 f.write(picture[1])
         write_svg(m, os.path.join(outdir, "build.svg"))
-        with open(os.path.join(outdir, "context.json"), "w", encoding="utf-8") as f:
+        with atomic_write(os.path.join(outdir, "context.json")) as f:
             # compact: this file is pasted into an AI, where indentation is tokens
             json.dump(context_package(m, lens=args.lens, cap=args.cap,
                                       osint=osint_data), f, separators=(",", ":"))
-        with open(os.path.join(outdir, "graph.json"), "w", encoding="utf-8") as f:
+        with atomic_write(os.path.join(outdir, "graph.json")) as f:
             json.dump(to_graph_json(m), f, indent=2)
-        with open(os.path.join(outdir, "graph.graphml"), "w", encoding="utf-8") as f:
+        with atomic_write(os.path.join(outdir, "graph.graphml")) as f:
             f.write(to_graphml(m))
-    except (OSError, sqlite3.Error) as e:
+    except (OSError, ValueError, sqlite3.Error) as e:
         print(f"could not write outputs to {outdir}: {e}", file=sys.stderr)
         return 2
 
@@ -361,7 +366,7 @@ def _collect_osint(args, m, osint_path: str) -> dict | None:
     try:
         result = osint_mod.run(host, timeout=args.osint_timeout, want_ports=False,
                                want_subdomains=True).to_dict()
-        with open(osint_path, "w", encoding="utf-8") as f:
+        with atomic_write(osint_path) as f:
             json.dump(result, f, indent=2)
         return result
     except Exception as e:                                   # fail soft: recon is optional
@@ -533,7 +538,7 @@ def cmd_crawl(args) -> int:
               "and were not sent", file=sys.stderr)
     if args.save_xml:
         try:
-            with open(args.save_xml, "w", encoding="utf-8") as f:
+            with atomic_write(args.save_xml) as f:
                 f.write(crawl_mod.to_burp_xml(res.items))
             print(f"wrote {args.save_xml} (Burp 'Save items' format; holds raw values, "
                   "unlike every burp2model output)", file=sys.stderr)
@@ -644,10 +649,10 @@ def cmd_osint(args) -> int:
             outdir = os.path.join(args.out, args.webapp)
             os.makedirs(outdir, exist_ok=True)
             saved = os.path.join(outdir, "osint.json")
-            with open(saved, "w", encoding="utf-8") as f:
+            with atomic_write(saved) as f:
                 f.write(blob)
         if args.out_file:
-            with open(args.out_file, "w", encoding="utf-8") as f:
+            with atomic_write(args.out_file) as f:
                 f.write(blob)
             saved = args.out_file
     except OSError as e:
@@ -668,6 +673,9 @@ def cmd_osint(args) -> int:
                     dbs = store.write_db(model, os.path.join(args.out, args.webapp,
                                                              store.DB_NAME),
                                          osint=result.to_dict())
+                    if dbs.get("damaged"):
+                        print(f"warning: graph.db was damaged; kept it aside as {dbs['damaged']}",
+                              file=sys.stderr)
                     print(f"graph.db updated ({dbs['external_nodes']} external nodes, "
                           f"{dbs['osint_runs']} recon run(s) stored)", file=sys.stderr)
                 except (OSError, ValueError, KeyError, TypeError, sqlite3.Error) as e:
@@ -755,7 +763,7 @@ def cmd_graph(args) -> int:
 
     if args.out_file:
         try:
-            with open(args.out_file, "w", encoding="utf-8") as f:
+            with atomic_write(args.out_file) as f:
                 f.write(out)
         except OSError as e:
             print(f"could not write {args.out_file}: {e}", file=sys.stderr)
@@ -826,7 +834,7 @@ def cmd_methodology(args) -> int:
         out = _render_plan(investigation_plan(m))
     if args.out_file:
         try:
-            with open(args.out_file, "w", encoding="utf-8") as f:
+            with atomic_write(args.out_file) as f:
                 f.write(out)
         except OSError as e:
             print(f"could not write {args.out_file}: {e}", file=sys.stderr)
@@ -936,7 +944,7 @@ def cmd_falsify(args) -> int:
                          "model": pkg["model"]}, indent=2) + "\n```")
     if args.out_file:
         try:
-            with open(args.out_file, "w", encoding="utf-8") as f:
+            with atomic_write(args.out_file) as f:
                 f.write(out)
         except OSError as e:
             print(f"could not write {args.out_file}: {e}", file=sys.stderr)
