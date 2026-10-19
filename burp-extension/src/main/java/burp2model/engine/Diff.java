@@ -314,11 +314,10 @@ public final class Diff {
         return m;
     }
 
-    @SuppressWarnings("unchecked")
-    public static Map<String, Object> diff(Model old, Model neu, Map<String, Object> oldMeta, Map<String, Object> newMeta,
-                                           java.util.function.BiFunction<String, String, Map<String, Object>> hist) {
-        Map<String, Model.Node> on = old.nodes;
-        Map<String, Model.Node> nn = neu.nodes;
+    /** Node ids only in the newer build, only in the older one, and the code-only endpoints since walked in traffic (gone id to new id). */
+    private record NodeDrift(Set<String> newIds, Set<String> goneIds, Map<String, String> closed) {}
+
+    private static NodeDrift nodeDrift(Map<String, Model.Node> on, Map<String, Model.Node> nn) {
         Set<String> newIds = new TreeSet<>();
         Set<String> goneIds = new TreeSet<>();
         for (String i : nn.keySet()) {
@@ -351,7 +350,11 @@ public final class Diff {
             goneIds.remove(g);
             newIds.remove(h);
         });
+        return new NodeDrift(newIds, goneIds, closed);
+    }
 
+    /** Nodes in both builds whose fingerprint changed, then the code-only endpoints now walked. */
+    private static List<Map<String, Object>> changedNodes(Map<String, Model.Node> on, Map<String, Model.Node> nn, Map<String, String> closed) {
         List<Map<String, Object>> changed = new ArrayList<>();
         for (String nid : new TreeSet<>(on.keySet())) {
             if (!nn.containsKey(nid)) {
@@ -367,26 +370,38 @@ public final class Diff {
                     "summary", "named in code before, now walked in traffic (" + on.get(g).label + " → " + nn.get(h).label + ")");
             changed.add(map("kind", "endpoint", "id", h, "label", nn.get(h).label, "changes", List.of(c), "evidence", evs(nn.get(h).evidence, 3)));
         });
+        return changed;
+    }
 
-        // the technology stack
+    private static String stackLabel(Map<String, Object> v) {
+        String ver = String.valueOf(v.getOrDefault("version", ""));
+        return v.get("name") + (!ver.isEmpty() ? " " + ver : "");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> firstEvidence(Map<String, Object> v) {
+        List<Object> ev = (List<Object>) v.getOrDefault("evidence", List.of());
+        return ev.subList(0, Math.min(3, ev.size()));
+    }
+
+    /**
+     * The technology stack: new and gone entries go to stackNew and stackGone, a version change goes to changed, and a single
+     * edge, web server or framework swapped for another is one change rather than one gone and one new.
+     */
+    private static void stackDrift(Model old, Model neu, List<Map<String, Object>> stackNew, List<Map<String, Object>> stackGone,
+                                   List<Map<String, Object>> changed) {
         Map<String, Map<String, Object>> so = stackIndex(old);
         Map<String, Map<String, Object>> sn = stackIndex(neu);
-        List<Map<String, Object>> stackNew = new ArrayList<>();
-        List<Map<String, Object>> stackGone = new ArrayList<>();
         for (Map.Entry<String, Map<String, Object>> e : sn.entrySet()) {
             if (!so.containsKey(e.getKey())) {
                 Map<String, Object> v = e.getValue();
-                String ver = String.valueOf(v.getOrDefault("version", ""));
-                List<Object> ev = (List<Object>) v.getOrDefault("evidence", List.of());
-                stackNew.add(map("kind", "stack", "label", v.get("name") + (!ver.isEmpty() ? " " + ver : ""), "category", v.get("category"),
-                        "evidence", ev.subList(0, Math.min(3, ev.size()))));
+                stackNew.add(map("kind", "stack", "label", stackLabel(v), "category", v.get("category"), "evidence", firstEvidence(v)));
             }
         }
         for (Map.Entry<String, Map<String, Object>> e : so.entrySet()) {
             if (!sn.containsKey(e.getKey())) {
                 Map<String, Object> v = e.getValue();
-                String ver = String.valueOf(v.getOrDefault("version", ""));
-                stackGone.add(map("kind", "stack", "label", v.get("name") + (!ver.isEmpty() ? " " + ver : ""), "category", v.get("category")));
+                stackGone.add(map("kind", "stack", "label", stackLabel(v), "category", v.get("category")));
             }
         }
         for (String k : sn.keySet()) {
@@ -394,11 +409,10 @@ public final class Diff {
                 String a = String.valueOf(so.get(k).getOrDefault("version", ""));
                 String b = String.valueOf(sn.get(k).getOrDefault("version", ""));
                 if (!a.equals(b)) {
-                    List<Object> ev = (List<Object>) sn.get(k).getOrDefault("evidence", List.of());
                     Map<String, Object> c = map("field", "version", "from", a, "to", b,
                             "summary", "version " + (a.isEmpty() ? "none" : a) + " → " + (b.isEmpty() ? "none" : b));
                     changed.add(map("kind", "stack", "id", "stack:" + sn.get(k).get("category") + ":" + sn.get(k).get("name"), "label", sn.get(k).get("name"),
-                            "category", sn.get(k).get("category"), "changes", List.of(c), "evidence", ev.subList(0, Math.min(3, ev.size()))));
+                            "category", sn.get(k).get("category"), "changes", List.of(c), "evidence", firstEvidence(sn.get(k))));
                 }
             }
         }
@@ -413,34 +427,47 @@ public final class Diff {
                 stackNew.remove(a.get(0));
             }
         }
+    }
 
-        Map<String, Model.Edge> oldE = new TreeMap<>();
-        Map<String, Model.Edge> newE = new TreeMap<>();
-        old.edges.forEach(e -> oldE.put(e.src + "\u0000" + e.type + "\u0000" + e.dst, e));
-        neu.edges.forEach(e -> newE.put(e.src + "\u0000" + e.type + "\u0000" + e.dst, e));
-        List<Model.Edge> added = new ArrayList<>();
-        List<Model.Edge> removed = new ArrayList<>();
-        newE.forEach((k, e) -> {
-            if (!oldE.containsKey(k)) {
-                added.add(e);
+    /** Edges in a and not in b, in key order. */
+    private static List<Model.Edge> edgesNotIn(Model a, Model b) {
+        Set<String> inB = new HashSet<>();
+        b.edges.forEach(e -> inB.add(e.src + "\u0000" + e.type + "\u0000" + e.dst));
+        Map<String, Model.Edge> byKey = new TreeMap<>();
+        a.edges.forEach(e -> byKey.put(e.src + "\u0000" + e.type + "\u0000" + e.dst, e));
+        List<Model.Edge> out = new ArrayList<>();
+        byKey.forEach((k, e) -> {
+            if (!inB.contains(k)) {
+                out.add(e);
             }
         });
-        oldE.forEach((k, e) -> {
-            if (!newE.containsKey(k)) {
-                removed.add(e);
-            }
-        });
+        return out;
+    }
 
+    @SuppressWarnings("unchecked")
+    private static Set<String> inWorkflows(List<String> singles, List<Map<String, Object>> wf) {
+        Set<String> ids = new HashSet<>(singles);
+        wf.forEach(w -> ((List<Map<String, Object>>) w.get("nodes")).forEach(n -> ids.add((String) n.get("id"))));
+        return ids;
+    }
+
+    public static Map<String, Object> diff(Model old, Model neu, Map<String, Object> oldMeta, Map<String, Object> newMeta,
+                                           java.util.function.BiFunction<String, String, Map<String, Object>> hist) {
+        NodeDrift nd = nodeDrift(old.nodes, neu.nodes);
+        List<Map<String, Object>> changed = changedNodes(old.nodes, neu.nodes, nd.closed());
+        List<Map<String, Object>> stackNew = new ArrayList<>();
+        List<Map<String, Object>> stackGone = new ArrayList<>();
+        stackDrift(old, neu, stackNew, stackGone, changed);
+        List<Model.Edge> added = edgesNotIn(neu, old);
+        List<Model.Edge> removed = edgesNotIn(old, neu);
+
+        // new and gone things that connect are one workflow; the rest stand alone
         List<Map<String, Object>> newWf = new ArrayList<>();
         List<String> newSingle = new ArrayList<>();
-        splitWorkflows("new_workflow", neu, newIds, added, old, newWf, newSingle);
+        splitWorkflows("new_workflow", neu, nd.newIds(), added, old, newWf, newSingle);
         List<Map<String, Object>> goneWf = new ArrayList<>();
         List<String> goneSingle = new ArrayList<>();
-        splitWorkflows("gone_workflow", old, goneIds, removed, neu, goneWf, goneSingle);
-        Set<String> inWfNew = new HashSet<>(newSingle);
-        newWf.forEach(w -> ((List<Map<String, Object>>) w.get("nodes")).forEach(n -> inWfNew.add((String) n.get("id"))));
-        Set<String> inWfGone = new HashSet<>(goneSingle);
-        goneWf.forEach(w -> ((List<Map<String, Object>>) w.get("nodes")).forEach(n -> inWfGone.add((String) n.get("id"))));
+        splitWorkflows("gone_workflow", old, nd.goneIds(), removed, neu, goneWf, goneSingle);
 
         List<Map<String, Object>> newNodes = new ArrayList<>();
         for (String i : newSingle) {
@@ -453,8 +480,8 @@ public final class Diff {
         Comparator<Map<String, Object>> byKind = Comparator.comparingInt((Map<String, Object> d) -> ord((String) d.get("kind"))).thenComparing(d -> (String) d.get("label"));
         newNodes.sort(byKind);
         goneNodes.sort(byKind);
-        List<Object> newEdges = looseEdges(added, neu, inWfNew);
-        List<Object> goneEdges = looseEdges(removed, old, inWfGone);
+        List<Object> newEdges = looseEdges(added, neu, inWorkflows(newSingle, newWf));
+        List<Object> goneEdges = looseEdges(removed, old, inWorkflows(goneSingle, goneWf));
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("new", (long) (newSingle.size() + stackNew.size() + newEdges.size()));

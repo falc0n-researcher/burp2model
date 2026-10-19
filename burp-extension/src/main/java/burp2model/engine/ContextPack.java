@@ -70,9 +70,157 @@ public final class ContextPack {
         return shown + "/" + total + (total > shown ? " (capped)" : "");
     }
 
-    @SuppressWarnings("unchecked")
+    /** What the edges say about each node: who references or calls it, how many references it makes, the parameters it takes. */
+    private record Relations(Map<String, Map<String, List<String>>> rels, Map<String, Integer> refsOut, Map<String, List<String>> paramsOf) {}
+
+    private static Relations relations(Model m) {
+        Map<String, Map<String, List<String>>> rels = new LinkedHashMap<>();
+        Map<String, Integer> refsOut = new LinkedHashMap<>();
+        Map<String, List<String>> paramsOf = new LinkedHashMap<>();
+        for (Model.Edge e : m.edges) {
+            if (e.type.equals("REFERENCES")) {
+                refsOut.merge(e.src, 1, Integer::sum);
+            } else if (e.type.equals("USES_PARAMETER") && m.nodes.containsKey(e.dst)) {
+                paramsOf.computeIfAbsent(e.src, k -> new ArrayList<>()).add(m.nodes.get(e.dst).label);
+            }
+            if (e.type.equals("REFERENCES") || e.type.equals("CALLS")) {
+                Model.Node src = m.nodes.get(e.src);
+                if (src != null) {
+                    rels.computeIfAbsent(e.dst, k -> new LinkedHashMap<>())
+                            .computeIfAbsent(e.type.equals("REFERENCES") ? "referenced_by" : "called_from", k -> new ArrayList<>()).add(src.label);
+                }
+            }
+        }
+        return new Relations(rels, refsOut, paramsOf);
+    }
+
+    private static Map<String, Object> row(Model.Node n, Set<Integer> cited) {
+        return map("id", n.id, "type", n.type, "label", n.label, "evidence", evList(n, 3, cited));
+    }
+
+    private static <T> List<T> head(List<T> l, int cap) {
+        return l.subList(0, Math.min(cap, l.size()));
+    }
+
+    private static List<Object> endpointRows(List<Model.Node> eps, int cap, Relations rel, Set<Integer> cited) {
+        List<Object> out = new ArrayList<>();
+        for (Model.Node n : head(eps, cap)) {
+            Map<String, Object> v = map("id", n.id, "type", n.type, "label", n.label, "api_state", n.attrs.get("api_state"), "evidence", evList(n, 3, cited));
+            if (n.attrs.get("statuses") instanceof List<?> l && !l.isEmpty()) {
+                v.put("statuses", l);
+            }
+            List<String> params = new ArrayList<>(new TreeSet<>(rel.paramsOf().getOrDefault(n.id, List.of())));
+            if (!params.isEmpty()) {
+                v.put("params", head(params, 12));
+            }
+            if (!n.roles.isEmpty()) {
+                v.put("reached_by", n.roles);
+                v.put("status_by_role", n.attrs.getOrDefault("status_by_role", Map.of()));
+            }
+            if (n.attrs.get("credentials") instanceof List<?> l && !l.isEmpty()) {
+                v.put("credentials", l);
+                if (((Number) n.attrs.getOrDefault("anonymous_requests", 0L)).longValue() > 0) {
+                    v.put("also_seen_without_credentials", true);
+                }
+            }
+            rel.rels().getOrDefault(n.id, Map.of()).forEach((k, vals) -> v.put(k, head(new ArrayList<>(new TreeSet<>(vals)), 5)));
+            if (Boolean.FALSE.equals(n.attrs.get("method_known"))) {
+                v.put("method", "unknown (static reference)");
+            }
+            out.add(v);
+        }
+        return out;
+    }
+
+    private static List<Object> unknownRows(Model m, int cap) {
+        List<Model.Unknown> us = new ArrayList<>(m.unknowns);
+        us.sort(Comparator.comparing(u -> u.type().equals("AUTHORIZATION_UNKNOWN")));
+        List<Object> out = new ArrayList<>();
+        for (Model.Unknown u : head(us, cap)) {
+            Model.Node en = m.nodes.get(u.entity());
+            out.add(map("type", u.type(), "entity", en != null ? en.label : u.entity().substring(u.entity().lastIndexOf(':') + 1),
+                    "we_know", u.weKnow(), "we_dont_know", u.weDontKnow(), "next", u.nextStep()));
+        }
+        return out;
+    }
+
+    private static Map<String, Object> trust(Model m, Set<Integer> cited) {
+        List<Object> auth = new ArrayList<>();
+        List<Object> cookies = new ArrayList<>();
+        for (Model.Node n : m.nodes.values()) {
+            if (n.type.equals("auth")) {
+                auth.add(row(n, cited));
+            } else if (n.type.equals("cookie")) {
+                Map<String, Object> c = row(n, cited);
+                c.put("httponly", n.attrs.get("httponly"));
+                c.put("secure", n.attrs.get("secure"));
+                c.put("samesite", n.attrs.get("samesite"));
+                cookies.add(c);
+            }
+        }
+        return map("auth", auth, "cookies", cookies);
+    }
+
+    /** The first k evidence ids of a stack entry or a secret, recorded as cited. */
+    private static List<Object> firstIds(Object ids, int k, Set<Integer> cited) {
+        List<?> l = (List<?>) ids;
+        List<Object> shown = new ArrayList<>();
+        for (int i = 0; i < Math.min(k, l.size()); i++) {
+            cited.add(((Number) l.get(i)).intValue());
+            shown.add("ev_" + l.get(i));
+        }
+        return shown;
+    }
+
+    private static List<Object> stackRows(Model m, int cap, Set<Integer> cited) {
+        List<Object> out = new ArrayList<>();
+        for (Map<String, Object> t : head(m.stack, cap)) {
+            List<Object> shown = firstIds(t.getOrDefault("evidence", List.of()), 2, cited);
+            Map<String, Object> s = map("name", t.get("name"), "category", t.get("category"));
+            if (!String.valueOf(t.getOrDefault("kind", "")).isEmpty()) {
+                s.put("kind", t.get("kind"));
+            }
+            if (!String.valueOf(t.getOrDefault("version", "")).isEmpty()) {
+                s.put("version", t.get("version"));
+            }
+            s.put("evidence", shown);
+            out.add(s);
+        }
+        return out;
+    }
+
+    private static List<Object> secretRows(Model m, Set<Integer> cited) {
+        List<Map<String, Object>> sec = new ArrayList<>(m.secrets);
+        sec.sort(Comparator.comparingLong((Map<String, Object> s) -> -((Number) s.get("count")).longValue()).thenComparing(s -> String.valueOf(s.get("kind"))));
+        List<Object> out = new ArrayList<>();
+        for (Map<String, Object> s : head(sec, 20)) {
+            out.add(map("kind", s.get("kind"), "length", s.get("length"), "entropy", s.get("entropy"), "count", s.get("count"),
+                    "evidence", firstIds(s.get("evidence"), 3, cited)));
+        }
+        return out;
+    }
+
+    /** Every cited id resolved to its request: method, host, path, status, role, source and item. */
+    private static Map<String, Object> evidenceTable(Model m, Set<Integer> cited) {
+        Map<Integer, Map<String, Object>> byId = new java.util.HashMap<>();
+        for (Map<String, Object> e : m.evidenceLog.metas()) {
+            byId.put(((Number) e.get("id")).intValue(), e);
+        }
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        for (int i : cited) {
+            Map<String, Object> e = byId.get(i);
+            if (e != null) {
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (String k : new String[] {"method", "host", "path", "status", "role", "source", "item"}) {
+                    r.put(k, e.get(k));
+                }
+                evidence.put("ev_" + i, r);
+            }
+        }
+        return evidence;
+    }
+
     public static Map<String, Object> pack(Model m, String lens, int cap) {
-        Set<Integer> cited = new TreeSet<>();
         List<Model.Node> eps = new ArrayList<>();
         List<Model.Node> routes = new ArrayList<>();
         List<Model.Node> scripts = new ArrayList<>();
@@ -94,114 +242,28 @@ public final class ContextPack {
             eps.sort(Comparator.comparingInt(ContextPack::priority).thenComparing(n -> n.label));
         }
         tps.sort(Comparator.comparingLong((Model.Node n) -> -((Number) n.attrs.getOrDefault("requests", 0L)).longValue()));
+        Relations rel = relations(m);
 
-        Map<String, Map<String, List<String>>> rels = new LinkedHashMap<>();
-        Map<String, Integer> refsOut = new LinkedHashMap<>();
-        Map<String, List<String>> paramsOf = new LinkedHashMap<>();
-        for (Model.Edge e : m.edges) {
-            if (e.type.equals("REFERENCES")) {
-                refsOut.merge(e.src, 1, Integer::sum);
-            } else if (e.type.equals("USES_PARAMETER") && m.nodes.containsKey(e.dst)) {
-                paramsOf.computeIfAbsent(e.src, k -> new ArrayList<>()).add(m.nodes.get(e.dst).label);
-            }
-            if (e.type.equals("REFERENCES") || e.type.equals("CALLS")) {
-                Model.Node src = m.nodes.get(e.src);
-                if (src != null) {
-                    rels.computeIfAbsent(e.dst, k -> new LinkedHashMap<>())
-                            .computeIfAbsent(e.type.equals("REFERENCES") ? "referenced_by" : "called_from", k -> new ArrayList<>()).add(src.label);
-                }
-            }
-        }
-
-        List<Object> endpoints = new ArrayList<>();
-        for (Model.Node n : eps.subList(0, Math.min(cap, eps.size()))) {
-            Map<String, Object> v = map("id", n.id, "type", n.type, "label", n.label, "api_state", n.attrs.get("api_state"), "evidence", evList(n, 3, cited));
-            if (n.attrs.get("statuses") instanceof List<?> l && !l.isEmpty()) {
-                v.put("statuses", l);
-            }
-            List<String> params = new ArrayList<>(new TreeSet<>(paramsOf.getOrDefault(n.id, List.of())));
-            if (!params.isEmpty()) {
-                v.put("params", params.subList(0, Math.min(12, params.size())));
-            }
-            if (!n.roles.isEmpty()) {
-                v.put("reached_by", n.roles);
-                v.put("status_by_role", n.attrs.getOrDefault("status_by_role", Map.of()));
-            }
-            if (n.attrs.get("credentials") instanceof List<?> l && !l.isEmpty()) {
-                v.put("credentials", l);
-                if (((Number) n.attrs.getOrDefault("anonymous_requests", 0L)).longValue() > 0) {
-                    v.put("also_seen_without_credentials", true);
-                }
-            }
-            rels.getOrDefault(n.id, Map.of()).forEach((k, vals) -> {
-                List<String> u = new ArrayList<>(new TreeSet<>(vals));
-                v.put(k, u.subList(0, Math.min(5, u.size())));
-            });
-            if (Boolean.FALSE.equals(n.attrs.get("method_known"))) {
-                v.put("method", "unknown (static reference)");
-            }
-            endpoints.add(v);
-        }
+        Set<Integer> cited = new TreeSet<>();
+        List<Object> endpoints = endpointRows(eps, cap, rel, cited);
         List<Object> routeList = new ArrayList<>();
-        for (Model.Node n : routes.subList(0, Math.min(cap, routes.size()))) {
-            routeList.add(map("id", n.id, "type", n.type, "label", n.label, "evidence", evList(n, 3, cited)));
+        for (Model.Node n : head(routes, cap)) {
+            routeList.add(row(n, cited));
         }
         List<Object> scriptList = new ArrayList<>();
-        for (Model.Node n : scripts.subList(0, Math.min(cap, scripts.size()))) {
-            scriptList.add(map("id", n.id, "type", n.type, "label", n.label, "evidence", evList(n, 3, cited), "references", (long) refsOut.getOrDefault(n.id, 0)));
+        for (Model.Node n : head(scripts, cap)) {
+            Map<String, Object> s = row(n, cited);
+            s.put("references", (long) rel.refsOut().getOrDefault(n.id, 0));
+            scriptList.add(s);
         }
         List<Object> tpList = new ArrayList<>();
-        for (Model.Node n : tps.subList(0, Math.min(cap, tps.size()))) {
-            tpList.add(map("id", n.id, "type", n.type, "label", n.label, "evidence", evList(n, 3, cited)));
+        for (Model.Node n : head(tps, cap)) {
+            tpList.add(row(n, cited));
         }
-        List<Model.Unknown> us = new ArrayList<>(m.unknowns);
-        us.sort(Comparator.comparing(u -> u.type().equals("AUTHORIZATION_UNKNOWN")));
-        List<Object> unknowns = new ArrayList<>();
-        for (Model.Unknown u : us.subList(0, Math.min(cap, us.size()))) {
-            Model.Node en = m.nodes.get(u.entity());
-            unknowns.add(map("type", u.type(), "entity", en != null ? en.label : u.entity().substring(u.entity().lastIndexOf(':') + 1),
-                    "we_know", u.weKnow(), "we_dont_know", u.weDontKnow(), "next", u.nextStep()));
-        }
-        List<Object> auth = new ArrayList<>();
-        List<Object> cookies = new ArrayList<>();
-        for (Model.Node n : m.nodes.values()) {
-            if (n.type.equals("auth")) {
-                auth.add(map("id", n.id, "type", n.type, "label", n.label, "evidence", evList(n, 3, cited)));
-            } else if (n.type.equals("cookie")) {
-                cookies.add(map("id", n.id, "type", n.type, "label", n.label, "evidence", evList(n, 3, cited), "httponly", n.attrs.get("httponly"),
-                        "secure", n.attrs.get("secure"), "samesite", n.attrs.get("samesite")));
-            }
-        }
-        List<Object> stack = new ArrayList<>();
-        for (Map<String, Object> t : m.stack.subList(0, Math.min(cap, m.stack.size()))) {
-            List<Object> ids = (List<Object>) t.getOrDefault("evidence", List.of());
-            List<Object> shown = new ArrayList<>();
-            for (int i = 0; i < Math.min(2, ids.size()); i++) {
-                cited.add(((Number) ids.get(i)).intValue());
-                shown.add("ev_" + ids.get(i));
-            }
-            Map<String, Object> s = map("name", t.get("name"), "category", t.get("category"));
-            if (!String.valueOf(t.getOrDefault("kind", "")).isEmpty()) {
-                s.put("kind", t.get("kind"));
-            }
-            if (!String.valueOf(t.getOrDefault("version", "")).isEmpty()) {
-                s.put("version", t.get("version"));
-            }
-            s.put("evidence", shown);
-            stack.add(s);
-        }
-        List<Map<String, Object>> sec = new ArrayList<>(m.secrets);
-        sec.sort(Comparator.comparingLong((Map<String, Object> s) -> -((Number) s.get("count")).longValue()).thenComparing(s -> String.valueOf(s.get("kind"))));
-        List<Object> secrets = new ArrayList<>();
-        for (Map<String, Object> s : sec.subList(0, Math.min(20, sec.size()))) {
-            List<Object> ids = (List<Object>) s.get("evidence");
-            List<Object> shown = new ArrayList<>();
-            for (int i = 0; i < Math.min(3, ids.size()); i++) {
-                cited.add(((Number) ids.get(i)).intValue());
-                shown.add("ev_" + ids.get(i));
-            }
-            secrets.add(map("kind", s.get("kind"), "length", s.get("length"), "entropy", s.get("entropy"), "count", s.get("count"), "evidence", shown));
-        }
+        List<Object> unknowns = unknownRows(m, cap);
+        Map<String, Object> trust = trust(m, cited);
+        List<Object> stack = stackRows(m, cap, cited);
+        List<Object> secrets = secretRows(m, cited);
 
         Map<String, Object> pkg = new LinkedHashMap<>();
         pkg.put("tool", "burp2model");
@@ -216,29 +278,14 @@ public final class ContextPack {
         pkg.put("scripts", scriptList);
         pkg.put("third_parties", tpList);
         pkg.put("stack", stack);
-        pkg.put("trust", map("auth", auth, "cookies", cookies));
+        pkg.put("trust", trust);
         pkg.put("secrets", secrets);
         pkg.put("unknowns", unknowns);
         pkg.put("coverage", map("routes", cov(routeList.size(), routes.size()), "endpoints", cov(endpoints.size(), eps.size()),
                 "scripts", cov(scriptList.size(), scripts.size()), "third_parties", cov(tpList.size(), tps.size()),
                 "unknowns", cov(unknowns.size(), m.unknowns.size()), "capture", new TreeMap<>(m.stats),
                 "note", lens.equals("all") ? "model order" : "endpoints are ordered by the lens, so capping drops the least interesting ones first"));
-        Map<String, Object> evidence = new LinkedHashMap<>();
-        Map<Integer, Map<String, Object>> byId = new java.util.HashMap<>();
-        for (Map<String, Object> e : m.evidenceLog.metas()) {
-            byId.put(((Number) e.get("id")).intValue(), e);
-        }
-        for (int i : cited) {
-            Map<String, Object> e = byId.get(i);
-            if (e != null) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                for (String k : new String[] {"method", "host", "path", "status", "role", "source", "item"}) {
-                    row.put(k, e.get(k));
-                }
-                evidence.put("ev_" + i, row);
-            }
-        }
-        pkg.put("evidence", evidence);
+        pkg.put("evidence", evidenceTable(m, cited));
         pkg.put("token_estimate", (long) (Json.write(pkg).length() / 4));
         return pkg;
     }
