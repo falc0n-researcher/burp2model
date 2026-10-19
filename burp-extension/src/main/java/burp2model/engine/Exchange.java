@@ -46,6 +46,9 @@ public final class Exchange {
     /** Builder's cached folding key for `siblingKeyFor` (the template it was worked out from); never saved. */
     transient Object siblingKey;
     transient String siblingKeyFor;
+    /** Builder's cached node kind for `kindFor` (the template it was worked out from); never saved. */
+    transient String kind;
+    transient String kindFor;
 
     public void setEv(Map<String, Object> ev) {
         evZ = EvidenceLog.pack(ev);

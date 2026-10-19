@@ -69,6 +69,16 @@ public final class Builder {
         return false;
     }
 
+    /** inScope against the model's scope, worked out once per host for each model. */
+    private static boolean inScope(Model m, String host) {
+        Boolean in = m.scopeCache.get(host);
+        if (in == null) {
+            in = inScope(host, m.scope);
+            m.scopeCache.put(host, in);
+        }
+        return in;
+    }
+
     public static String matchKey(String path) {
         String key = PLACEHOLDER.matcher(path).replaceAll("{}");
         while (key.endsWith("/")) {
@@ -106,7 +116,16 @@ public final class Builder {
         return ex.status != null && ex.status >= 300 && ex.status < 400;
     }
 
+    /** The node kind of an exchange; kept on the exchange while its template is the same (pass 1 and pass 2 both ask). */
     static String classify(Exchange ex) {
+        if (ex.kind == null || !ex.pathTemplate.equals(ex.kindFor)) {
+            ex.kind = kindOf(ex);
+            ex.kindFor = ex.pathTemplate;
+        }
+        return ex.kind;
+    }
+
+    private static String kindOf(Exchange ex) {
         if (ex.preflight) {
             return "preflight";
         }
@@ -380,25 +399,30 @@ public final class Builder {
         m.secrets.add(entry);
     }
 
-    @SuppressWarnings("unchecked")
     public static Model build(List<Exchange> exchanges, String name, String seedHost, List<String> scopeIn, Map<String, Object> stats) {
-        Model m = new Model(name);
-        m.stats = new LinkedHashMap<>(stats == null ? Map.of() : stats);
-        m.stats.putIfAbsent("exchanges", (long) exchanges.size());
-        for (String k : new String[] {"static_assets", "preflight", "third_party_requests"}) {
-            m.stats.put(k, 0L);
-        }
+        return build(exchanges, name, seedHost, scopeIn, stats, null);
+    }
+
+    /**
+     * Build the model. With `keep`, pass 1 (observed traffic) is kept between builds, so a build that only adds
+     * requests observes just the new ones (live capture); the model is the same as a build from scratch.
+     */
+    public static Model build(List<Exchange> exchanges, String name, String seedHost, List<String> scopeIn, Map<String, Object> stats,
+                              Observed keep) {
         numberExchanges(exchanges);
-        m.stats.put("slug_templates_folded", (long) collapseSiblings(exchanges));
+        long folded = collapseSiblings(exchanges);
         seedHost = pickSeed(exchanges, seedHost, scopeIn);
-        m.scope = scopeFor(scopeIn, seedHost);
+        List<String> scope = scopeFor(scopeIn, seedHost);
         final String primary = seedHost;
 
-        Set<String> runtimeSeen = new LinkedHashSet<>();
+        Observed o = keep != null ? keep : new Observed();
+        o.catchUp(exchanges, name, primary, scope);
+        // the later passes change what pass 1 made, so a kept pass 1 is copied first
+        Model m = keep != null ? o.m.copyObserved() : o.m;
+        Set<String> runtimeSeen = keep != null ? new LinkedHashSet<>(o.runtimeSeen) : o.runtimeSeen;
+        Map<String, String> routeOfPage = keep != null ? new HashMap<>(o.routeOfPage) : o.routeOfPage;
+        m.stats = statsFor(stats, exchanges.size(), folded, o.m.stats);
         Set<String> referenced = new LinkedHashSet<>();
-        Map<String, String> routeOfPage = new HashMap<>();
-
-        observeTraffic(m, exchanges, primary, runtimeSeen, referenced, routeOfPage);
 
         dropNotFound(m, runtimeSeen, routeOfPage);
 
@@ -409,6 +433,91 @@ public final class Builder {
         emitUnknowns(m, exchanges);
         sortEvidence(m);
         return m;
+    }
+
+    /**
+     * Pass 1 of a build kept for the next one: the observed-traffic model of the exchanges seen so far. It carries on
+     * only while the next build starts with the same exchanges (same index, same folded paths) under the same name,
+     * seed host and scope; otherwise it observes them all again.
+     */
+    public static final class Observed {
+        Model m;
+        Set<String> runtimeSeen;
+        Map<String, String> routeOfPage;
+        private String primary;
+        private final List<Exchange> seen = new ArrayList<>();
+        private final List<Integer> indexes = new ArrayList<>();
+        private final List<String> templates = new ArrayList<>();
+        private final List<String> referers = new ArrayList<>();
+        private int restarts;
+
+        /** Forget everything observed (the requests were cleared or replaced). */
+        public void reset() {
+            m = null;
+            seen.clear();
+            indexes.clear();
+            templates.clear();
+            referers.clear();
+        }
+
+        /** How many times pass 1 has started over from the first request (for tests). */
+        public int restarts() {
+            return restarts;
+        }
+
+        private boolean continues(List<Exchange> exchanges, String name, String primary, List<String> scope) {
+            if (m == null || !m.name.equals(name) || !java.util.Objects.equals(this.primary, primary) || !m.scope.equals(scope)
+                    || seen.size() > exchanges.size()) {
+                return false;
+            }
+            for (int i = 0; i < seen.size(); i++) {
+                Exchange ex = exchanges.get(i);
+                if (ex != seen.get(i) || ex.index != indexes.get(i) || !ex.pathTemplate.equals(templates.get(i))
+                        || !java.util.Objects.equals(ex.refererPath, referers.get(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        void catchUp(List<Exchange> exchanges, String name, String primary, List<String> scope) {
+            if (!continues(exchanges, name, primary, scope)) {
+                reset();
+                restarts++;
+                m = new Model(name);
+                m.scope = new ArrayList<>(scope);
+                m.stats = new LinkedHashMap<>();
+                for (String k : new String[] {"static_assets", "preflight", "third_party_requests"}) {
+                    m.stats.put(k, 0L);
+                }
+                runtimeSeen = new LinkedHashSet<>();
+                routeOfPage = new HashMap<>();
+                this.primary = primary;
+            }
+            List<Exchange> fresh = exchanges.subList(seen.size(), exchanges.size());
+            observeTraffic(m, fresh, primary, runtimeSeen, routeOfPage);
+            for (Exchange ex : fresh) {
+                seen.add(ex);
+                indexes.add(ex.index);
+                templates.add(ex.pathTemplate);
+                referers.add(ex.refererPath);
+            }
+        }
+    }
+
+    /** The build's stats: the caller's, then the request count, what pass 1 counted and how many templates were folded. */
+    private static Map<String, Object> statsFor(Map<String, Object> given, int n, long folded, Map<String, Object> counted) {
+        Map<String, Object> s = new LinkedHashMap<>(given == null ? Map.of() : given);
+        s.putIfAbsent("exchanges", (long) n);
+        for (String k : new String[] {"static_assets", "preflight", "third_party_requests"}) {
+            s.put(k, counted.get(k));
+        }
+        s.put("slug_templates_folded", folded);
+        Object probes = counted.get("probe_requests");
+        if (probes != null) {
+            s.merge("probe_requests", probes, (a, b) -> (Long) a + (Long) b);
+        }
+        return s;
     }
 
     // ------------------------------------------------------ the passes of build(), in order
@@ -471,9 +580,8 @@ public final class Builder {
 
     /** Pass 1, observed traffic: hosts, pages, endpoints, scripts, parameters, cookies, credentials and roles from each exchange. */
     @SuppressWarnings("unchecked")
-    private static void observeTraffic(Model m, List<Exchange> exchanges, String primary, Set<String> runtimeSeen, Set<String> referenced,
+    private static void observeTraffic(Model m, List<Exchange> exchanges, String primary, Set<String> runtimeSeen,
                                        Map<String, String> routeOfPage) {
-        // ---- pass 1: observed traffic
         for (Exchange ex : exchanges) {
             int i = ex.index;
             String role = ex.role;
@@ -500,7 +608,7 @@ public final class Builder {
                 m.addNode("role:" + role, "role", 5, "role: " + role);
                 m.evidence("role:" + role, i);
             }
-            boolean firstParty = inScope(ex.host, m.scope);
+            boolean firstParty = inScope(m, ex.host);
             if (!firstParty) {
                 String tpId = "host:" + ex.host;
                 Model.Node tp = m.addNode(tpId, "third_party", 5, ex.host, "scope", "external", "requests", 0L);
@@ -694,12 +802,12 @@ public final class Builder {
         }
         for (Exchange ex : exchanges) {
             int i = ex.index;
-            if (!inScope(ex.host, m.scope)) {
+            if (!inScope(m, ex.host)) {
                 continue;
             }
             String kind = classify(ex);
             String src = nodeFor(m, ex, kind);
-            if (src != null && ex.refererHost != null && inScope(ex.refererHost, m.scope)) {
+            if (src != null && ex.refererHost != null && inScope(m, ex.refererHost)) {
                 String page = routeOfPage.get(ex.refererHost + "\u0000" + ex.refererPath);
                 if (page != null && !page.equals(src)) {
                     String etype = kind.equals("endpoint") ? "CALLS" : kind.equals("script") ? "INCLUDES" : "NAVIGATES_TO";
@@ -712,21 +820,21 @@ public final class Builder {
                 continue;
             }
             int i = ex.index;
-            boolean firstParty = inScope(ex.host, m.scope);
+            boolean firstParty = inScope(m, ex.host);
             String kind = firstParty ? classify(ex) : (isJs(ex) ? "script" : null);
             String src = kind != null ? nodeFor(m, ex, kind) : null;
             if (src == null) {
                 continue;
             }
             String baseHost = ex.host;
-            if (!inScope(baseHost, m.scope) || "script".equals(kind)) {
-                baseHost = ex.refererHost != null && inScope(ex.refererHost, m.scope) ? ex.refererHost : primary;
+            if (!inScope(m, baseHost) || "script".equals(kind)) {
+                baseHost = ex.refererHost != null && inScope(m, ex.refererHost) ? ex.refererHost : primary;
             }
             for (Extract.Ref ref : ex.jsRefs) {
                 String method = ref.method();
                 String host = ref.host();
                 String path = ref.path();
-                if (host != null && !inScope(host, m.scope)) {
+                if (host != null && !inScope(m, host)) {
                     String tpId = "host:" + host;
                     m.addNode(tpId, "third_party", 5, host, "scope", "external", "requests", 0L);
                     m.evidence(tpId, i);
@@ -783,7 +891,7 @@ public final class Builder {
             }
         }
         for (Exchange ex : exchanges) {
-            if (ex.jsAssets.isEmpty() || isProbe(ex) || !inScope(ex.host, m.scope)) {
+            if (ex.jsAssets.isEmpty() || isProbe(ex) || !inScope(m, ex.host)) {
                 continue;
             }
             String src = "script:" + ex.host + ex.pathTemplate;
@@ -791,7 +899,7 @@ public final class Builder {
                 continue;
             }
             for (Extract.Asset a : ex.jsAssets) {
-                if (!inScope(a.host(), m.scope)) {
+                if (!inScope(m, a.host())) {
                     continue;
                 }
                 if (a.kind().equals("sourcemap")) {
@@ -840,7 +948,7 @@ public final class Builder {
             return e;
         };
         for (Exchange ex : exchanges) {
-            if (isProbe(ex) || !inScope(ex.host, m.scope)) {
+            if (isProbe(ex) || !inScope(m, ex.host)) {
                 continue;
             }
             for (Stack.Hit h : ex.stack) {

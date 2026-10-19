@@ -66,6 +66,11 @@ public final class EvidenceLog extends AbstractList<Map<String, Object>> impleme
         rows.add(new Row(meta, z, reqPath));
     }
 
+    /** Add every entry of another log, sharing them (entries are never changed once added). */
+    void share(EvidenceLog other) {
+        rows.addAll(other.rows);
+    }
+
     /** Add a full entry (as read from a saved model). */
     @Override
     public boolean add(Map<String, Object> entry) {

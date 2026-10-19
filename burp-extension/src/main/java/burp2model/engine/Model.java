@@ -130,9 +130,60 @@ public final class Model {
     public final EvidenceLog evidenceLog = new EvidenceLog();
     Map<String, Edge> edgeIndex = new LinkedHashMap<>();
     final Map<String, Map<String, Object>> secretIndex = new LinkedHashMap<>();
+    /** Builder's answer to "is this host in scope" for each host, for this model's scope; never saved. */
+    final Map<String, Boolean> scopeCache = new java.util.HashMap<>();
 
     public Model(String name) {
         this.name = name;
+    }
+
+    /**
+     * A deep copy of what pass 1 of a build fills in (nodes, edges, roles, secrets, scope, the evidence log), so the
+     * later passes can work on the copy while the original takes the next requests. Evidence entries are shared:
+     * nothing changes them once logged.
+     */
+    Model copyObserved() {
+        Model c = new Model(name);
+        for (Node n : nodes.values()) {
+            Node d = new Node(n.id, n.type, n.layer, n.label);
+            n.attrs.forEach((k, v) -> d.attrs.put(k, deepCopy(v)));
+            d.evidence.addAll(n.evidence);
+            d.roles.addAll(n.roles);
+            c.nodes.put(d.id, d);
+        }
+        for (Edge e : edges) {
+            Edge d = new Edge(e.src, e.dst, e.type, e.state);
+            d.evidence.addAll(e.evidence);
+            c.edges.add(d);
+            c.edgeIndex.put(edgeKey(d.src, d.dst, d.type), d);
+        }
+        c.roles.addAll(roles);
+        for (Map<String, Object> s : secrets) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> d = (Map<String, Object>) deepCopy(s);
+            c.secrets.add(d);
+            c.secretIndex.put(d.get("kind") + "\u0000" + d.get("hmac_12"), d);
+        }
+        c.scope = new ArrayList<>(scope);
+        c.stats = new LinkedHashMap<>(stats);
+        c.evidenceLog.share(evidenceLog);
+        c.unknowns.addAll(unknowns);
+        c.stack = new ArrayList<>(stack);
+        return c;
+    }
+
+    private static Object deepCopy(Object v) {
+        if (v instanceof Map<?, ?> m) {
+            Map<Object, Object> out = new LinkedHashMap<>();
+            m.forEach((k, x) -> out.put(k, deepCopy(x)));
+            return out;
+        }
+        if (v instanceof List<?> l) {
+            List<Object> out = new ArrayList<>(l.size());
+            l.forEach(x -> out.add(deepCopy(x)));
+            return out;
+        }
+        return v;
     }
 
     public Node addNode(String id, String type, int layer, String label, Object... attrKv) {

@@ -319,8 +319,12 @@ public final class Session {
         pendingKeys.clear();
         fullRewrite = false;
         dirty = false;
+        observed.reset();
         Parse.clearCache();
     }
+
+    /** Pass 1 of the last build, so a live tick observes only the requests it adds. */
+    private final Builder.Observed observed = new Builder.Observed();
 
     private BuildInfo rebuild(String label, int skipped, boolean snapshot) throws IOException {
         // evidence ids are 1-based and stable across the exchanges kept so far; folding starts from the raw paths each time
@@ -337,7 +341,7 @@ public final class Session {
         stats.put("parsed", (long) exchanges.size());
         stats.put("skipped", (long) skipped);
         List<Exchange> copy = new ArrayList<>(exchanges);
-        model = Builder.build(copy, name, null, scope.isEmpty() ? null : scope, stats);
+        model = Builder.build(copy, name, null, scope.isEmpty() ? null : scope, stats, observed);
         Set<String> r = new TreeSet<>();
         for (Exchange e : exchanges) {
             if (e.role != null) {
