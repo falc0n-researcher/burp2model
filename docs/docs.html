@@ -56,7 +56,7 @@
 <main id="main" class="prose">
 
 <div class="doc-section" id="overview">
-  <span class="kicker">Documentation · v1.0.2</span>
+  <span class="kicker">Documentation · CLI 1.3 · extension 1.2</span>
   <h1>burp2model</h1>
   <p class="lead">burp2model turns Burp traffic into an evidence-backed model of a web app. It is a model builder, not a scanner.</p>
   <ul>
@@ -72,7 +72,21 @@
   <p>Python 3.9 or newer.</p>
   <div class="code"><span class="label">shell</span><button class="copy" type="button" data-copy aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><pre>pip install burp2model
 burp2model --version</pre></div>
-  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (379 tests).</p>
+  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (424 tests). Releases are also on <a href="https://github.com/falc0n-researcher/burp2model/releases">GitHub</a> as a wheel.</p>
+</div>
+
+<div class="doc-section" id="extension">
+  <h2>Burp extension <a class="anchor" href="#extension" aria-label="Link to Burp extension">#</a></h2>
+  <p>The same model, built inside Burp: no Python, no export, nothing to run. Get <code>burp2model.jar</code> from the <a href="https://github.com/falc0n-researcher/burp2model/releases?q=extension">extension releases</a>, then in Burp choose <b>Extensions → Add → Java</b> and pick it. Burp 2023.x or later.</p>
+  <ul>
+    <li>Select requests in Proxy history or the Site map, right-click, <b>Send to burp2model</b>. Or turn on <b>Live</b> in the header: in-scope Proxy traffic joins the model every few seconds, a few samples of each request shape.</li>
+    <li>The tab opens on a welcome page with a sample model, so there is something to look at before your first send.</li>
+    <li>Overview, ranked leads, a map that holds still, the surface as a list or site map, every masked request, a query console, builds and what changed, role comparison and light recon.</li>
+    <li>Models live in <code>~/.burp2model/models/</code>; the header switches between them, and ⋯ imports a HAR or Burp export, exports, or deletes a model.</li>
+    <li>Keyboard: <kbd>Cmd/Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> for tabs, <kbd>Cmd/Ctrl</kbd>+<kbd>F</kbd> search, <kbd>Cmd/Ctrl</kbd>+<kbd>L</kbd> query, <kbd>Alt</kbd>+<kbd>←</kbd> back.</li>
+  </ul>
+  <p><img src="assets/extension-overview.png" alt="The burp2model tab in Burp: the Overview" style="max-width:100%;border:1px solid var(--line);border-radius:8px"></p>
+  <p>The Java engine is checked against the Python one on every change: same model, same query answers, same diff.</p>
 </div>
 
 <div class="doc-section" id="quickstart">

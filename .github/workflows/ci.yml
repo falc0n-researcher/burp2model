@@ -106,6 +106,10 @@ jobs:
         run: gradle -p burp-extension test --no-daemon
       - name: The tab and the engine work end to end
         run: java -Djava.awt.headless=true -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.Smoke samples/burp-history-sample.xml
+      - name: No slower than allowed (5,000 requests)
+        run: |
+          java -Xmx1g -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.ScaleBench samples/juiceshop-user.xml 5000 5 --check
+          java -Djava.awt.headless=true -Xmx1g -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.ui.EdtBench samples/juiceshop-user.xml 5000 --check
       - name: The map is stable
         run: java -Djava.awt.headless=true -cp classes:montoya.jar:burp-extension/src/main/resources burp2model.ui.MapStability samples/juiceshop-user.xml
       - uses: actions/upload-artifact@v4

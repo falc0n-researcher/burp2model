@@ -62,6 +62,7 @@ public final class ScaleBench {
         List<Parse.Raw> base = BurpXml.readRaw(new File(a[0]));
         int n = Integer.parseInt(a[1]);
         int snapshots = a.length > 2 ? Integer.parseInt(a[2]) : 10;
+        boolean check = java.util.Arrays.asList(a).contains("--check");
         List<Parse.Raw> all = replicate(base, n, "x");
         Path home = Files.createTempDirectory("b2m-scale");
         Session s = new Session(home, "scale");
@@ -85,8 +86,10 @@ public final class ScaleBench {
             s.snapshot("live capture");
             snapMs += System.nanoTime() - t;
         }
-        System.out.printf("  live tick (+5): %d ms avg over %d%n", tickMs / ticks / 1_000_000, ticks);
-        System.out.printf("  snapshot: %d ms avg over %d%n", snapMs / snapshots / 1_000_000, snapshots);
+        long tickAvg = tickMs / ticks / 1_000_000;
+        long snapAvg = snapMs / snapshots / 1_000_000;
+        System.out.printf("  live tick (+5): %d ms avg over %d%n", tickAvg, ticks);
+        System.out.printf("  snapshot: %d ms avg over %d%n", snapAvg, snapshots);
         System.out.printf("  heap after gc: %d MB%n", heapMb());
         Path builds = s.dir().resolve("builds");
         System.out.printf("  disk: %d MB total, builds %d MB (%d builds), inputs %d MB%n", dirBytes(s.dir()) >> 20, dirBytes(builds) >> 20,
@@ -97,6 +100,29 @@ public final class ScaleBench {
         System.out.printf("  reload: %d ms (%d requests)%n", (System.nanoTime() - t) / 1_000_000, again.requestCount());
         t = System.nanoTime();
         again.diff(1, again.builds().size());
-        System.out.printf("  diff first..last after reload: %d ms%n", (System.nanoTime() - t) / 1_000_000);
+        long diffMs = (System.nanoTime() - t) / 1_000_000;
+        System.out.printf("  diff first..last after reload: %d ms%n", diffMs);
+        if (check) {
+            // CI guard: limits several times today's numbers at 5,000 requests, so a slow runner passes and a regression does not
+            long buildsKb = dirBytes(builds) >> 10;
+            List<String> over = new ArrayList<>();
+            if (tickAvg > 300) {
+                over.add("live tick " + tickAvg + " ms > 300");
+            }
+            if (snapAvg > 600) {
+                over.add("snapshot " + snapAvg + " ms > 600");
+            }
+            if (diffMs > 2000) {
+                over.add("diff " + diffMs + " ms > 2000");
+            }
+            if (buildsKb > 6 * 1024) {
+                over.add("builds on disk " + buildsKb + " KB > 6 MB (are panes being saved in builds again?)");
+            }
+            if (!over.isEmpty()) {
+                System.out.println("SLOWER THAN ALLOWED: " + String.join("; ", over));
+                System.exit(1);
+            }
+            System.out.println("within limits");
+        }
     }
 }
