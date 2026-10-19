@@ -157,20 +157,203 @@ public final class Har {
         }
     }
 
-    /** The responses a HAR holds, as raw items; entries without a response are left out. */
+    /**
+     * The responses a HAR holds, as raw items; entries without a response are left out. The file is read as a
+     * stream: only one entry is held as text at a time, so a capture of hundreds of MB does not sit in memory twice.
+     */
     @SuppressWarnings("unchecked")
     public static List<Parse.Raw> readRaw(File f) throws Exception {
-        Object doc = Json.parse(Files.readString(f.toPath(), StandardCharsets.UTF_8));
-        Object entries = doc instanceof Map<?, ?> m && m.get("log") instanceof Map<?, ?> l ? l.get("entries") : null;
-        if (!(entries instanceof List<?> list)) {
-            throw new IllegalArgumentException("not a HAR file (no log.entries)");
-        }
         List<Parse.Raw> out = new ArrayList<>();
-        for (Object o : list) {
-            Parse.Raw r = o instanceof Map<?, ?> m ? entry((Map<String, Object>) m) : null;
-            out.add(r);                       // null stays, so the item count is the file's
+        try (java.io.Reader in = new java.io.BufferedReader(new java.io.InputStreamReader(Files.newInputStream(f.toPath()), StandardCharsets.UTF_8), 1 << 16)) {
+            Stream st = new Stream(in);
+            boolean found = st.entries(text -> {
+                Object o = Json.parse(text);
+                out.add(o instanceof Map<?, ?> m ? entry((Map<String, Object>) m) : null);   // null stays, so the item count is the file's
+            });
+            if (!found) {
+                throw new IllegalArgumentException("not a HAR file (no log.entries)");
+            }
         }
         return out;
+    }
+
+    /** Just enough of a streaming JSON reader to walk to log.entries and hand out each entry's text. */
+    static final class Stream {
+        private final java.io.Reader in;
+        private int peeked = -2;
+
+        Stream(java.io.Reader in) {
+            this.in = in;
+        }
+
+        private int peek() throws java.io.IOException {
+            if (peeked == -2) {
+                peeked = in.read();
+                if (peeked == 0xFEFF) {
+                    peeked = in.read();                       // a byte order mark before the JSON
+                }
+            }
+            return peeked;
+        }
+
+        private int next() throws java.io.IOException {
+            int c = peek();
+            peeked = in.read();
+            return c;
+        }
+
+        private int skipWs() throws java.io.IOException {
+            while (peek() == ' ' || peek() == '\n' || peek() == '\r' || peek() == '\t') {
+                next();
+            }
+            return peek();
+        }
+
+        private void expect(char ch) throws java.io.IOException {
+            int c = skipWs();
+            if (c != ch) {
+                throw new IllegalArgumentException("not a HAR file (expected '" + ch + "', found " + (c < 0 ? "the end" : "'" + (char) c + "'") + ")");
+            }
+            next();
+        }
+
+        /** A JSON string (positioned at its opening quote), decoded through the ordinary parser. */
+        private String string() throws java.io.IOException {
+            StringBuilder raw = new StringBuilder();
+            copyString(raw);
+            return (String) Json.parse(raw.toString());
+        }
+
+        private void copyString(StringBuilder sb) throws java.io.IOException {
+            sb.append((char) next());                          // the opening quote
+            while (true) {
+                int c = next();
+                if (c < 0) {
+                    throw new IllegalArgumentException("not a HAR file (cut off inside a string)");
+                }
+                if (sb != null) {
+                    sb.append((char) c);
+                }
+                if (c == '\\') {
+                    int e = next();
+                    if (e < 0) {
+                        throw new IllegalArgumentException("not a HAR file (cut off inside a string)");
+                    }
+                    sb.append((char) e);
+                } else if (c == '"') {
+                    return;
+                }
+            }
+        }
+
+        /** Copy one value (object, array, string or literal) into sb, or skip it when sb is null. */
+        private void value(StringBuilder sb) throws java.io.IOException {
+            int c = skipWs();
+            if (c == '"') {
+                copyString(sb == null ? new StringBuilder() : sb);
+                return;
+            }
+            if (c == '{' || c == '[') {
+                int depth = 0;
+                while (true) {
+                    c = peek();
+                    if (c < 0) {
+                        throw new IllegalArgumentException("not a HAR file (cut off)");
+                    }
+                    if (c == '"') {
+                        copyString(sb == null ? new StringBuilder() : sb);
+                        continue;
+                    }
+                    next();
+                    if (sb != null) {
+                        sb.append((char) c);
+                    }
+                    if (c == '{' || c == '[') {
+                        depth++;
+                    } else if (c == '}' || c == ']') {
+                        if (--depth == 0) {
+                            return;
+                        }
+                    }
+                }
+            }
+            while (true) {                                     // number, true, false, null
+                c = peek();
+                if (c < 0 || c == ',' || c == '}' || c == ']' || c == ' ' || c == '\n' || c == '\r' || c == '\t') {
+                    return;
+                }
+                next();
+                if (sb != null) {
+                    sb.append((char) c);
+                }
+            }
+        }
+
+        /** Walk the object at the cursor, calling onKey for each key with the cursor on its value. */
+        private void object(KeyHandler onKey) throws java.io.IOException {
+            expect('{');
+            if (skipWs() == '}') {
+                next();
+                return;
+            }
+            while (true) {
+                if (skipWs() != '"') {
+                    throw new IllegalArgumentException("not a HAR file (expected a key)");
+                }
+                String key = string();
+                expect(':');
+                onKey.value(key);
+                int c = skipWs();
+                next();
+                if (c == '}') {
+                    return;
+                }
+                if (c != ',') {
+                    throw new IllegalArgumentException("not a HAR file (expected ',' or '}')");
+                }
+            }
+        }
+
+        private interface KeyHandler {
+            void value(String key) throws java.io.IOException;
+        }
+
+        /** Hand each element of log.entries to sink as JSON text; false when the file has no log.entries. */
+        boolean entries(java.util.function.Consumer<String> sink) throws java.io.IOException {
+            boolean[] found = {false};
+            object(key -> {
+                if (!key.equals("log") || skipWs() != '{') {
+                    value(null);
+                    return;
+                }
+                object(k2 -> {
+                    if (!k2.equals("entries") || skipWs() != '[') {
+                        value(null);
+                        return;
+                    }
+                    found[0] = true;
+                    expect('[');
+                    if (skipWs() == ']') {
+                        next();
+                        return;
+                    }
+                    while (true) {
+                        StringBuilder one = new StringBuilder();
+                        value(one);
+                        sink.accept(one.toString());
+                        int c = skipWs();
+                        next();
+                        if (c == ']') {
+                            return;
+                        }
+                        if (c != ',') {
+                            throw new IllegalArgumentException("not a HAR file (expected ',' or ']' between entries)");
+                        }
+                    }
+                });
+            });
+            return found[0];
+        }
     }
 
     public static List<Exchange> read(File f, String role) throws Exception {
