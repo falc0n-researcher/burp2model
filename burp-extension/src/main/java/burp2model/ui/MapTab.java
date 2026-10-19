@@ -4,6 +4,7 @@ import static burp2model.ui.Layouts.*;
 
 import burp2model.engine.Model;
 import java.awt.Component;
+import java.util.List;
 import java.util.Map;
 import javax.swing.JSplitPane;
 
@@ -39,6 +40,21 @@ final class MapTab implements Tab {
 
     private Component build() {
         graph.onSelect(n -> {
+            if (n.type.equals("group")) {
+                // a group: what is in it, and the requests behind its first members
+                List<Model.Node> in = graph.groupMembers.getOrDefault(n.id, List.of());
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < Math.min(40, in.size()); i++) {
+                    sb.append(in.get(i).label).append('\n');
+                }
+                if (in.size() > 40) {
+                    sb.append("… and ").append(in.size() - 40).append(" more\n");
+                }
+                sb.append("\nDouble-click the group, or right-click it, to open it on the map.");
+                graphFacts.showText(n.label, sb.toString());
+                graphViewer.show(n.evidence, n.label);
+                return;
+            }
             graphFacts.show(n, app.model());
             graphViewer.show(n.evidence, n.label);
         });

@@ -57,6 +57,8 @@ public final class EdtBench {
         Redact.setKey(new byte[32]);
         List<Parse.Raw> base = BurpXml.readRaw(new File(a[0]));
         int n = Integer.parseInt(a[1]);
+        boolean check = java.util.Arrays.asList(a).contains("--check");
+        java.util.List<String> over = new java.util.ArrayList<>();
         Path home = Files.createTempDirectory("b2m-edt");
         Session seed = new Session(home, "edt");
         seed.add(ScaleBench.replicate(base, n, "x"), null, "one", false);
@@ -92,15 +94,31 @@ public final class EdtBench {
             int i = t;
             SwingUtilities.invokeAndWait(() -> tabs.setSelectedIndex(i));
             Thread.sleep(400);
-            System.out.printf("show %-10s worst Swing stall %d ms%n", tabs.getTitleAt(i), w.take());
+            long stall = w.take();
+            System.out.printf("show %-10s worst Swing stall %d ms%n", tabs.getTitleAt(i), stall);
+            if (stall > 500) {
+                over.add(tabs.getTitleAt(i) + " " + stall + " ms");
+            }
         }
         SwingUtilities.invokeAndWait(() -> panel[0].ask("resp.body.regex:\"pass(word)?\""));
         Thread.sleep(1500);
-        System.out.printf("body regex query: worst Swing stall %d ms%n", w.take());
+        long q1 = w.take();
+        System.out.printf("body regex query: worst Swing stall %d ms%n", q1);
+        if (q1 > 500) {
+            over.add("body regex query " + q1 + " ms");
+        }
         SwingUtilities.invokeAndWait(() -> panel[0].ask("changed-since 1"));
         Thread.sleep(1500);
         System.out.printf("changed-since query: worst Swing stall %d ms%n", w.take());
         w.on = false;
+        if (check) {
+            // CI guard: nothing the user does may hold Burp's Swing thread for half a second (building the tab once is exempt)
+            if (!over.isEmpty()) {
+                System.out.println("SWING THREAD BLOCKED: " + String.join("; ", over));
+                System.exit(1);
+            }
+            System.out.println("within limits");
+        }
         System.exit(0);
     }
 }

@@ -38,3 +38,8 @@ burp-extension/build/
 
 # engine binaries are built, not committed
 burp-extension/src/main/resources/engine/
+
+# real-site captures kept locally for testing redaction; never commit
+samples/sample-romaantwerpen.xml
+samples/sample-shop-bolt-new.xml
+samples/private/

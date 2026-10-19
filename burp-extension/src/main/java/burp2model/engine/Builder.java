@@ -388,6 +388,33 @@ public final class Builder {
         for (String k : new String[] {"static_assets", "preflight", "third_party_requests"}) {
             m.stats.put(k, 0L);
         }
+        numberExchanges(exchanges);
+        m.stats.put("slug_templates_folded", (long) collapseSiblings(exchanges));
+        seedHost = pickSeed(exchanges, seedHost, scopeIn);
+        m.scope = scopeFor(scopeIn, seedHost);
+        final String primary = seedHost;
+
+        Set<String> runtimeSeen = new LinkedHashSet<>();
+        Set<String> referenced = new LinkedHashSet<>();
+        Map<String, String> routeOfPage = new HashMap<>();
+
+        observeTraffic(m, exchanges, primary, runtimeSeen, referenced, routeOfPage);
+
+        dropNotFound(m, runtimeSeen, routeOfPage);
+
+        linkReferences(m, exchanges, primary, runtimeSeen, referenced, routeOfPage);
+        linkScriptAssets(m, exchanges);
+        m.stack = buildStack(m, exchanges);
+        reconcile(m, referenced, runtimeSeen);
+        emitUnknowns(m, exchanges);
+        sortEvidence(m);
+        return m;
+    }
+
+    // ------------------------------------------------------ the passes of build(), in order
+
+    /** Evidence ids must be unique: number the exchanges 1..n when they are not. */
+    private static void numberExchanges(List<Exchange> exchanges) {
         java.util.Set<Integer> idxs = new HashSet<>();
         for (Exchange ex : exchanges) {
             idxs.add(ex.index);
@@ -397,46 +424,55 @@ public final class Builder {
                 exchanges.get(n).index = n + 1;
             }
         }
-        m.stats.put("slug_templates_folded", (long) collapseSiblings(exchanges));
-        if (seedHost == null && !exchanges.isEmpty()) {
-            Map<String, Integer> hosts = new LinkedHashMap<>();
-            for (Exchange ex : exchanges) {
-                hosts.merge(ex.host, 1, Integer::sum);
-            }
-            List<String> pool = new ArrayList<>();
-            if (scopeIn != null && !scopeIn.isEmpty()) {
-                for (String h : hosts.keySet()) {
-                    if (inScope(h, scopeIn)) {
-                        pool.add(h);
-                    }
-                }
-            }
-            if (pool.isEmpty()) {
-                pool.addAll(hosts.keySet());
-            }
-            java.util.Collections.sort(pool);
-            String best = null;
-            for (String h : pool) {
-                if (best == null || hosts.get(h) >= hosts.get(best)) {
-                    best = h;                       // max(sorted(pool), key=count): the last of equals wins
-                }
-            }
-            seedHost = best;
+    }
+
+    /** The app's own host when none was given: the busiest one (inside the scope, when there is one). */
+    private static String pickSeed(List<Exchange> exchanges, String seedHost, List<String> scopeIn) {
+        if (seedHost != null || exchanges.isEmpty()) {
+            return seedHost;
         }
+        Map<String, Integer> hosts = new LinkedHashMap<>();
+        for (Exchange ex : exchanges) {
+            hosts.merge(ex.host, 1, Integer::sum);
+        }
+        List<String> pool = new ArrayList<>();
         if (scopeIn != null && !scopeIn.isEmpty()) {
-            m.scope = new ArrayList<>(scopeIn);
-        } else {
-            m.scope = new ArrayList<>();
-            if (seedHost != null) {
-                m.scope.add(Domains.registrableDomain(seedHost));
+            for (String h : hosts.keySet()) {
+                if (inScope(h, scopeIn)) {
+                    pool.add(h);
+                }
             }
         }
-        final String primary = seedHost;
+        if (pool.isEmpty()) {
+            pool.addAll(hosts.keySet());
+        }
+        java.util.Collections.sort(pool);
+        String best = null;
+        for (String h : pool) {
+            if (best == null || hosts.get(h) >= hosts.get(best)) {
+                best = h;                       // max(sorted(pool), key=count): the last of equals wins
+            }
+        }
+        return best;
+    }
 
-        Set<String> runtimeSeen = new LinkedHashSet<>();
-        Set<String> referenced = new LinkedHashSet<>();
-        Map<String, String> routeOfPage = new HashMap<>();
+    /** The scope as given, or the seed host's registrable domain. */
+    private static List<String> scopeFor(List<String> scopeIn, String seedHost) {
+        if (scopeIn != null && !scopeIn.isEmpty()) {
+            return new ArrayList<>(scopeIn);
+        } else {
+            List<String> scope = new ArrayList<>();
+            if (seedHost != null) {
+                scope.add(Domains.registrableDomain(seedHost));
+            }
+            return scope;
+        }
+    }
 
+    /** Pass 1, observed traffic: hosts, pages, endpoints, scripts, parameters, cookies, credentials and roles from each exchange. */
+    @SuppressWarnings("unchecked")
+    private static void observeTraffic(Model m, List<Exchange> exchanges, String primary, Set<String> runtimeSeen, Set<String> referenced,
+                                       Map<String, String> routeOfPage) {
         // ---- pass 1: observed traffic
         for (Exchange ex : exchanges) {
             int i = ex.index;
@@ -601,6 +637,10 @@ public final class Builder {
             }
         }
 
+    }
+
+    /** A path that only ever answered 404/410 is not part of the app: drop it, its edges and its parameters. */
+    private static void dropNotFound(Model m, Set<String> runtimeSeen, Map<String, String> routeOfPage) {
         // A path that only ever answered 404/410 is not part of the app.
         List<String> gone = new ArrayList<>();
         for (Map.Entry<String, Model.Node> e : m.nodes.entrySet()) {
@@ -641,6 +681,12 @@ public final class Builder {
         }
         m.stats.put("not_found_paths_dropped", (long) gone.size());
 
+    }
+
+    /** Pass 2: referer edges between pages and endpoints, and the references scripts and pages make to paths. */
+    @SuppressWarnings("unchecked")
+    private static void linkReferences(Model m, List<Exchange> exchanges, String primary, Set<String> runtimeSeen, Set<String> referenced,
+                                       Map<String, String> routeOfPage) {
         // ---- pass 2: referer edges and static references
         Map<String, List<String>> byKey = new LinkedHashMap<>();
         for (String nid : new TreeSet<>(runtimeSeen)) {
@@ -717,17 +763,16 @@ public final class Builder {
                 m.addEdge(src, eid, "REFERENCES", "INFERRED", i);
             }
         }
-        linkScriptAssets(m, exchanges);
-        m.stack = buildStack(m, exchanges);
-        reconcile(m, referenced, runtimeSeen);
-        emitUnknowns(m, exchanges);
+    }
+
+    /** Evidence lists in id order, so the same requests always give the same model. */
+    private static void sortEvidence(Model m) {
         for (Model.Node n : m.nodes.values()) {
             java.util.Collections.sort(n.evidence);
         }
         for (Model.Edge e : m.edges) {
             java.util.Collections.sort(e.evidence);
         }
-        return m;
     }
 
     private static void linkScriptAssets(Model m, List<Exchange> exchanges) {

@@ -1,28 +1,12 @@
 package burp2model.ui;
 
 import burp2model.engine.Model;
-import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Cursor;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.RenderingHints;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.CubicCurve2D;
-import java.awt.geom.Line2D;
-import java.awt.geom.Path2D;
-import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -36,11 +20,8 @@ import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.ButtonGroup;
@@ -68,6 +49,8 @@ final class GraphPanel extends JPanel {
         final List<E> edges = new ArrayList<>();
         Color color;
         String shortLabel;
+        /** For a group's stand-in: how many nodes it holds (0 for an ordinary node). */
+        int members;
         /** The label lowercased once, for search highlighting on every frame. */
         final String lower;
 
@@ -87,37 +70,46 @@ final class GraphPanel extends JPanel {
         {"Third parties", "third_party"}, {"Trust", "cookie,auth,role"}, {"Tech", "tech"}};
     private static final int BIG = 1500;
     /** Above this many nodes, frames drawn while the map moves skip dashes and labels. */
-    private static final int FAST_PAINT = 600;
+    static final int FAST_PAINT = 600;
 
-    private final Canvas canvas = new Canvas();
+    final MapCanvas canvas = new MapCanvas(this);
     private final Map<String, JCheckBox> toggles = new LinkedHashMap<>();
-    private final JTextField search = new JTextField(14);
+    final JTextField search = new JTextField(14);
     private final JLabel info = new JLabel(" ");
     private final JToggleButton networkBtn = new JToggleButton("Network", true);
     private final JToggleButton flowBtn = new JToggleButton("Flow");
     private final JCheckBox codeOnly = new JCheckBox("Only code-named");
-    private final JCheckBox labelsBox = new JCheckBox("Labels", true);
-    private Model model;
-    private final List<V> vs = new ArrayList<>();
-    private final List<E> es = new ArrayList<>();
+    final JCheckBox labelsBox = new JCheckBox("Labels", true);
+    /** Large maps (over GROUP_ABOVE visible nodes) show each host's path areas as groups; double-click opens one. */
+    final JCheckBox groupBox = new JCheckBox("Group", true);
+    static final int GROUP_ABOVE = 150;
+    /** Groups the user opened (they stay open across refreshes until closed or Re-layout). */
+    final Set<String> expanded = new HashSet<>();
+    /** Member node id -> the group key it belongs to, for the nodes of open groups (to close them again). */
+    final Map<String, String> openGroupOf = new HashMap<>();
+    /** Group stand-in id -> its member nodes. */
+    final Map<String, List<Model.Node>> groupMembers = new HashMap<>();
+    Model model;
+    final List<V> vs = new ArrayList<>();
+    final List<E> es = new ArrayList<>();
     private final Map<String, V> byId = new HashMap<>();
     /** Where each node was last drawn, kept across rebuilds so a growing model does not scramble. */
-    private final Map<String, double[]> memory = new HashMap<>();
-    private V selected;
-    private V hover;
-    private V focus;
-    private Point mouse = new Point();
+    final Map<String, double[]> memory = new HashMap<>();
+    V selected;
+    V hover;
+    V focus;
+    Point mouse = new Point();
     private Consumer<Model.Node> onSelect = n -> { };
-    private Consumer<Model.Node> onOpen = n -> { };
-    private final Timer sim;
-    private final Timer anim;
+    Consumer<Model.Node> onOpen = n -> { };
+    final Timer sim;
+    final Timer anim;
     private int steps;
     private int maxSteps = 320;
-    private double scale = 1;
-    private double ox;
-    private double oy;
-    private boolean fitted;
-    private boolean flow;
+    double scale = 1;
+    double ox;
+    double oy;
+    boolean fitted;
+    boolean flow;
     private List<V> matches = new ArrayList<>();
     private int matchAt = -1;
     // animated view
@@ -146,7 +138,11 @@ final class GraphPanel extends JPanel {
         codeOnly.addActionListener(e -> rebuild(false));
         labelsBox.setFont(Theme.font(11f, Font.PLAIN));
         labelsBox.addActionListener(e -> canvas.repaint());
+        groupBox.setFont(Theme.font(11f, Font.PLAIN));
+        groupBox.setToolTipText("On a large map, show each host's path areas as groups (double-click a group to open it)");
+        groupBox.addActionListener(e -> rebuild(false));
         bar.add(codeOnly);
+        bar.add(groupBox);
         bar.add(labelsBox);
         ButtonGroup bg = new ButtonGroup();
         bg.add(networkBtn);
@@ -186,6 +182,7 @@ final class GraphPanel extends JPanel {
         bar.add(button("Fit", "Fit everything on screen (F)", this::fitAnimated));
         bar.add(button("Re-layout", "Forget positions and lay the map out again", () -> {
             memory.clear();
+            expanded.clear();                   // and close every opened group
             rebuild(true);
         }));
         bar.add(button("PNG", "Save the map as an image", this::savePng));
@@ -319,18 +316,53 @@ final class GraphPanel extends JPanel {
             }
         }
         int cap = 0;
+        List<Model.Node> shown = new ArrayList<>();
         for (Model.Node n : model.nodes.values()) {
             if (types.contains(n.type) && (keep == null || keep.contains(n.id))) {
-                V v = new V(n);
-                vs.add(v);
-                byId.put(n.id, v);
+                shown.add(n);
                 cap++;
             }
         }
+        groupMembers.clear();
+        openGroupOf.clear();
+        boolean grouping = groupBox.isSelected() && !flow && keep == null && shown.size() > GROUP_ABOVE;
+        Map<String, List<Model.Node>> groups = new LinkedHashMap<>();
+        if (grouping) {
+            for (Model.Node n : shown) {
+                String k = groupKey(n, model);
+                if (k != null) {
+                    groups.computeIfAbsent(k, x -> new ArrayList<>()).add(n);
+                }
+            }
+        }
+        for (Model.Node n : shown) {
+            String k = grouping ? groupKey(n, model) : null;
+            List<Model.Node> g = k == null ? null : groups.get(k);
+            if (g != null && g.size() > 1 && !expanded.contains(k)) {
+                String gid = "group:" + k;
+                V gv = byId.get(gid);
+                if (gv == null) {
+                    gv = standIn(gid, k, g);
+                    vs.add(gv);
+                    byId.put(gid, gv);
+                    groupMembers.put(gid, g);
+                }
+                byId.put(n.id, gv);                       // edges to a member go to its group
+                continue;
+            }
+            if (g != null && g.size() > 1) {
+                openGroupOf.put(n.id, k);
+            }
+            V v = new V(n);
+            vs.add(v);
+            byId.put(n.id, v);
+        }
+        Set<String> edgeSeen = new HashSet<>();
         for (Model.Edge e : model.edges) {
             V a = byId.get(e.src);
             V b = byId.get(e.dst);
-            if (a != null && b != null) {
+            // inside one group there is nothing to draw; between groups, one line per kind of link
+            if (a != null && b != null && a != b && edgeSeen.add(a.node.id + "\u0000" + b.node.id + "\u0000" + e.state + "\u0000" + e.type)) {
                 E ed = new E(a, b, e.state, e.type);
                 es.add(ed);
                 a.edges.add(ed);
@@ -342,12 +374,15 @@ final class GraphPanel extends JPanel {
             }
         }
         for (V v : vs) {
-            v.r = 4 + Math.min(10, Math.sqrt(v.degree) * 1.6);
+            v.r = v.members > 0 ? 7 + Math.min(9, Math.sqrt(v.members) * 1.2) : 4 + Math.min(10, Math.sqrt(v.degree) * 1.6);
         }
         maxSteps = vs.size() > 900 ? 160 : 320;
         int gen = ++layoutGen;
-        String infoText = vs.size() + " nodes · " + es.size() + " edges   ·   solid: seen in traffic · dashed: found in code   ·   scroll to zoom · drag to pan or move · double-click to focus · right-click for more"
-                + (cap > BIG ? "   ·   a large map: turn groups off to see less" : "");
+        int groupCount = groupMembers.size();
+        String infoText = vs.size() + " nodes · " + es.size() + " edges"
+                + (groupCount > 0 ? "   ·   " + groupCount + " groups: double-click one to open it" : "")
+                + "   ·   solid: seen in traffic · dashed: found in code   ·   scroll to zoom · drag to pan or move · double-click to focus · right-click for more"
+                + (cap > BIG && groupCount == 0 ? "   ·   a large map: turn groups off to see less" : "");
         // The map never animates: the layout is computed to the end and shown once. Nodes already placed keep their
         // place (they are fixed while new ones settle among them), so a refresh only adds; Re-layout starts over.
         if (!flow && vs.size() > ASYNC_LAYOUT) {
@@ -378,7 +413,11 @@ final class GraphPanel extends JPanel {
         }
         install(vs, es, byId);
         layingOut = false;
-        place();
+        if (flow) {
+            place();
+        } else if (MapLayout.placeAll(this.vs, memory)) {
+            steps = 0;
+        }
         if (!flow) {
             MapLayout.relax(vs, es, maxSteps, true, 0, maxSteps);
             remember();
@@ -389,6 +428,170 @@ final class GraphPanel extends JPanel {
             fitted = false;
         }
         canvas.repaint();
+    }
+
+    /**
+     * Which group a node belongs to on a large map: endpoints, pages and their parameters by host and first path
+     * segment, scripts by host. Hosts, third parties, tech, roles and the rest stay on their own (null).
+     */
+    static String groupKey(Model.Node n, Model m) {
+        switch (n.type) {
+            case "endpoint", "route", "operation" -> {
+                String host = String.valueOf(n.attrs.getOrDefault("host", ""));
+                String path = String.valueOf(n.attrs.getOrDefault("path", "/"));
+                int q = path.indexOf('?');
+                path = q < 0 ? path : path.substring(0, q);
+                String[] segs = path.split("/");
+                String first = "";
+                for (String s : segs) {
+                    if (!s.isEmpty()) {
+                        first = s;
+                        break;
+                    }
+                }
+                return host + " /" + first;
+            }
+            case "parameter" -> {
+                // "param:<endpoint id>:<name>": with its endpoint's group
+                int c = n.id.lastIndexOf(':');
+                Model.Node owner = c > 6 ? m.nodes.get(n.id.substring(6, c)) : null;
+                return owner == null || owner.type.equals("parameter") ? null : groupKey(owner, m);
+            }
+            case "script" -> {
+                Object h = n.attrs.get("host");
+                if (h == null && n.id.startsWith("script:")) {
+                    int slash = n.id.indexOf('/', 7);              // "script:<host><path>"
+                    h = slash > 7 ? n.id.substring(7, slash) : n.id.substring(7);
+                }
+                return (h == null ? "" : h) + " scripts";
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
+
+    /** The stand-in drawn for a closed group: its name, size, and the evidence of its first members. */
+    private V standIn(String gid, String key, List<Model.Node> members) {
+        Map<String, Integer> kinds = new HashMap<>();
+        int layer = Integer.MAX_VALUE;
+        for (Model.Node n : members) {
+            kinds.merge(n.type, 1, Integer::sum);
+            layer = Math.min(layer, n.layer);
+        }
+        String kind = kinds.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("endpoint");
+        Model.Node n = Model.Node.standIn(gid, "group", layer, key + "  (" + members.size() + ")");
+        n.attrs.put("members", (long) members.size());
+        n.attrs.put("kind", kind);
+        Set<Integer> ev = new java.util.TreeSet<>();
+        for (Model.Node x : members) {
+            ev.addAll(x.evidence);
+            if (ev.size() > 300) {
+                break;
+            }
+        }
+        n.evidence.addAll(ev);
+        V v = new V(n);
+        v.color = Theme.type(kind);
+        v.members = members.size();
+        return v;
+    }
+
+    /** Open a group: its members take its place, starting around where it was. */
+    void expandGroup(V g) {
+        if (g == null || g.members == 0) {
+            return;
+        }
+        String key = g.node.id.substring("group:".length());
+        List<Model.Node> members = groupMembers.getOrDefault(g.node.id, List.of());
+        // the rest of the map moves out by the disc's radius, all in the same direction from the group, so its shape
+        // is kept; the members fill the disc, evenly (a sunflower spiral), and stay where they are put
+        double rad = openRadius(members.size());
+        double cx = g.x;
+        double cy = g.y;
+        Set<String> ids = new HashSet<>();
+        ids.add(g.node.id);
+        for (Model.Node n : members) {
+            ids.add(n.id);
+        }
+        shiftOut(cx, cy, rad, ids);
+        memory.remove(g.node.id);
+        for (int i = 0; i < members.size(); i++) {
+            double d = rad * 0.92 * Math.sqrt((i + 0.5) / members.size());
+            double a = i * 2.399963229728653;
+            memory.put(members.get(i).id, new double[] {cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0});
+        }
+        expanded.add(key);
+        selected = null;
+        rebuild(true);                          // the map grew or shrank: fit it again
+    }
+
+    /** How much room an opened group of n members takes: a disc that fits them about 26 apart. */
+    static double openRadius(int n) {
+        return 30 + 15 * Math.sqrt(n);
+    }
+
+    /** Move every remembered position except `skip` along the line from (cx, cy) by `by` (inwards when negative, never past the centre). */
+    private void shiftOut(double cx, double cy, double by, Set<String> skip) {
+        remember();
+        for (Map.Entry<String, double[]> e : memory.entrySet()) {
+            if (skip.contains(e.getKey())) {
+                continue;
+            }
+            double[] p = e.getValue();
+            double dx = p[0] - cx;
+            double dy = p[1] - cy;
+            double d = Math.hypot(dx, dy);
+            if (d < 1e-6) {
+                dx = 1;
+                dy = 0;
+                d = 1;
+            }
+            double nd = Math.max(by < 0 ? Math.min(d, 8) : 0, d + by);
+            p[0] = cx + dx / d * nd;
+            p[1] = cy + dy / d * nd;
+        }
+        // the nodes on screen too, since the next layout starts from what is on screen
+        for (V v : vs) {
+            double[] p = memory.get(v.node.id);
+            if (p != null && !skip.contains(v.node.id)) {
+                v.x = p[0];
+                v.y = p[1];
+            }
+        }
+    }
+
+    /** Close the open group a node belongs to: its members fold back into one node where they are. */
+    void collapseGroupOf(V v) {
+        String key = v == null ? null : openGroupOf.get(v.node.id);
+        if (key == null) {
+            return;
+        }
+        double sx = 0;
+        double sy = 0;
+        int c = 0;
+        for (V x : vs) {
+            if (key.equals(openGroupOf.get(x.node.id))) {
+                sx += x.x;
+                sy += x.y;
+                c++;
+            }
+        }
+        if (c > 0) {
+            Set<String> ids = new HashSet<>();
+            for (V x : vs) {
+                if (key.equals(openGroupOf.get(x.node.id))) {
+                    ids.add(x.node.id);
+                    memory.remove(x.node.id);
+                }
+            }
+            // the rest of the map closes the gap the group left
+            shiftOut(sx / c, sy / c, -openRadius(c), ids);
+            memory.put("group:" + key, new double[] {sx / c, sy / c, 0});
+        }
+        expanded.remove(key);
+        selected = null;
+        rebuild(true);                          // the map grew or shrank: fit it again
     }
 
     /** Put a newly built graph on screen in one step. */
@@ -402,7 +605,7 @@ final class GraphPanel extends JPanel {
     }
 
     /** Above this many nodes the first layout runs off the Swing thread. */
-    static final int ASYNC_LAYOUT = 200;
+    static final int ASYNC_LAYOUT = 60;
     private static final java.util.concurrent.ThreadPoolExecutor LAYOUT = new java.util.concurrent.ThreadPoolExecutor(1, 1, 2, java.util.concurrent.TimeUnit.SECONDS,
             new java.util.concurrent.LinkedBlockingQueue<>(), r -> {
                 Thread t = new Thread(r, "burp2model-map-layout");
@@ -415,7 +618,12 @@ final class GraphPanel extends JPanel {
     }
 
     private int layoutGen;
-    private volatile boolean layingOut;
+    volatile boolean layingOut;
+
+    /** For tests: the nodes on the map now. */
+    List<V> vsForTest() {
+        return new ArrayList<>(vs);
+    }
 
     /** For tests: wait until a background layout has been applied. */
     void awaitLayout(long ms) throws InterruptedException {
@@ -442,7 +650,7 @@ final class GraphPanel extends JPanel {
 
 
 
-    private void remember() {
+    void remember() {
         for (V v : vs) {
             memory.put(v.node.id, new double[] {v.x, v.y, v.pinned ? 1 : 0});
         }
@@ -483,7 +691,7 @@ final class GraphPanel extends JPanel {
 
     // ------------------------------------------------------------------ view
 
-    private double[] extent() {
+    double[] extent() {
         double minX = Double.MAX_VALUE;
         double minY = Double.MAX_VALUE;
         double maxX = -Double.MAX_VALUE;
@@ -586,7 +794,7 @@ final class GraphPanel extends JPanel {
         info.setText("match " + (matchAt + 1) + " of " + matches.size() + " — Enter for the next");
     }
 
-    private void select(V v) {
+    void select(V v) {
         selected = v;
         if (v != null) {
             onSelect.accept(v.node);
@@ -609,7 +817,7 @@ final class GraphPanel extends JPanel {
         }
     }
 
-    private boolean visible(V v) {
+    boolean visible(V v) {
         return focus == null || v == focus || focus.nbrs.contains(v);
     }
 
@@ -636,564 +844,4 @@ final class GraphPanel extends JPanel {
 
     // ------------------------------------------------------------------ the canvas
 
-    private final class Canvas extends JComponent {
-        private V dragging;
-        private Point last;
-        private boolean moved;
-        private boolean fast;
-        private double vx0;
-        private double vy0;
-        private double vx1;
-        private double vy1;
-
-        /** A big map while it moves (layout running, camera animating, being dragged) is drawn the cheap way. */
-        private boolean moving() {
-            return vs.size() > FAST_PAINT && (sim.isRunning() || anim.isRunning() || (last != null && moved));
-        }
-
-        private boolean inView(V v) {
-            return v.x >= vx0 && v.x <= vx1 && v.y >= vy0 && v.y <= vy1;
-        }
-
-        /** An edge is skipped only when its bounding box misses the screen (flow curves stay inside it too). */
-        private boolean inView(E e) {
-            return Math.max(e.a.x, e.b.x) >= vx0 && Math.min(e.a.x, e.b.x) <= vx1 && Math.max(e.a.y, e.b.y) >= vy0 && Math.min(e.a.y, e.b.y) <= vy1;
-        }
-
-        Canvas() {
-            setOpaque(true);
-            setFocusable(true);
-            MouseAdapter ma = new MouseAdapter() {
-                @Override
-                public void mousePressed(MouseEvent e) {
-                    requestFocusInWindow();
-                    if (layingOut) {
-                        return;
-                    }
-                    if (e.isPopupTrigger()) {
-                        popup(e);
-                        return;
-                    }
-                    anim.stop();
-                    dragging = pick(e.getPoint());
-                    last = e.getPoint();
-                    moved = false;
-                    if (dragging != null) {
-                        dragging.pinned = true;
-                    }
-                }
-
-                @Override
-                public void mouseDragged(MouseEvent e) {
-                    if (last == null) {
-                        return;
-                    }
-                    double dx = e.getX() - last.getX();
-                    double dy = e.getY() - last.getY();
-                    moved = moved || Math.abs(dx) + Math.abs(dy) > 2;
-                    if (dragging != null) {
-                        dragging.x += dx / scale;
-                        dragging.y += dy / scale;
-                    } else {
-                        ox += dx;
-                        oy += dy;
-                    }
-                    last = e.getPoint();
-                    repaint();
-                }
-
-                @Override
-                public void mouseReleased(MouseEvent e) {
-                    if (e.isPopupTrigger()) {
-                        popup(e);
-                        return;
-                    }
-                    if (dragging != null && moved) {
-                        remember();
-                    } else if (dragging != null) {
-                        dragging.pinned = memory.containsKey(dragging.node.id) && memory.get(dragging.node.id).length > 2 && memory.get(dragging.node.id)[2] == 1;
-                    }
-                    if (!moved && e.getButton() == MouseEvent.BUTTON1) {
-                        select(pick(e.getPoint()));
-                    }
-                    dragging = null;
-                    if (moved && fast) {
-                        repaint();                              // the full-quality frame after a drag
-                    }
-                    last = null;
-                }
-
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
-                        V v = pick(e.getPoint());
-                        focus = v == null || v == focus ? null : v;
-                        if (focus != null) {
-                            select(focus);
-                        }
-                        fitAnimated();
-                    }
-                }
-
-                @Override
-                public void mouseMoved(MouseEvent e) {
-                    mouse = e.getPoint();
-                    if (layingOut) {
-                        return;
-                    }
-                    V h = pick(e.getPoint());
-                    boolean changed = h != hover;
-                    if (changed) {
-                        hover = h;
-                        setCursor(Cursor.getPredefinedCursor(h == null ? Cursor.DEFAULT_CURSOR : Cursor.HAND_CURSOR));
-                    }
-                    // the tooltip follows the mouse over a node; over empty canvas nothing changes, so nothing is redrawn
-                    if (changed || h != null) {
-                        repaint();
-                    }
-                }
-
-                @Override
-                public void mouseExited(MouseEvent e) {
-                    hover = null;
-                    repaint();
-                }
-
-                @Override
-                public void mouseWheelMoved(MouseWheelEvent e) {
-                    double f = Math.pow(1.18, -e.getPreciseWheelRotation());
-                    double ns = Math.max(0.05, Math.min(6, scale * f));
-                    ox = e.getX() - (e.getX() - ox) * ns / scale;
-                    oy = e.getY() - (e.getY() - oy) * ns / scale;
-                    scale = ns;
-                    fitted = true;
-                    repaint();
-                }
-            };
-            addMouseListener(ma);
-            addMouseMotionListener(ma);
-            addMouseWheelListener(ma);
-            addKeyListener(new KeyAdapter() {
-                @Override
-                public void keyPressed(KeyEvent e) {
-                    if (e.getKeyChar() == '/') {
-                        search.requestFocusInWindow();          // '/' jumps to Find, as in many viewers
-                        search.selectAll();
-                        return;
-                    }
-                    switch (e.getKeyCode()) {
-                        case KeyEvent.VK_F -> fitAnimated();
-                        case KeyEvent.VK_ESCAPE -> {
-                            focus = null;
-                            selected = null;
-                            repaint();
-                        }
-                        case KeyEvent.VK_EQUALS, KeyEvent.VK_PLUS -> zoom(1.25);
-                        case KeyEvent.VK_MINUS -> zoom(0.8);
-                        case KeyEvent.VK_LEFT -> {
-                            ox += 60;
-                            repaint();
-                        }
-                        case KeyEvent.VK_RIGHT -> {
-                            ox -= 60;
-                            repaint();
-                        }
-                        case KeyEvent.VK_UP -> {
-                            oy += 60;
-                            repaint();
-                        }
-                        case KeyEvent.VK_DOWN -> {
-                            oy -= 60;
-                            repaint();
-                        }
-                        default -> {
-                        }
-                    }
-                }
-            });
-        }
-
-        private void zoom(double f) {
-            double ns = Math.max(0.05, Math.min(6, scale * f));
-            ox = getWidth() / 2.0 - (getWidth() / 2.0 - ox) * ns / scale;
-            oy = getHeight() / 2.0 - (getHeight() / 2.0 - oy) * ns / scale;
-            scale = ns;
-            repaint();
-        }
-
-        private void popup(MouseEvent e) {
-            V v = pick(e.getPoint());
-            JPopupMenu m = new JPopupMenu();
-            if (v != null) {
-                select(v);
-                m.add(item("Focus on this and its neighbours", () -> {
-                    focus = v;
-                    fitAnimated();
-                }));
-                m.add(item("Show it in Surface", () -> onOpen.accept(v.node)));
-                m.add(item(v.pinned ? "Unpin" : "Pin here", () -> {
-                    v.pinned = !v.pinned;
-                    remember();
-                    repaint();
-                }));
-                m.add(item("Hide this", () -> {
-                    v.hidden = true;
-                    repaint();
-                }));
-                m.add(item("Copy its name", () -> Tables.copy(v.node.label)));
-            } else {
-                m.add(item("Fit", GraphPanel.this::fitAnimated));
-                m.add(item("Clear focus and hidden", () -> {
-                    focus = null;
-                    for (V x : vs) {
-                        x.hidden = false;
-                    }
-                    repaint();
-                }));
-            }
-            m.show(this, e.getX(), e.getY());
-        }
-
-        private JMenuItem item(String t, Runnable r) {
-            JMenuItem i = new JMenuItem(t);
-            i.addActionListener(e -> r.run());
-            return i;
-        }
-
-        private V pick(Point p) {
-            double x = (p.x - ox) / scale;
-            double y = (p.y - oy) / scale;
-            V best = null;
-            double bd = 1e18;
-            for (V v : vs) {
-                if (v.hidden || (focus != null && !visible(v))) {
-                    continue;
-                }
-                double d = (v.x - x) * (v.x - x) + (v.y - y) * (v.y - y);
-                double r = Math.max(v.r + 2, 8 / scale);
-                if (d <= r * r && d < bd) {
-                    bd = d;
-                    best = v;
-                }
-            }
-            return best;
-        }
-
-        @Override
-        protected void paintComponent(Graphics g0) {
-            if (!fitted && getWidth() > 10 && !vs.isEmpty()) {
-                fit();
-            }
-            Graphics2D g = (Graphics2D) g0.create();
-            Theme.quality(g);
-            fast = moving();
-            // a big map in motion is drawn without dashes and labels (they come back when it stops); antialiasing stays
-            // on, since Java2D's plain renderer is slower than Marlin on large paths
-            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, fast ? RenderingHints.VALUE_STROKE_NORMALIZE : RenderingHints.VALUE_STROKE_PURE);
-            Color bg = Theme.dark() ? Theme.shift(Theme.bg(), -8) : Theme.surface();
-            g.setColor(bg);
-            g.fillRect(0, 0, getWidth(), getHeight());
-            if (layingOut && vs.isEmpty()) {
-                g.setColor(Theme.muted());
-                g.setFont(Theme.font(13f, Font.PLAIN));
-                g.drawString("Laying out " + vs.size() + " nodes…", 24, 36);
-                g.dispose();
-                return;
-            }
-            // what is on screen, in map coordinates, with a margin for node sizes and rings
-            double pad = 30 / scale + 20;
-            vx0 = -ox / scale - pad;
-            vy0 = -oy / scale - pad;
-            vx1 = (getWidth() - ox) / scale + pad;
-            vy1 = (getHeight() - oy) / scale + pad;
-            if (vs.isEmpty()) {
-                g.setColor(Theme.muted());
-                g.setFont(Theme.font(13f, Font.PLAIN));
-                g.drawString(model == null ? "Send some requests and the map appears here." : "Nothing to show: turn a group on above.", 24, 36);
-                g.dispose();
-                return;
-            }
-            AffineTransform base = g.getTransform();
-            g.translate(ox, oy);
-            g.scale(scale, scale);
-            Set<V> lit = new HashSet<>();
-            if (selected != null) {
-                lit.add(selected);
-                lit.addAll(selected.nbrs);
-            } else if (hover != null) {
-                lit.add(hover);
-                lit.addAll(hover.nbrs);
-            }
-            boolean dimming = !lit.isEmpty();
-            drawEdges(g, lit, dimming);
-            drawNodes(g, lit, dimming);
-            drawLabels(g, lit);
-            g.setTransform(base);
-            legend(g);
-            minimap(g);
-            tooltip(g);
-            g.dispose();
-        }
-
-        private void drawEdges(Graphics2D g, Set<V> lit, boolean dimming) {
-            double sw = 1.0 / Math.sqrt(scale);
-            Color base = Theme.fg();
-            Map<String, Path2D.Double> batches = new HashMap<>();
-            List<E> hot = new ArrayList<>();
-            for (E e : es) {
-                if (e.a.hidden || e.b.hidden || (focus != null && !(visible(e.a) && visible(e.b)))) {
-                    continue;
-                }
-                if (!inView(e)) {
-                    continue;
-                }
-                boolean on = selected != null ? (e.a == selected || e.b == selected) : hover != null && (e.a == hover || e.b == hover);
-                if (on) {
-                    hot.add(e);
-                    continue;
-                }
-                if (scale < 0.25 && vs.size() > 400 && !e.state.equals("OBSERVED")) {
-                    continue;
-                }
-                Path2D.Double p = batches.computeIfAbsent(e.state, k -> new Path2D.Double());
-                addEdge(p, e);
-            }
-            int alpha = dimming ? 26 : (vs.size() > 600 ? 50 : 78);
-            for (Map.Entry<String, Path2D.Double> b : batches.entrySet()) {
-                g.setColor(Theme.alpha(base, alpha));
-                g.setStroke(strokeFor(b.getKey(), (float) sw));
-                g.draw(b.getValue());
-            }
-            g.setFont(Theme.font((float) Math.max(9, 10 / Math.sqrt(scale)), Font.PLAIN));
-            for (E e : hot) {
-                g.setColor(Theme.ACCENT);
-                g.setStroke(strokeFor(e.state, (float) (sw * 2)));
-                Path2D.Double p = new Path2D.Double();
-                addEdge(p, e);
-                g.draw(p);
-                if (scale > 0.55 && hot.size() <= 10) {
-                    double mx = (e.a.x + e.b.x) / 2;
-                    double my = (e.a.y + e.b.y) / 2;
-                    String t = e.type.toLowerCase().replace('_', ' ');
-                    FontMetrics fm = g.getFontMetrics();
-                    g.setColor(Theme.alpha(Theme.dark() ? Theme.shift(Theme.bg(), -8) : Theme.surface(), 220));
-                    g.fillRoundRect((int) mx - fm.stringWidth(t) / 2 - 3, (int) my - fm.getAscent(), fm.stringWidth(t) + 6, fm.getHeight(), 6, 6);
-                    g.setColor(Theme.ACCENT);
-                    g.drawString(t, (int) mx - fm.stringWidth(t) / 2, (int) my);
-                }
-            }
-            g.setStroke(new BasicStroke(1f));
-        }
-
-        private void addEdge(Path2D.Double p, E e) {
-            if (flow) {
-                double mx = (e.a.x + e.b.x) / 2;
-                CubicCurve2D.Double c = new CubicCurve2D.Double(e.a.x, e.a.y, mx, e.a.y, mx, e.b.y, e.b.x, e.b.y);
-                p.append(c, false);
-            } else {
-                p.append(new Line2D.Double(e.a.x, e.a.y, e.b.x, e.b.y), false);
-            }
-        }
-
-        private BasicStroke strokeFor(String state, float w) {
-            if (fast) {
-                return new BasicStroke(w);
-            }
-            return switch (state) {
-                case "INFERRED" -> new BasicStroke(w, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {6f * w, 5f * w}, 0f);
-                case "EXTERNAL" -> new BasicStroke(w, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {1.5f * w, 4f * w}, 0f);
-                default -> new BasicStroke(w);
-            };
-        }
-
-        private void drawNodes(Graphics2D g, Set<V> lit, boolean dimming) {
-            String q = search.getText().strip().toLowerCase();
-            // nodes of one colour are filled as one shape, and the code-only rings stroked as one: a few draw calls, not thousands
-            Map<Color, Path2D.Double> fills = new LinkedHashMap<>();
-            Path2D.Double rings = new Path2D.Double();
-            Path2D.Double dimRings = new Path2D.Double();
-            List<V> marked = new ArrayList<>();
-            for (V v : vs) {
-                if (v.hidden || (focus != null && !visible(v)) || !inView(v)) {
-                    continue;
-                }
-                boolean dim = dimming && !lit.contains(v);
-                fills.computeIfAbsent(dim ? Theme.alpha(v.color, 60) : v.color, k -> new Path2D.Double())
-                        .append(new java.awt.geom.Ellipse2D.Double(v.x - v.r, v.y - v.r, v.r * 2, v.r * 2), false);
-                if ("STATIC_ONLY".equals(v.node.attrs.get("api_state"))) {
-                    (dim ? dimRings : rings).append(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 2.5, v.y - v.r - 2.5, v.r * 2 + 5, v.r * 2 + 5), false);
-                }
-                if (v == selected || v == hover || v.pinned || (!q.isEmpty() && v.lower.contains(q))) {
-                    marked.add(v);
-                }
-            }
-            fills.forEach((c, shape) -> {
-                g.setColor(c);
-                g.fill(shape);
-            });
-            // code-only rings: present but quiet, so a map of mostly code-only endpoints still shows its structure
-            float rw = (float) (1.1 / Math.sqrt(scale));
-            g.setStroke(fast ? new BasicStroke(rw) : new BasicStroke(rw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {2.5f, 3f}, 0f));
-            g.setColor(Theme.alpha(Theme.ACCENT, 40));
-            g.draw(dimRings);
-            g.setColor(Theme.alpha(Theme.ACCENT, 150));
-            g.draw(rings);
-            for (V v : marked) {
-                g.setColor(v.pinned && v != selected ? Theme.muted() : Theme.fg());
-                g.setStroke(new BasicStroke((float) ((v == selected ? 2.4 : 1.6) / Math.sqrt(scale))));
-                g.draw(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 3, v.y - v.r - 3, v.r * 2 + 6, v.r * 2 + 6));
-            }
-            g.setStroke(new BasicStroke(1f));
-        }
-
-        /** Labels are placed in priority order and skipped where they would overlap one already drawn. */
-        private void drawLabels(Graphics2D g, Set<V> lit) {
-            if (!labelsBox.isSelected()) {
-                return;
-            }
-            // labels are drawn in map space: keep them at least 10 px on screen however far the map is zoomed out
-            g.setFont(Theme.font((float) Math.max(Math.max(9.5, 11.5 / Math.sqrt(scale)), 10.5 / scale), Font.PLAIN));
-            FontMetrics fm = g.getFontMetrics();
-            String q = search.getText().strip().toLowerCase();
-            List<V> cand = new ArrayList<>();
-            for (V v : vs) {
-                if (v.hidden || (focus != null && !visible(v)) || !inView(v)) {
-                    continue;
-                }
-                if (fast && v != selected && v != hover) {
-                    continue;                                   // labels come back in the full-quality frame
-                }
-                boolean match = !q.isEmpty() && v.lower.contains(q);
-                if (v == selected || v == hover || match || (selected != null && lit.contains(v) && scale > 0.4)
-                        || (flow && scale > 0.3) || (!flow && v.degree >= 5 && scale > 0.35) || scale > 1.6
-                        || vs.size() <= 80) {                           // a small map names everything that fits
-                    cand.add(v);
-                }
-            }
-            cand.sort(Comparator.comparingInt((V v) -> v == selected ? 0 : v == hover ? 1 : 2).thenComparingInt(v -> -v.degree));
-            List<Rectangle> placed = new ArrayList<>();
-            Rectangle view = new Rectangle((int) (-ox / scale) - 200, (int) (-oy / scale) - 100, (int) (getWidth() / scale) + 400, (int) (getHeight() / scale) + 200);
-            int drawn = 0;
-            for (V v : cand) {
-                if (drawn > 140 && v != selected && v != hover) {
-                    break;
-                }
-                if (!view.contains(v.x, v.y)) {
-                    continue;
-                }
-                int tw = fm.stringWidth(v.shortLabel);
-                int lx = (int) (v.x + v.r + 5);
-                int ly = (int) (v.y + fm.getAscent() / 2.0 - 1);
-                Rectangle r = new Rectangle(lx - 3, ly - fm.getAscent(), tw + 6, fm.getHeight());
-                boolean clash = false;
-                if (v != selected && v != hover) {
-                    for (Rectangle p : placed) {
-                        if (p.intersects(r)) {
-                            clash = true;
-                            break;
-                        }
-                    }
-                }
-                if (clash) {
-                    continue;
-                }
-                placed.add(r);
-                g.setColor(Theme.alpha(Theme.dark() ? Theme.shift(Theme.bg(), -8) : Theme.surface(), 215));
-                g.fillRoundRect(r.x, r.y, r.width, r.height, 6, 6);
-                g.setColor(Theme.fg());
-                g.drawString(v.shortLabel, lx, ly);
-                drawn++;
-            }
-        }
-
-        private void legend(Graphics2D g) {
-            String[][] items = {{"host", "host"}, {"route", "page"}, {"script", "script"}, {"endpoint", "endpoint"}, {"third_party", "third party"}, {"cookie", "trust"}, {"tech", "tech"}};
-            int x = 12;
-            int y = getHeight() - 14;
-            g.setFont(Theme.font(11f, Font.PLAIN));
-            for (String[] it : items) {
-                Color c = Theme.type(it[0]);
-                g.setColor(c);
-                g.fillOval(x, y - 8, 9, 9);
-                g.setColor(Theme.muted());
-                g.drawString(it[1], x + 13, y);
-                x += 22 + g.getFontMetrics().stringWidth(it[1]);
-            }
-            g.setColor(Theme.ACCENT);
-            g.setStroke(new BasicStroke(1.4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {3f, 2.5f}, 0f));
-            g.drawOval(x, y - 9, 11, 11);
-            g.setStroke(new BasicStroke(1f));
-            g.setColor(Theme.muted());
-            g.drawString("named in code, never called", x + 16, y);
-        }
-
-        private void minimap(Graphics2D g) {
-            if (vs.size() < 30) {
-                return;
-            }
-            double[] b = extent();
-            double bw = Math.max(1, b[2] - b[0]);
-            double bh = Math.max(1, b[3] - b[1]);
-            int mw = 160;
-            int mh = (int) Math.max(40, Math.min(110, mw * bh / bw));
-            int mx = getWidth() - mw - 12;
-            int my = getHeight() - mh - 12;
-            g.setColor(Theme.alpha(Theme.surface(), 220));
-            g.fill(new RoundRectangle2D.Float(mx, my, mw, mh, 8, 8));
-            g.setColor(Theme.line());
-            g.draw(new RoundRectangle2D.Float(mx, my, mw, mh, 8, 8));
-            double s = Math.min((mw - 12) / bw, (mh - 12) / bh);
-            for (V v : vs) {
-                if (v.hidden) {
-                    continue;
-                }
-                g.setColor(Theme.alpha(v.color, 170));
-                g.fillRect((int) (mx + 6 + (v.x - b[0]) * s), (int) (my + 6 + (v.y - b[1]) * s), 2, 2);
-            }
-            double vx = (-ox / scale - b[0]) * s + mx + 6;
-            double vy = (-oy / scale - b[1]) * s + my + 6;
-            double vw = getWidth() / scale * s;
-            double vh = getHeight() / scale * s;
-            g.setColor(Theme.ACCENT);
-            g.setClip(mx, my, mw, mh);
-            g.drawRect((int) vx, (int) vy, (int) vw, (int) vh);
-            g.setClip(null);
-        }
-
-        private void tooltip(Graphics2D g) {
-            V v = hover;
-            if (v == null || dragging != null) {
-                return;
-            }
-            List<String> lines = new ArrayList<>();
-            lines.add(v.node.label.length() > 70 ? v.node.label.substring(0, 69) + "…" : v.node.label);
-            Object st = v.node.attrs.get("api_state");
-            lines.add(v.node.type.replace('_', ' ') + (st == null ? "" : " · " + String.valueOf(st).replace('_', ' ').toLowerCase()) + " · " + v.degree + " connections");
-            if (!v.node.evidence.isEmpty()) {
-                lines.add(v.node.evidence.size() + " request" + (v.node.evidence.size() == 1 ? "" : "s") + " · first ev_" + v.node.evidence.get(0));
-            }
-            g.setFont(Theme.font(11.5f, Font.PLAIN));
-            FontMetrics fm = g.getFontMetrics();
-            int w = 0;
-            for (String l : lines) {
-                w = Math.max(w, fm.stringWidth(l));
-            }
-            int h = lines.size() * (fm.getHeight() + 1) + 10;
-            int x = Math.min(getWidth() - w - 24, mouse.x + 16);
-            int y = Math.min(getHeight() - h - 8, mouse.y + 14);
-            g.setColor(Theme.alpha(Theme.dark() ? Theme.shift(Theme.bg(), 18) : Color.WHITE, 245));
-            g.fill(new RoundRectangle2D.Float(x, y, w + 18, h, 8, 8));
-            g.setColor(Theme.line());
-            g.draw(new RoundRectangle2D.Float(x, y, w + 18, h, 8, 8));
-            g.setColor(v.color);
-            g.fillRoundRect(x, y + 6, 3, h - 12, 3, 3);
-            int ty = y + 6 + fm.getAscent();
-            for (int i = 0; i < lines.size(); i++) {
-                g.setColor(i == 0 ? Theme.fg() : Theme.muted());
-                g.setFont(Theme.font(11.5f, i == 0 ? Font.BOLD : Font.PLAIN));
-                g.drawString(lines.get(i), x + 11, ty);
-                ty += fm.getHeight() + 1;
-            }
-        }
-    }
 }
