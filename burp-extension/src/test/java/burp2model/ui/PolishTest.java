@@ -142,7 +142,7 @@ class PolishTest {
                 new java.io.File(System.getProperty("burp2model.samples", "../samples"), "burp-history-sample.xml")), null, "one", false);
         new Session(home, "empty");                             // nothing saved: not offered
         MainPanel p = open(new HashMap<>(Map.of("app", "alpha", "welcome.seen", "1")));
-        JComboBox<String> models = field(p, "models");
+        JComboBox<String> models = p.header.models;
         List<String> items = new ArrayList<>();
         SwingUtilities.invokeAndWait(() -> {
             for (int i = 0; i < models.getItemCount(); i++) {
@@ -159,7 +159,7 @@ class PolishTest {
     void theLiveButtonTurnsCaptureOnAndOff() throws Exception {
         Map<String, String> prefs = new HashMap<>(Map.of("welcome.seen", "1"));
         MainPanel p = open(prefs);
-        javax.swing.JButton live = field(p, "live");
+        javax.swing.JButton live = p.header.live;
         SwingUtilities.invokeAndWait(live::doClick);
         assertEquals("1", prefs.get("auto"));
         assertTrue(live.getText().contains("Live") && !live.getText().contains("off"), live.getText());

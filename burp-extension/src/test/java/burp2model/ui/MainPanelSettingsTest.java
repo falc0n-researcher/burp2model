@@ -50,9 +50,9 @@ class MainPanelSettingsTest {
                 return new Session(home, name);
             }
         }));
-        JTextField role = field(panel[0], "roleField");
-        JTextField scope = field(panel[0], "scopeField");
-        JCheckBox replace = field(panel[0], "replaceRole");
+        JTextField role = panel[0].settingsTab.roleField;
+        JTextField scope = panel[0].settingsTab.scopeField;
+        JCheckBox replace = panel[0].settingsTab.replaceRole;
         assertEquals("saved-role", panel[0].settings().role(), "starts from the saved settings");
 
         SwingUtilities.invokeAndWait(() -> {
