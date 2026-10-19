@@ -402,7 +402,7 @@ final class GraphPanel extends JPanel {
     }
 
     /** Above this many nodes the first layout runs off the Swing thread. */
-    static final int ASYNC_LAYOUT = 200;
+    static final int ASYNC_LAYOUT = 60;
     private static final java.util.concurrent.ThreadPoolExecutor LAYOUT = new java.util.concurrent.ThreadPoolExecutor(1, 1, 2, java.util.concurrent.TimeUnit.SECONDS,
             new java.util.concurrent.LinkedBlockingQueue<>(), r -> {
                 Thread t = new Thread(r, "burp2model-map-layout");
