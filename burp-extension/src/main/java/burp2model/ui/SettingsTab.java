@@ -150,7 +150,7 @@ final class SettingsTab {
                 }, x -> {
                     app.setStatus("Cleared the model '" + s.name + "'.", MainPanel.Level.OK);
                     app.refresh();
-                }, t -> app.sayError("could not clear: " + app.messageOf(t)));
+                }, t -> app.sayError("could not clear: " + MainPanel.messageOf(t)));
             }
         });
         JPanel holder = new JPanel(new BorderLayout()) {

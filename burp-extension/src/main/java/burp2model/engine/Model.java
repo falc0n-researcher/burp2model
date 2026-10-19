@@ -41,6 +41,11 @@ public final class Model {
             this.label = label;
         }
 
+        /** A node that is not part of any model: the map's stand-in for a group of nodes. */
+        public static Node standIn(String id, String type, int layer, String label) {
+            return new Node(id, type, layer, label);
+        }
+
         @SuppressWarnings("unchecked")
         public List<Object> list(String key) {
             return (List<Object>) attrs.get(key);
