@@ -184,7 +184,8 @@ final class MapLayout {
             double dx = e.b().x - e.a().x;
             double dy = e.b().y - e.a().y;
             double d = Math.sqrt(dx * dx + dy * dy) + 0.01;
-            double want = 64 + e.a().r + e.b().r;
+            // a group stands further out, so its name has room
+            double want = 64 + e.a().r + e.b().r + (e.a().members > 0 || e.b().members > 0 ? 50 : 0);
             double k = e.state().equals("INFERRED") ? 0.035 : 0.06;
             double f = (d - want) * k;
             double fx = dx / d * f;

@@ -129,6 +129,10 @@ private final GraphPanel map;
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
                     V v = pick(e.getPoint());
+                    if (v != null && v.members > 0) {
+                        map.expandGroup(v);                 // a group opens in place
+                        return;
+                    }
                     map.focus = v == null || v == map.focus ? null : v;
                     if (map.focus != null) {
                         map.select(map.focus);
@@ -228,11 +232,18 @@ private final GraphPanel map;
         JPopupMenu m = new JPopupMenu();
         if (v != null) {
             map.select(v);
+            if (v.members > 0) {
+                m.add(item("Open this group (" + v.members + ")", () -> map.expandGroup(v)));
+            } else if (map.openGroupOf.containsKey(v.node.id)) {
+                m.add(item("Close its group", () -> map.collapseGroupOf(v)));
+            }
             m.add(item("Focus on this and its neighbours", () -> {
                 map.focus = v;
                 map.fitAnimated();
             }));
-            m.add(item("Show it in Surface", () -> map.onOpen.accept(v.node)));
+            if (v.members == 0) {
+                m.add(item("Show it in Surface", () -> map.onOpen.accept(v.node)));
+            }
             m.add(item(v.pinned ? "Unpin" : "Pin here", () -> {
                 v.pinned = !v.pinned;
                 map.remember();
@@ -414,6 +425,7 @@ private final GraphPanel map;
         Map<Color, Path2D.Double> fills = new LinkedHashMap<>();
         Path2D.Double rings = new Path2D.Double();
         Path2D.Double dimRings = new Path2D.Double();
+        Path2D.Double groupRings = new Path2D.Double();
         List<V> marked = new ArrayList<>();
         for (V v : map.vs) {
             if (v.hidden || (map.focus != null && !map.visible(v)) || !inView(v)) {
@@ -422,6 +434,9 @@ private final GraphPanel map;
             boolean dim = dimming && !lit.contains(v);
             fills.computeIfAbsent(dim ? Theme.alpha(v.color, 60) : v.color, k -> new Path2D.Double())
                     .append(new java.awt.geom.Ellipse2D.Double(v.x - v.r, v.y - v.r, v.r * 2, v.r * 2), false);
+            if (v.members > 0) {
+                groupRings.append(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 3.5, v.y - v.r - 3.5, v.r * 2 + 7, v.r * 2 + 7), false);
+            }
             if ("STATIC_ONLY".equals(v.node.attrs.get("api_state"))) {
                 (dim ? dimRings : rings).append(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 2.5, v.y - v.r - 2.5, v.r * 2 + 5, v.r * 2 + 5), false);
             }
@@ -433,6 +448,10 @@ private final GraphPanel map;
             g.setColor(c);
             g.fill(shape);
         });
+        // a group wears a second ring: there is more inside, a double-click away
+        g.setStroke(new BasicStroke((float) (1.4 / Math.sqrt(map.scale))));
+        g.setColor(Theme.alpha(Theme.fg(), 110));
+        g.draw(groupRings);
         // code-only rings: present but quiet, so a map of mostly code-only endpoints still shows its structure
         float rw = (float) (1.1 / Math.sqrt(map.scale));
         g.setStroke(fast ? new BasicStroke(rw) : new BasicStroke(rw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {2.5f, 3f}, 0f));
@@ -468,7 +487,7 @@ private final GraphPanel map;
             boolean match = !q.isEmpty() && v.lower.contains(q);
             if (v == map.selected || v == map.hover || match || (map.selected != null && lit.contains(v) && map.scale > 0.4)
                     || (map.flow && map.scale > 0.3) || (!map.flow && v.degree >= 5 && map.scale > 0.35) || map.scale > 1.6
-                    || map.vs.size() <= 80) {                           // a small map names everything that fits
+                    || map.vs.size() <= 80 || v.members > 0) {          // a small map names everything; groups are always named
                 cand.add(v);
             }
         }
