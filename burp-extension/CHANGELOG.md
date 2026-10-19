@@ -1,6 +1,6 @@
 # Changelog: Burp extension
 
-## 1.2.0 — 2026-10-17
+## 1.2.0 — 2026-10-19
 
 A safer, faster and calmer extension: saved models survive crashes and damaged files, Burp never waits on the tab, live capture stays bounded, the map holds still, and a welcome page with a sample model gets you started.
 
@@ -12,7 +12,7 @@ A safer, faster and calmer extension: saved models survive crashes and damaged f
 - After **Clear this model**, the model could not be opened again (the next Burp start or rename failed with a missing build file). Clearing now removes the build list too, and a model whose build file has gone missing opens with the builds before it.
 - The dedupe list (`seen.txt`) was first written without a final newline, so the next batch's first key joined the previous last key on one line, and after a restart those two requests could be added again. New saves end with a newline, and lines already joined in existing models are split when read.
 - While live capture was on, every refresh reset the Settings fields, wiping a role or scope you were typing.
-- A large map (over 200 nodes) jumped whenever live capture added to it: the view re-fitted itself, the map blanked while the new layout ran, and nodes restarted from older positions. The current map now stays on screen until the new layout is ready (see the map under UI).
+- A large map (over 60 nodes) jumped whenever live capture added to it: the view re-fitted itself, the map blanked while the new layout ran, and nodes restarted from older positions. The current map now stays on screen until the new layout is ready (see the map under UI).
 - Inside Burp, some text showed raw markup such as `<html>…</html>` (facts titles, connection links, the site map, the Copy for AI menu). Burp's theme does not always let labels render HTML, so these are now drawn with fonts and colours instead.
 - Under Burp's theme the Settings form squeezed its fields to nothing and cut the labels short (see Settings below).
 - Roles first compares the lower-sounding role against the higher one (user against admin, not admin against user).
@@ -46,7 +46,7 @@ A safer, faster and calmer extension: saved models survive crashes and damaged f
   - Path folding, the workflow grouping in diffs and the cleanup of removed endpoints no longer compare every path with every other.
   - Technology detection skips most signatures with a cheap text check before running their pattern over a page.
   - The content cache keeps the most recently used scans rather than stopping once full.
-  - Burp XML import reads the export one item at a time instead of loading it as a document; checking a `.json` file for HAR reads only its first 4 KB.
+  - Burp XML import reads the export one item at a time instead of loading it as a document; checking a `.json` file for HAR reads only its first 4 KB. HAR import reads one entry at a time instead of parsing the whole file.
 - A later change made the live-capture tick about a fifth cheaper again (140 ms to 110 ms in its own run): a repeated secret no longer rebuilds its record, dropping not-found paths no longer rebuilds the whole edge index, and path folding keeps each request's folding key between rebuilds and splits paths without a regex.
 - **Burp never waits on the tab.** The longest the Swing thread is busy, measured on a 20,000-request model (`EdtBench`):
 
@@ -60,7 +60,7 @@ A safer, faster and calmer extension: saved models survive crashes and damaged f
   - The tab is built on the Swing thread and the model opens in the background ("Opening the model…"); a send right after Burp starts waits for it.
   - Queries, comparing builds, Copy for AI, exporting the model or a summary, switching models and clearing all run in the background, with a progress indicator in the status line.
   - A query can be cancelled, and stops by itself after 20 seconds, so a regex that backtracks badly cannot hang Burp.
-  - Maps over 200 nodes are laid out on a background thread while the current map stays on screen.
+  - Maps over 60 nodes are laid out on a background thread while the current map stays on screen.
   - A large map draws only what is on screen and, while the camera moves or a node is dragged, leaves out dashes and labels (they come back when it stops). Moving the mouse over empty canvas no longer redraws it.
   - The map's Find and the Surface and Requests filters wait for a pause in typing instead of running on every keystroke.
   - The site map counts each folder once per model instead of on every row it paints, and a node's facts no longer scan every edge.
@@ -76,6 +76,7 @@ The model itself is unchanged by all of this: the same export gives byte-identic
 - **Settings** is laid out as cards (Model, Next send, Live capture, Data, About) whose fields keep their width.
 - **Delete this model…** in ⋯ and in Settings removes a model and everything in it (after asking) and opens the sample.
 - **The map holds still.** Each layout is computed to the end and shown once instead of animating; nodes already on the map keep their exact place and new ones settle among them, so live capture only ever adds. The camera moves only when you ask (Fit, a new layout, the first map). Re-layout starts over. Roles, cookies and credentials ("Trust") are off at first, because each links to most of the map and turned it into a ball of lines; the layout is roomier, and a map of 80 nodes or fewer labels everything that fits. The Network and Flow toggles always show the layout drawn, the rings around code-only endpoints are lighter, and labels stay at least 10 px however far out you zoom.
+- **Large maps show groups.** Above 150 nodes, the network map folds pages, endpoints and their parameters into one node per host and first path segment (`shop.example.com /api  (469)`), and scripts into one per host. Double-click a group, or use its menu, to open it: the rest of the map moves out to make room and its members fill the space it leaves. **Close its group** on any member folds them back. Opened groups stay open while live capture adds requests; Re-layout closes them all. The **Group** toggle shows every node on its own, and Map facts lists a group's members.
 - **Overview** reflows: six tiles in a row when there is room, then three or two, and the charts stack in a narrow pane; long lines are cut short instead of scrolling sideways. The technology stack uses two columns when wide. A lead row opens on click or Enter and lights up under the pointer (the separate Open buttons are gone), and "any" replaces "*" for any method. The empty Overview links to the welcome page.
 - The Query tab starts with a short guide instead of an empty table. The status line marks errors in red, and "Comparing builds…" and similar messages give way to the model summary as soon as the work ends.
 - **Keyboard.** Every button can be reached with Tab. While focus is in the tab: Cmd/Ctrl+1–9 and 0 switch tabs, Cmd/Ctrl+F searches, Cmd/Ctrl+L goes to the query box, Cmd/Ctrl+Shift+C copies the whole model for AI, Alt+Left goes back after a jump, and `/` on the map jumps to Find. None of these are taken from the rest of Burp.
@@ -84,6 +85,8 @@ The model itself is unchanged by all of this: the same export gives byte-identic
 ### Under the hood
 
 - Each tab is its own class behind a small `Tab` interface (the panel no longer switches tabs by number), the map's layout is its own class, and live capture's flush logic is separate from Burp and unit tested.
+- The panel's header and Settings tab, and the map's painter, are their own classes; building a model reads as its passes in order (the output is byte-identical).
+- CI fails a change that makes a 5,000-request model slower than set limits (`ScaleBench --check`, `EdtBench --check`).
 - Unit tests for the extension (`gradle test`, JUnit 5, test-only: the jar still has no dependencies), run in CI.
 
 ## 1.1.0 — 2026-10-16

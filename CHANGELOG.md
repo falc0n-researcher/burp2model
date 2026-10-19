@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 — 2026-10-19
 
 - **Crash-safe outputs.** model.json, report.html, context.json, graph.json, graph.graphml, build.svg, osint.json, the saved inputs, watch.json and the fingerprint key are written to a temporary file and renamed into place, so a crash, a full disk or Ctrl-C leaves the previous file whole instead of half of a new one. A rebuild puts the new input in place before clearing the old ones.
 - **A damaged graph.db is kept, never wiped.** If SQLite reports graph.db as not a database or malformed, the next build moves it (and any journal beside it) to `graph.db.damaged-<time>`, says so, and starts a new one. `builds`, `diff` and `q` refuse a damaged file with a clear message and leave it untouched. A damaged build snapshot is reported instead of crashing `diff`, `changes` and `changed-since`. A damaged watch.json is kept aside too.
