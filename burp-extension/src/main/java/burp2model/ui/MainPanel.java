@@ -48,6 +48,11 @@ public final class MainPanel extends JPanel {
         default void deleteModel(String name) throws java.io.IOException {
         }
 
+        /** Burp's own message editors, inside Burp; null elsewhere (then requests show in burp2model's own panes). */
+        default MessageEditors editors() {
+            return null;
+        }
+
         /** Run slow work off the Swing thread; the extension tracks it so unloading waits for it. */
         default void background(String name, Runnable task) {
             Thread t = new Thread(null, task, name, 64L * 1024 * 1024);
@@ -106,6 +111,7 @@ public final class MainPanel extends JPanel {
             fillTab(now);
         });
         shortcuts();
+        applyMessageEditor();
         status.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 12));
         status.setFont(Theme.font(11f, Font.PLAIN));
         status.setForeground(Theme.MUTED);
@@ -520,6 +526,30 @@ public final class MainPanel extends JPanel {
     private final Map<Component, Tab> byView = new java.util.HashMap<>();
     /** Tabs whose contents are out of date; each is filled when it is first shown, so a send costs only what is on screen. */
     private final java.util.Set<Tab> stale = new java.util.HashSet<>();
+
+    /** Requests show in Burp's message editor inside Burp, unless it is turned off in Settings. */
+    boolean burpEditorOn() {
+        return host.editors() != null && !"0".equals(host.get("editor.burp", "1"));
+    }
+
+    /** Point every request and response viewer at Burp's editor or burp2model's own panes, as the setting says. */
+    void applyMessageEditor() {
+        MessageEditors e = burpEditorOn() ? host.editors() : null;
+        for (EvidenceViewer v : viewers(this, new ArrayList<>())) {
+            v.useEditors(e);
+        }
+    }
+
+    private static List<EvidenceViewer> viewers(java.awt.Container c, List<EvidenceViewer> out) {
+        for (Component k : c.getComponents()) {
+            if (k instanceof EvidenceViewer v) {
+                out.add(v);
+            } else if (k instanceof java.awt.Container kc) {
+                viewers(kc, out);
+            }
+        }
+        return out;
+    }
 
     private void addTab(String title, Tab t) {
         tabs.addTab(title, t.view());

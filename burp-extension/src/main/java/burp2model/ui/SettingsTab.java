@@ -20,7 +20,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
-/** Settings: the model, the next send, live capture, data and about, as cards whose fields keep their width. */
+/** Settings: the model, the next send, live capture, the request viewer, data and about, as cards whose fields keep their width. */
 final class SettingsTab {
     private final MainPanel app;
 
@@ -37,6 +37,8 @@ final class SettingsTab {
     final JCheckBox replaceRole = new JCheckBox("Replace this role's earlier requests when sending");
 
     final JCheckBox autoCapture = new JCheckBox("Capture proxied traffic automatically (only hosts in Burp's target scope)");
+
+    final JCheckBox burpEditor = new JCheckBox("Show requests and responses in Burp's message editor");
 
     Component build() {
         // a column of cards, at most 760 wide: a form whose fields keep their width whatever the pane does
@@ -72,6 +74,27 @@ final class SettingsTab {
         c.insets = new Insets(4, 24, 0, 0);
         liveCard.add(Widgets.muted("In-scope Proxy traffic joins the model every few seconds; a few samples of each request shape are kept."), c);
         col.add(liveCard);
+        col.add(javax.swing.Box.createVerticalStrut(12));
+
+        JPanel viewCard = formCard("Requests and responses");
+        c = new GridBagConstraints();
+        c.gridx = 0;
+        c.gridy = 0;
+        c.anchor = GridBagConstraints.WEST;
+        viewCard.add(burpEditor, c);
+        c.gridy = 1;
+        c.insets = new Insets(4, 24, 0, 0);
+        boolean inBurp = app.host().editors() != null;
+        viewCard.add(Widgets.muted(inBurp
+                ? "Burp's Pretty, Raw, Hex and Inspector views, over the same masked text burp2model stores. Off: burp2model's own coloured view."
+                : "Only inside Burp. Here requests show in burp2model's own view."), c);
+        burpEditor.setEnabled(inBurp);
+        burpEditor.setSelected(app.burpEditorOn());
+        burpEditor.addActionListener(e -> {
+            app.host().set("editor.burp", burpEditor.isSelected() ? "1" : "0");
+            app.applyMessageEditor();
+        });
+        col.add(viewCard);
         col.add(javax.swing.Box.createVerticalStrut(12));
 
         JButton save = new JButton("Save settings");

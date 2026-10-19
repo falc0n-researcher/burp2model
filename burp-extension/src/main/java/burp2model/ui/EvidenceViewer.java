@@ -20,8 +20,10 @@ import javax.swing.JSplitPane;
 final class EvidenceViewer extends JPanel {
     private final DefaultListModel<Integer> list = new DefaultListModel<>();
     private final JList<Integer> ids = new JList<>(list);
-    private final HttpPane req = new HttpPane("Request");
-    private final HttpPane resp = new HttpPane("Response");
+    private MessageView req = new HttpPane("Request");
+    private MessageView resp = new HttpPane("Response");
+    private MessageEditors editors;
+    private final JSplitPane panes;
     private final JLabel title = new JLabel(" ");
     private Model model;
     private final List<Integer> current = new ArrayList<>();
@@ -51,7 +53,7 @@ final class EvidenceViewer extends JPanel {
         });
         title.setFont(Theme.font(12f, Font.BOLD));
         title.setBorder(BorderFactory.createEmptyBorder(6, 10, 4, 10));
-        JSplitPane panes = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, req, resp);
+        panes = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, req.view(), resp.view());
         panes.addComponentListener(new java.awt.event.ComponentAdapter() {
             private boolean done;
 
@@ -73,6 +75,31 @@ final class EvidenceViewer extends JPanel {
         body.add(panes, BorderLayout.CENTER);
         add(title, BorderLayout.NORTH);
         add(body, BorderLayout.CENTER);
+    }
+
+    /** Show requests and responses in Burp's message editors, or (null) in burp2model's own panes. */
+    void useEditors(MessageEditors e) {
+        if (e == editors) {
+            return;
+        }
+        editors = e;
+        req = e == null ? new HttpPane("Request") : new BurpMessagePane("Request", e.request());
+        resp = e == null ? new HttpPane("Response") : new BurpMessagePane("Response", e.response());
+        int at = panes.getDividerLocation();
+        panes.setLeftComponent(req.view());
+        panes.setRightComponent(resp.view());
+        panes.setDividerLocation(at);
+        int sel = ids.getSelectedIndex();
+        if (sel >= 0) {
+            show(sel);
+        } else {
+            req.clear("Select something above to see the request behind it.");
+            resp.clear("");
+        }
+    }
+
+    boolean usesEditors() {
+        return editors != null;
     }
 
     void setModel(Model m) {
