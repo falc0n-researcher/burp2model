@@ -3,7 +3,6 @@ package burp2model.ui;
 import static burp2model.ui.Layouts.*;
 
 import burp2model.engine.Analysis;
-import burp2model.engine.ContextPack;
 import burp2model.engine.Json;
 import burp2model.engine.Model;
 import burp2model.engine.Query;
@@ -11,11 +10,8 @@ import burp2model.engine.Recon;
 import burp2model.engine.Session;
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.Insets;
 import java.awt.event.KeyEvent;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -23,18 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
-import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.JTabbedPane;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
 /** The burp2model tab. */
@@ -67,27 +56,22 @@ public final class MainPanel extends JPanel {
         }
     }
 
-    private final Host host;
-    private volatile Session session;
+    final Host host;
+    volatile Session session;
     private final JLabel status = new JLabel(" ");
-    private final JTabbedPane tabs = new JTabbedPane();
-    private final JPanel pills = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-    private final JTextField globalSearch = new JTextField(22);
+    final JTabbedPane tabs = new JTabbedPane();
 
     private final Dashboard dashboard = new Dashboard();
+    final SettingsTab settingsTab = new SettingsTab(this);
+    final HeaderBar header = new HeaderBar(this);
     private List<Analysis.Lead> leads = new ArrayList<>();
 
     // settings
-    private final JTextField nameField = new JTextField(16);
-    private final JTextField roleField = new JTextField(14);
-    private final JTextField scopeField = new JTextField(30);
-    private final JCheckBox replaceRole = new JCheckBox("Replace this role's earlier requests when sending");
-    private final JCheckBox autoCapture = new JCheckBox("Capture proxied traffic automatically (only hosts in Burp's target scope)");
 
     public MainPanel(Host host) {
         super(new BorderLayout());
         this.host = host;
-        add(header(), BorderLayout.NORTH);
+        add(header.build(), BorderLayout.NORTH);
         leadsTab = new LeadsTab(this);
         mapTab = new MapTab(this);
         surfaceTab = new SurfaceTab(this);
@@ -101,7 +85,7 @@ public final class MainPanel extends JPanel {
         addTab("Changes", new ChangesTab(this));
         addTab("Roles", new RolesTab(this));
         addTab("Recon", new ReconTab(this));
-        settingsView = settingsTab();
+        settingsView = settingsTab.build();
         tabs.addTab("Settings", settingsView);
         tabs.setFont(Theme.font(12f, Font.PLAIN));
         welcome = new Welcome(welcomeActions(), burp2model.engine.Version.EXTENSION);
@@ -143,31 +127,31 @@ public final class MainPanel extends JPanel {
             leadsTab.selectLead(l);
         });
         // the Settings fields are filled once; refreshes never touch them, so a half-typed value survives live capture
-        nameField.setText(appName());
-        roleField.setText(host.get("role", ""));
-        scopeField.setText(host.get("scope", ""));
-        replaceRole.setSelected("1".equals(host.get("replace", "0")));
-        autoCapture.setSelected("1".equals(host.get("auto", "0")));
-        roleField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
-        scopeField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
-        replaceRole.addItemListener(e -> {
+        settingsTab.nameField.setText(appName());
+        settingsTab.roleField.setText(host.get("role", ""));
+        settingsTab.scopeField.setText(host.get("scope", ""));
+        settingsTab.replaceRole.setSelected("1".equals(host.get("replace", "0")));
+        settingsTab.autoCapture.setSelected("1".equals(host.get("auto", "0")));
+        settingsTab.roleField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
+        settingsTab.scopeField.getDocument().addDocumentListener(new SimpleDoc(this::updateSettings));
+        settingsTab.replaceRole.addItemListener(e -> {
             updateSettings();
-            host.set("replace", replaceRole.isSelected() ? "1" : "0");
+            host.set("replace", settingsTab.replaceRole.isSelected() ? "1" : "0");
         });
-        autoCapture.addItemListener(e -> {
-            host.set("auto", autoCapture.isSelected() ? "1" : "0");
-            showLive();
+        settingsTab.autoCapture.addItemListener(e -> {
+            host.set("auto", settingsTab.autoCapture.isSelected() ? "1" : "0");
+            header.showLive();
         });
         // role and scope are kept as soon as the field is left; only a new model name needs Save (it opens another model)
         java.awt.event.FocusAdapter keep = new java.awt.event.FocusAdapter() {
             @Override
             public void focusLost(java.awt.event.FocusEvent e) {
-                host.set("role", roleField.getText().strip());
-                host.set("scope", scopeField.getText().strip());
+                host.set("role", settingsTab.roleField.getText().strip());
+                host.set("scope", settingsTab.scopeField.getText().strip());
             }
         };
-        roleField.addFocusListener(keep);
-        scopeField.addFocusListener(keep);
+        settingsTab.roleField.addFocusListener(keep);
+        settingsTab.scopeField.addFocusListener(keep);
         updateSettings();
         openSession(appName(), false);
         addHierarchyListener(e -> {
@@ -244,7 +228,7 @@ public final class MainPanel extends JPanel {
     }
 
     /** Open (or switch to) a model off the Swing thread; a large one takes a second or more to read and rebuild. */
-    private void openSession(String name, boolean applyScope) {
+    void openSession(String name, boolean applyScope) {
         async("Opening the model '" + name + "'…", () -> {
             Session s;
             if (OLD_DEFAULT.equals(name) && !host.hasModel(name)) {
@@ -266,7 +250,7 @@ public final class MainPanel extends JPanel {
             }
             if (!s.name.equals(name)) {
                 host.set("app", s.name);
-                nameField.setText(s.name);
+                settingsTab.nameField.setText(s.name);
             }
             session = s;
             opened.countDown();
@@ -307,11 +291,11 @@ public final class MainPanel extends JPanel {
     private final java.awt.CardLayout cards = new java.awt.CardLayout();
     private final JPanel center = new JPanel(cards);
     private final Welcome welcome;
-    private boolean welcomeShowing;
+    boolean welcomeShowing;
     /** Requests in the model when it was last shown; the welcome page steps aside when the first ones arrive. */
     private int lastRequests = -1;
 
-    private void showWelcome(boolean on) {
+    void showWelcome(boolean on) {
         welcomeShowing = on;
         if (on) {
             welcome.update("1".equals(host.get("auto", "0")), "1".equals(host.get("welcome.show", "0")));
@@ -345,7 +329,7 @@ public final class MainPanel extends JPanel {
 
             @Override
             public void liveCapture() {
-                autoCapture.setSelected(true);
+                settingsTab.autoCapture.setSelected(true);
                 host.set("auto", "1");
                 welcome.update(true, "1".equals(host.get("welcome.show", "0")));
                 setStatus("Live capture is on: in-scope Proxy traffic (Burp's target scope) joins the model every few seconds.", Level.OK);
@@ -373,7 +357,7 @@ public final class MainPanel extends JPanel {
     private static final String OLD_DEFAULT = "burp";
 
     /** The model to open: the one chosen in Settings, or the sample. An empty model from the old default gives way to it. */
-    private String appName() {
+    String appName() {
         return host.get("app", SAMPLE);
     }
 
@@ -401,8 +385,8 @@ public final class MainPanel extends JPanel {
         }, s -> {
             session = s;
             host.set("app", SAMPLE);
-            nameField.setText(SAMPLE);
-            listModels();
+            settingsTab.nameField.setText(SAMPLE);
+            header.listModels();
             host.set("welcome.seen", "1");
             showWelcome(false);
             lastRequests = s.requestCount();
@@ -509,7 +493,7 @@ public final class MainPanel extends JPanel {
         }
     }
 
-    private volatile Settings settings = new Settings(null, List.of(), false);
+    volatile Settings settings = new Settings(null, List.of(), false);
 
     /** Safe to call from any thread: a copy taken on the Swing thread whenever a field changes. */
     public Settings settings() {
@@ -517,7 +501,7 @@ public final class MainPanel extends JPanel {
     }
 
     private void updateSettings() {
-        settings = Settings.of(roleField.getText(), scopeField.getText(), replaceRole.isSelected());
+        settings = Settings.of(settingsTab.roleField.getText(), settingsTab.scopeField.getText(), settingsTab.replaceRole.isSelected());
     }
 
     /** Run a query as if it were typed in the Query tab. */
@@ -529,9 +513,9 @@ public final class MainPanel extends JPanel {
 
     private final LeadsTab leadsTab;
     private final MapTab mapTab;
-    private final SurfaceTab surfaceTab;
+    final SurfaceTab surfaceTab;
     private final QueryTab queryTab;
-    private Component settingsView;
+    Component settingsView;
     /** The tabs filled from the model, by their component in the tabbed pane. */
     private final Map<Component, Tab> byView = new java.util.HashMap<>();
     /** Tabs whose contents are out of date; each is filled when it is first shown, so a send costs only what is on screen. */
@@ -581,14 +565,14 @@ public final class MainPanel extends JPanel {
             });
         }
         bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_F, menu), "search", () -> {
-            globalSearch.requestFocusInWindow();
-            globalSearch.selectAll();
+            header.globalSearch.requestFocusInWindow();
+            header.globalSearch.selectAll();
         });
         bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_L, menu), "query", () -> {
             select(queryTab);
             queryTab.focusField();
         });
-        bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_C, menu | java.awt.event.InputEvent.SHIFT_DOWN_MASK), "copyForAi", () -> copyForAi("whole"));
+        bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_C, menu | java.awt.event.InputEvent.SHIFT_DOWN_MASK), "copyForAi", () -> header.copyForAi("whole"));
         bind(im, am, javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, java.awt.event.InputEvent.ALT_DOWN_MASK), "back", this::back);
     }
 
@@ -667,178 +651,10 @@ public final class MainPanel extends JPanel {
 
     // ------------------------------------------------------------------ header
 
-    private Component header() {
-        JPanel bar = new JPanel(new BorderLayout(14, 0)) {
-            @Override
-            protected void paintComponent(java.awt.Graphics g0) {
-                java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
-                g.setColor(Theme.surface());
-                g.fillRect(0, 0, getWidth(), getHeight());
-                g.setColor(Theme.line());
-                g.fillRect(0, getHeight() - 1, getWidth(), 1);
-                g.setColor(Theme.ACCENT);
-                g.fillRect(0, 0, 4, getHeight());
-                g.dispose();
-            }
-        };
-        bar.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 12));
-        JLabel logo = new JLabel("burp2model");
-        logo.setFont(Theme.font(16f, Font.BOLD));
-        models.setFont(Theme.mono(12f));
-        models.setToolTipText("The open model; pick another, or make a new one");
-        models.getAccessibleContext().setAccessibleName("Model");
-        models.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
-            @Override
-            public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) {
-                listModels();
-            }
-
-            @Override
-            public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) {
-            }
-
-            @Override
-            public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {
-            }
-        });
-        models.addActionListener(e -> {
-            if (!listingModels && models.getSelectedItem() != null) {
-                switchModel(String.valueOf(models.getSelectedItem()));
-            }
-        });
-        live.setToolTipText("Live capture: add in-scope Proxy traffic to the model every few seconds. Click to turn it on or off.");
-        live.addActionListener(e -> setLive(!"1".equals(host.get("auto", "0"))));
-        pills.setOpaque(false);
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        left.setOpaque(false);
-        left.add(logo);
-        left.add(models);
-        left.add(live);
-        left.add(pills);
-        globalSearch.putClientProperty("JTextField.placeholderText", "Search endpoints, hosts, params…");
-        globalSearch.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.LINE), BorderFactory.createEmptyBorder(4, 8, 4, 8)));
-        globalSearch.setToolTipText("Search the whole surface (Enter)");
-        globalSearch.addActionListener(e -> {
-            select(surfaceTab);
-            surfaceTab.search(globalSearch.getText());
-        });
-        JButton ai = new JButton("Copy for AI  ▾");
-        JPopupMenu menu = new JPopupMenu();
-        String[][] opts = {{"methodology", "Hunting methodology", "a recon and hunting plan for this app"}, {"whole", "Whole model", "everything an AI needs, with the rules"},
-            {"endpoints", "Endpoints only", "the API surface with parameters and evidence"}, {"open", "Open questions only", "what to test next"}};
-        for (String[] o : opts) {
-            JMenuItem mi = new Widgets.TwoLineItem(o[1], o[2]);
-            mi.addActionListener(e -> copyForAi(o[0]));
-            menu.add(mi);
-        }
-        ai.addActionListener(e -> menu.show(ai, 0, ai.getHeight()));
-        JButton more = new JButton("⋯");
-        more.setToolTipText("Import, export and settings");
-        more.getAccessibleContext().setAccessibleName("More actions");
-        JPopupMenu moreMenu = new JPopupMenu();
-        JMenuItem imp = new JMenuItem("Import HAR or Burp export…");
-        imp.addActionListener(e -> importFile());
-        JMenuItem expJson = new JMenuItem("Export model.json…");
-        expJson.addActionListener(e -> exportModel());
-        JMenuItem expMd = new JMenuItem("Export summary (Markdown)…");
-        expMd.addActionListener(e -> exportSummary());
-        JMenuItem del = new JMenuItem("Delete this model…");
-        del.addActionListener(e -> deleteModel());
-        JMenuItem set = new JMenuItem("Settings");
-        set.addActionListener(e -> {
-            showWelcome(false);
-            tabs.setSelectedComponent(settingsView);
-        });
-        for (JMenuItem mi : new JMenuItem[] {imp, expJson, expMd}) {
-            moreMenu.add(mi);
-        }
-        moreMenu.addSeparator();
-        moreMenu.add(del);
-        moreMenu.addSeparator();
-        moreMenu.add(set);
-        more.addActionListener(e -> moreMenu.show(more, 0, more.getHeight()));
-        JButton about = new JButton("?");
-        about.setToolTipText("About burp2model: the welcome page");
-        about.getAccessibleContext().setAccessibleName("About burp2model");
-        about.addActionListener(e -> showWelcome(!welcomeShowing));
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        right.setOpaque(false);
-        right.add(globalSearch);
-        right.add(ai);
-        right.add(more);
-        right.add(about);
-        bar.add(left, BorderLayout.WEST);
-        bar.add(right, BorderLayout.EAST);
-        return bar;
-    }
-
     // ------------------------------------------------------------------ header: model switcher and live capture
 
-    private final JComboBox<String> models = new JComboBox<>();
-    private final JButton live = new JButton();
-    private boolean listingModels;
-    private static final String NEW_MODEL = "New model…";
-
-    /** Fill the switcher with the models saved on this machine, the open one selected. */
-    private void listModels() {
-        Session s = session;
-        listingModels = true;
-        try {
-            Object keep = s == null ? null : s.name;
-            models.removeAllItems();
-            java.util.TreeSet<String> names = new java.util.TreeSet<>();
-            if (s != null) {
-                names.add(s.name);
-                try (var dirs = Files.list(s.dir().getParent())) {
-                    // a folder with nothing saved in it (an empty model) is not offered; one with requests always is
-                    dirs.filter(Files::isDirectory).filter(d -> Files.exists(d.resolve("inputs.jsonl.gz")) || Files.exists(d.resolve("session.json")))
-                            .forEach(d -> names.add(d.getFileName().toString()));
-                } catch (java.io.IOException ignored) {
-                    // the folder is unreadable: the open model is still listed
-                }
-            }
-            names.forEach(models::addItem);
-            models.addItem(NEW_MODEL);
-            if (keep != null) {
-                models.setSelectedItem(keep);
-            }
-        } finally {
-            listingModels = false;
-        }
-    }
-
-    private void showModelName() {
-        Session s = session;
-        if (s != null && !s.name.equals(models.getSelectedItem())) {
-            listModels();
-        }
-    }
-
-    /** Open another model (or make a new one), as Settings does when its name changes. */
-    private void switchModel(String picked) {
-        String name = picked;
-        if (NEW_MODEL.equals(name)) {
-            String n = JOptionPane.showInputDialog(this, "Name of the new model (letters, digits, '.', '_' or '-'):", "New model", JOptionPane.PLAIN_MESSAGE);
-            listModels();
-            if (n == null || n.isBlank()) {
-                return;
-            }
-            name = n.strip();
-        }
-        if (!name.matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")) {
-            setStatus("The model name must be letters, digits, '.', '_' or '-'.", Level.ERROR);
-            return;
-        }
-        if (session != null && name.equals(session.name)) {
-            return;
-        }
-        nameField.setText(name);
-        host.set("app", name);
-        openSession(name, true);
-    }
-
     /** Delete the open model (after asking) and open the sample; deleting the sample itself just empties and refills it. */
-    private void deleteModel() {
+    void deleteModel() {
         Session s = session;
         if (s == null) {
             return;
@@ -857,43 +673,17 @@ public final class MainPanel extends JPanel {
         }, next -> {
             session = next;
             host.set("app", SAMPLE);
-            nameField.setText(SAMPLE);
-            listModels();
+            settingsTab.nameField.setText(SAMPLE);
+            header.listModels();
             refresh();
             setStatus("Deleted the model '" + name + "'. The sample model is open.", Level.OK);
         }, t -> sayError("could not delete '" + name + "': " + messageOf(t)));
     }
 
-    private void setLive(boolean on) {
-        host.set("auto", on ? "1" : "0");
-        autoCapture.setSelected(on);
-        showLive();
-        setStatus(on ? "Live capture is on: in-scope Proxy traffic (Burp's target scope) joins the model every few seconds." : "Live capture is off.", Level.OK);
-    }
-
-    private void showLive() {
-        boolean on = "1".equals(host.get("auto", "0"));
-        live.setText(on ? "● Live" : "Live: off");
-        live.setForeground(on ? Theme.readable(Theme.GREEN, Theme.surface()) : Theme.MUTED);
-        live.getAccessibleContext().setAccessibleName(on ? "Live capture is on" : "Live capture is off");
-    }
-
-    private void copyForAi(String scope) {
-        Model m = model();
-        if (m == null) {
-            say("Nothing to copy yet. Send some requests first.");
-            return;
-        }
-        async("Packing the " + scope + " package…", () -> new String[] {ContextPack.forAi(m, scope), String.valueOf(ContextPack.tokens(m) / 1000)}, r -> {
-            Tables.copy(r[0]);
-            setStatus("Copied the " + scope + " package for your own AI (about " + r[1] + "k tokens). Values are masked; every claim cites a request.", Level.OK);
-        });
-    }
-
     /** The header shows the open model and whether live capture is on; the counts are on the Overview. */
     private void headerPills(Model m) {
-        showModelName();
-        showLive();
+        header.showModelName();
+        header.showLive();
     }
 
     // ------------------------------------------------------------------ layout helpers
@@ -940,186 +730,11 @@ public final class MainPanel extends JPanel {
 
     // ------------------------------------------------------------------ settings
 
-    private Component settingsTab() {
-        // a column of cards, at most 760 wide: a form whose fields keep their width whatever the pane does
-        JPanel col = new JPanel();
-        col.setLayout(new javax.swing.BoxLayout(col, javax.swing.BoxLayout.Y_AXIS));
-        col.setBorder(BorderFactory.createEmptyBorder(18, 22, 22, 22));
 
-        JPanel model = formCard("Model");
-        formRow(model, 0, "Name", nameField, "Each name is a separate model; the header's switcher changes it too. Save to open it.");
-        col.add(model);
-        col.add(javax.swing.Box.createVerticalStrut(12));
 
-        JPanel send = formCard("Next send");
-        formRow(send, 0, "Role", roleField, "Optional, for example user or admin. Leave empty for one account.");
-        formRow(send, 2, "In-scope hosts", scopeField, "Optional, comma separated. Default: the busiest host's registrable domain.");
-        GridBagConstraints c = new GridBagConstraints();
-        c.gridx = 1;
-        c.gridy = 4;
-        c.anchor = GridBagConstraints.WEST;
-        c.insets = new Insets(8, 0, 0, 0);
-        send.add(replaceRole, c);
-        col.add(send);
-        col.add(javax.swing.Box.createVerticalStrut(12));
-
-        JPanel liveCard = formCard("Live capture");
-        c = new GridBagConstraints();
-        c.gridx = 0;
-        c.gridy = 0;
-        c.gridwidth = 2;
-        c.anchor = GridBagConstraints.WEST;
-        liveCard.add(autoCapture, c);
-        c.gridy = 1;
-        c.insets = new Insets(4, 24, 0, 0);
-        liveCard.add(Widgets.muted("In-scope Proxy traffic joins the model every few seconds; a few samples of each request shape are kept."), c);
-        col.add(liveCard);
-        col.add(javax.swing.Box.createVerticalStrut(12));
-
-        JButton save = new JButton("Save settings");
-        JButton export = new JButton("Export model.json…");
-        JButton summaryBtn = new JButton("Export summary (Markdown)…");
-        JButton importBtn = new JButton("Import HAR or Burp export…");
-        JButton clear = new JButton("Clear this model");
-        JButton deleteBtn = new JButton("Delete this model…");
-        deleteBtn.addActionListener(e -> deleteModel());
-        JButton aboutBtn = new JButton("Welcome page");
-        aboutBtn.addActionListener(e -> showWelcome(true));
-        JPanel saveRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        saveRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        saveRow.add(save);
-        col.add(saveRow);
-        col.add(javax.swing.Box.createVerticalStrut(18));
-
-        JPanel data = formCard("Data");
-        JPanel btns = new JPanel(new java.awt.GridLayout(0, 2, 8, 8));
-        btns.setOpaque(false);
-        for (JButton b : new JButton[] {importBtn, export, summaryBtn, clear, deleteBtn, aboutBtn}) {
-            btns.add(b);
-        }
-        c = new GridBagConstraints();
-        c.gridx = 0;
-        c.gridy = 0;
-        c.weightx = 1;
-        c.fill = GridBagConstraints.HORIZONTAL;
-        data.add(btns, c);
-        col.add(data);
-        col.add(javax.swing.Box.createVerticalStrut(12));
-
-        JPanel aboutCard = formCard("About");
-        c = new GridBagConstraints();
-        c.gridx = 0;
-        c.gridy = 0;
-        c.weightx = 1;
-        c.fill = GridBagConstraints.HORIZONTAL;
-        aboutCard.add(Widgets.wrapText("burp2model builds an evidence-cited model of one web app from the requests you send it; every line cites the "
-                + "request that shows it. Cookies, tokens, keys and personal data are masked before anything is stored. It is a model "
-                + "builder, never a scanner: leads are hypotheses to verify in an authorised session.\n\nModels live in "
-                + "~/.burp2model/models/<name>/. Nothing is sent anywhere unless you run Recon or paste a package into your own AI.\n\n"
-                + "Extension " + burp2model.engine.Version.EXTENSION + "  ·  github.com/falc0n-researcher/burp2model",
-                Theme.font(12f, Font.PLAIN), Theme.MUTED), c);
-        col.add(aboutCard);
-        save.addActionListener(e -> {
-            String n = nameField.getText().strip();
-            if (!n.matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")) {
-                setStatus("The model name must be letters, digits, '.', '_' or '-'.", Level.ERROR);
-                return;
-            }
-            boolean renamed = !n.equals(appName());
-            host.set("app", n);
-            host.set("role", roleField.getText().strip());
-            host.set("scope", scopeField.getText().strip());
-            host.set("replace", replaceRole.isSelected() ? "1" : "0");
-            host.set("auto", autoCapture.isSelected() ? "1" : "0");
-            if (renamed) {
-                openSession(n, true);
-            } else if (session != null) {
-                session.scope = settings().scope();
-            }
-            setStatus("Settings saved.", Level.OK);
-            refresh();
-        });
-        export.addActionListener(e -> exportModel());
-        importBtn.addActionListener(e -> importFile());
-        summaryBtn.addActionListener(e -> exportSummary());
-        clear.addActionListener(e -> {
-            if (session != null && JOptionPane.showConfirmDialog(this, "Delete everything in the model '" + session.name + "'?", "burp2model",
-                    JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-                Session s = session;
-                async("Clearing the model…", () -> {
-                    s.clear();
-                    return s;
-                }, x -> {
-                    setStatus("Cleared the model '" + s.name + "'.", Level.OK);
-                    refresh();
-                }, t -> sayError("could not clear: " + messageOf(t)));
-            }
-        });
-        JPanel holder = new JPanel(new BorderLayout()) {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public java.awt.Dimension getPreferredSize() {
-                java.awt.Dimension d = super.getPreferredSize();
-                return new java.awt.Dimension(Math.min(d.width, Math.round(760 * Theme.uiScale())), d.height);
-            }
-        };
-        holder.add(col, BorderLayout.NORTH);
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        left.add(holder);
-        javax.swing.JScrollPane sp = new javax.swing.JScrollPane(left);
-        sp.setBorder(null);
-        sp.getVerticalScrollBar().setUnitIncrement(16);
-        return sp;
-    }
-
-    /** A titled card for one group of settings; rows go in with formRow. */
-    private static JPanel formCard(String title) {
-        JPanel card = new JPanel(new GridBagLayout()) {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            protected void paintComponent(java.awt.Graphics g0) {
-                java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
-                Theme.quality(g);
-                g.setColor(Theme.surface());
-                g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
-                g.setColor(Theme.line());
-                g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
-                g.dispose();
-            }
-        };
-        card.setOpaque(false);
-        card.setAlignmentX(Component.LEFT_ALIGNMENT);
-        card.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0),
-                BorderFactory.createTitledBorder(BorderFactory.createEmptyBorder(30, 16, 14, 16), title, javax.swing.border.TitledBorder.LEFT,
-                        javax.swing.border.TitledBorder.TOP, Theme.font(12f, Font.BOLD))));
-        return card;
-    }
-
-    /** A label, its field filling the rest of the row, and a muted hint under the field. */
-    private static void formRow(JPanel card, int row, String label, JTextField field, String hint) {
-        GridBagConstraints c = new GridBagConstraints();
-        c.gridx = 0;
-        c.gridy = row;
-        c.anchor = GridBagConstraints.WEST;
-        c.insets = new Insets(row == 0 ? 0 : 10, 0, 0, 12);
-        JLabel l = new JLabel(label);
-        l.setPreferredSize(new java.awt.Dimension(Math.round(120 * Theme.uiScale()), l.getPreferredSize().height));
-        card.add(l, c);
-        c.gridx = 1;
-        c.weightx = 1;
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = new Insets(row == 0 ? 0 : 10, 0, 0, 0);
-        field.setMinimumSize(new java.awt.Dimension(Math.round(240 * Theme.uiScale()), field.getPreferredSize().height));
-        card.add(field, c);
-        c.gridy = row + 1;
-        c.insets = new Insets(4, 0, 0, 0);
-        card.add(Widgets.muted(hint), c);
-    }
 
     /** Save the whole model as JSON (in the background). */
-    private void exportModel() {
+    void exportModel() {
         Model m = model();
         if (m == null) {
             return;
@@ -1134,7 +749,7 @@ public final class MainPanel extends JPanel {
     }
 
     /** Save a Markdown summary of the model (in the background). */
-    private void exportSummary() {
+    void exportSummary() {
         Model m = model();
         if (m == null) {
             return;
