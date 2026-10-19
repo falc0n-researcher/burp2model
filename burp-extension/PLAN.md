@@ -2,27 +2,26 @@
 
 Drafted 2026-10-16 from a read-only review of `burp-extension/src` (extension 1.1.0). File references are `path:line` under `src/main/java/burp2model/` as of commit `e682211`.
 
-## Status (2026-10-17, extension 1.2.0)
+## Status (2026-10-19: every item is done)
 
-Phases 0-5 are merged into `main` (PRs #1-#11) and ship as 1.2.0. The plan below is kept as written; where the work went differently, this section says so.
+Phases 0-5 are merged into `main` (PRs #1-#11) and ship as 1.2.0; the rest of the plan landed after it. The plan below is kept as written; where the work went differently, this section says so.
 
 **Done**
 - **Phase 0, bug fixes, and 5.1, JUnit:** #1.
 - **Phase 1, data safety and lifecycle (1.1-1.6):** #2.
-- **Phase 2, performance and scale (2.1-2.8):** #3; cheaper live ticks toward 2.9 in #6 (about 110 ms at 20k requests, short of the 60 ms target).
+- **Phase 2, performance and scale (2.1-2.8):** #3. Cheaper live ticks in #6 (about 110 ms at 20k requests). HAR import streams one entry at a time (the rest of 2.8), in 1.2.0.
+- **2.9, incremental builder:** pass 1 of a build (observed traffic) is kept between builds in `Builder.Observed`. A build that only adds requests, with the same name, seed host, scope and folded paths, observes just the new ones and runs the later passes on a copy; anything else observes everything again. A live tick at 20k requests is now about 50 ms (target 60). `IncrementalBuildTest` checks each kept build against one from scratch.
 - **Phase 3, responsive UI (3.1-3.8):** #4.
 - **4A, welcome page:** #5, with IBM Plex Mono in place of the pixel fonts in #9 (open decision 1 is settled: no pixel fonts). The bundled sample model (open decision 2) shipped in #5 and became the default model in #10.
 - **4B, visual polish, keyboard and the header switcher (4.1-4.7):** #8.
-- **Phase 5, structure (5.2, 5.3, 5.5, 5.6; 5.4 in part, `MapLayout`):** #7.
+- **Phase 5, structure (5.2, 5.3, 5.5, 5.6):** #7. Settings and the header became `SettingsTab` and `HeaderBar`.
+- **5.4, splitting `GraphPanel`:** the layouts are `MapLayout` (#7) and the painter is `MapCanvas` (1.2.0). `GraphPanel` keeps the map's data, groups, camera and toolbar.
+- **5.7, splitting the large engine methods:** `Builder.build` lists its passes (1.2.0). `Parse.item`, `ContextPack.pack`, `Diff.diff` and `Query.termPred` read as theirs too, byte-identical to before on every bundled export.
+- **Open decision 4, Montoya message editor:** done, not as a replacement for `HttpPane` but as an option beside it. Inside Burp, every viewer uses Burp's read-only editors, fed only the masked text the model stores (a request with no target service). Settings → Requests and responses switches back to the own coloured view. `HttpPane` stays for that choice and outside Burp.
+- **Open decision 3, slim builds:** older builds open and are read as before; no downgrade path, as proposed.
 - **After the plan:** a still map during live capture, no raw HTML text inside Burp, the sample as the default model (#10); a map that never animates with Trust off by default, a Settings form of cards, Delete model (#11).
 
-**Remaining**
-- **2.9, incremental builder.** After #6 the profile is flat; it needs a redesign of `Builder`, worth doing only if large live sessions show a problem.
-- **5.7, splitting `Builder.build` into passes** (and the other large engine methods).
-- **Settings and the header still live in `MainPanel`** (about 1,190 lines); they could become their own classes.
-- **5.4, the rest:** the painter is still inside `GraphPanel` (about 1,200 lines).
-- **Streaming HAR import (part of 2.8):** Burp XML streams, but a HAR file is still read whole.
-- **Montoya message editor (open decision 4):** the spike has not been done.
+**Remaining:** nothing from this plan.
 
 ## Goals
 
