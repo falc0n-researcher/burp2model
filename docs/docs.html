@@ -72,7 +72,7 @@
   <p>Python 3.9 or newer.</p>
   <div class="code"><span class="label">shell</span><button class="copy" type="button" data-copy aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><pre>pip install burp2model
 burp2model --version</pre></div>
-  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code> (424 tests). Releases are also on <a href="https://github.com/falc0n-researcher/burp2model/releases">GitHub</a> as a wheel.</p>
+  <p>From source: <code>pip install -e ".[dev]"</code>, then <code>pytest -q</code>. Releases are also on <a href="https://github.com/falc0n-researcher/burp2model/releases">GitHub</a> as a wheel.</p>
 </div>
 
 <div class="doc-section" id="extension">
@@ -81,7 +81,7 @@ burp2model --version</pre></div>
   <ul>
     <li>Select requests in Proxy history or the Site map, right-click, <b>Send to burp2model</b>. Or turn on <b>Live</b> in the header: in-scope Proxy traffic joins the model every few seconds, a few samples of each request shape.</li>
     <li>The tab opens on a welcome page with a sample model, so there is something to look at before your first send.</li>
-    <li>Overview, ranked leads, a map that holds still, the surface as a list or site map, every masked request, a query console, builds and what changed, role comparison and light recon.</li>
+    <li>Overview, ranked leads, a map that holds still, the surface as a list or site map, every masked request (in Burp's own message editor, or burp2model's view), a query console, builds and what changed, role comparison and light recon.</li>
     <li>Models live in <code>~/.burp2model/models/</code>; the header switches between them, and ⋯ imports a HAR or Burp export, exports, or deletes a model.</li>
     <li>Keyboard: <kbd>Cmd/Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> for tabs, <kbd>Cmd/Ctrl</kbd>+<kbd>F</kbd> search, <kbd>Cmd/Ctrl</kbd>+<kbd>L</kbd> query, <kbd>Alt</kbd>+<kbd>←</kbd> back.</li>
   </ul>
@@ -201,7 +201,7 @@ burp2model cross-role shop --low user --high admin</pre></div>
     <li>Path-token masking uses shape and entropy. A short token can survive, and an odd slug can be masked.</li>
     <li>Default scope uses the busiest host. A capture dominated by a CDN can pick the wrong site. Use <code>--scope</code>.</li>
     <li>"Privileged-looking" in <code>cross-role</code> is a path-name heuristic.</li>
-    <li>The export is parsed as a stream, but the model and the outputs are built in memory. A 40 MB export with 20,000 requests used about 590 MB of memory (about 225 MB of it Python objects) and built in about 8 seconds.</li>
+    <li>The export is parsed to disk as a stream; the model is built in memory. A 40 MB export peaks near 135 MB.</li>
     <li>Page-to-API edges depend on the Referer header. Strict policies give fewer <code>CALLS</code> edges.</li>
     <li>The model covers only what was captured. Nothing it reports is a finding.</li>
   </ul>
