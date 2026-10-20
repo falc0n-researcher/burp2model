@@ -4,7 +4,7 @@
 
 - **Requests in Burp's own message editor.** Inside Burp, the request and response under every list now show in Burp's read-only message editor, with its Pretty, Raw, Hex and Inspector views and search. It is given only the masked text burp2model stores, so masked values stay masked; the bar above it still says when a stored body was cut off. Settings → **Requests and responses** switches back to burp2model's own coloured view.
 - **Live capture is about twice as cheap on large models.** A tick that only adds requests now looks at just the new ones instead of rebuilding the model from the first request: about 50 ms at 20,000 requests, down from 110 ms. When an earlier request reads differently (a new path fold, a new busiest host, a changed scope) the whole model is built again, as before. The model is the same either way.
-- Under the hood: the request parser, Copy for AI, the build diff and the query filters are split into small steps, with byte-identical output on every bundled export.
+- Under the hood: the request parser, Copy for AI, the build diff and the query filters are split into small steps, with byte-identical output on every bundled export. The map and the tab itself are split into small classes too, and draw exactly as before.
 
 ## 1.2.0 — 2026-10-19
 

@@ -14,8 +14,9 @@ Phases 0-5 are merged into `main` (PRs #1-#11) and ship as 1.2.0; the rest of th
 - **Phase 3, responsive UI (3.1-3.8):** #4.
 - **4A, welcome page:** #5, with IBM Plex Mono in place of the pixel fonts in #9 (open decision 1 is settled: no pixel fonts). The bundled sample model (open decision 2) shipped in #5 and became the default model in #10.
 - **4B, visual polish, keyboard and the header switcher (4.1-4.7):** #8.
-- **Phase 5, structure (5.2, 5.3, 5.5, 5.6):** #7. Settings and the header became `SettingsTab` and `HeaderBar`.
-- **5.4, splitting `GraphPanel`:** the layouts are `MapLayout` (#7) and the painter is `MapCanvas` (1.2.0). `GraphPanel` keeps the map's data, groups, camera and toolbar.
+- **Phase 5, structure (5.2, 5.5, 5.6):** #7.
+- **5.3, splitting `MainPanel`:** one class per tab (#7), then `SettingsTab` and `HeaderBar` (1.2.0), then `StatusBar`, `Models` (opening, switching, the sample, deleting), `DataActions` (import and export), `Shortcuts` and `WelcomeFlow`. `MainPanel` is the `Host` interface, the tabs and the wiring: 331 lines, down from 1,301. The plan guessed about 150; the rest is the `Host` interface and the small methods the tabs call.
+- **5.4, splitting `GraphPanel`:** the layouts are `MapLayout` (#7), the painter is `MapCanvas` (1.2.0), what the map draws (toggles, code-only, path groups) is `GraphData`, the camera is `Viewport` and the bar is `GraphToolbar`. `GraphPanel` holds them together: 548 lines, down from 1,186. Map screenshots are byte-identical to before.
 - **5.7, splitting the large engine methods:** `Builder.build` lists its passes (1.2.0). `Parse.item`, `ContextPack.pack`, `Diff.diff` and `Query.termPred` read as theirs too, byte-identical to before on every bundled export.
 - **Open decision 4, Montoya message editor:** done, not as a replacement for `HttpPane` but as an option beside it. Inside Burp, every viewer uses Burp's read-only editors, fed only the masked text the model stores (a request with no target service). Settings → Requests and responses switches back to the own coloured view. `HttpPane` stays for that choice and outside Burp.
 - **Open decision 3, slim builds:** older builds open and are read as before; no downgrade path, as proposed.
