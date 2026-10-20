@@ -98,6 +98,7 @@ final class SurfaceTab implements Tab {
         Tables.render(surfaceTable, "Type", Renderers.type());
         Tables.render(surfaceTable, "Name", Renderers.path());
         Tables.render(surfaceTable, "State", Renderers.state());
+        Tables.render(surfaceTable, "Statuses", Renderers.codes());
         Tables.widths(surfaceTable, 100, 420, 120, 90, 90, 80, 200);
         surfaceCards.add(scroll(surfaceTable), "list");
         surfaceCards.add(siteTree, "tree");
@@ -130,8 +131,8 @@ final class SurfaceTab implements Tab {
                 Object st = n.attrs.get("api_state");
                 Object statuses = n.attrs.get("statuses");
                 Object reqs = n.attrs.get("requests");
-                rows.add(new Object[] {n.type, n.label, st == null ? "" : st, statuses == null ? "" : String.valueOf(statuses).replace("[", "").replace("]", ""),
-                        String.join(",", n.roles), reqs == null ? String.valueOf(n.evidence.size()) : String.valueOf(reqs),
+                rows.add(new Object[] {n.type, n.label, st == null ? "" : st, Cells.text(statuses),
+                        String.join(", ", n.roles), reqs == null ? String.valueOf(n.evidence.size()) : String.valueOf(reqs),
                         n.attrs.get("host") == null ? "" : String.valueOf(n.attrs.get("host"))});
             }
         }

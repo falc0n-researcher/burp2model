@@ -4,10 +4,10 @@ import burp2model.engine.Session;
 
 /** Which model is open: opening or switching one off the Swing thread, the bundled sample, deleting a model. */
 final class Models {
-    /** The model that opens when none was chosen: the demo shop, so a first look has something in it. */
+    /** The demo shop, opened only when asked for (Try the sample model, or the header's switcher). */
     static final String SAMPLE = "sample";
-    /** What 1.1 opened by default, an empty model nobody asked for. */
-    private static final String OLD_DEFAULT = "burp";
+    /** The model sends go to when none was chosen. */
+    static final String DEFAULT = "default";
 
     private final MainPanel app;
     private final java.util.concurrent.CountDownLatch opened = new java.util.concurrent.CountDownLatch(1);
@@ -16,27 +16,19 @@ final class Models {
         this.app = app;
     }
 
-    /** The model to open: the one chosen in Settings, or the sample. An empty model from the old default gives way to it. */
+    /** The model to open: the one chosen in Settings, or "default". The sample never opens by itself. */
     String appName() {
-        return app.host.get("app", SAMPLE);
+        String a = app.host.get("app", DEFAULT);
+        return a.isBlank() || SAMPLE.equals(a) ? DEFAULT : a;
     }
 
     /** Open (or switch to) a model off the Swing thread; a large one takes a second or more to read and rebuild. */
     void open(String name, boolean applyScope) {
         MainPanel.Host host = app.host;
         app.async("Opening the model '" + name + "'…", () -> {
-            Session s;
-            if (OLD_DEFAULT.equals(name) && !host.hasModel(name)) {
-                s = host.session(SAMPLE);                       // the old default, gone: open the sample, never re-create it
-            } else {
-                s = host.session(name);
-                if (OLD_DEFAULT.equals(name) && s.requestCount() == 0 && s.builds().isEmpty()) {
-                    host.deleteModel(name);                     // the old empty default: remove it, open the sample instead
-                    s = host.session(SAMPLE);
-                }
-            }
+            Session s = host.session(name);
             if (SAMPLE.equals(s.name)) {
-                fillSample(s);                                  // before it is shown, so the first look is a full model
+                fillSample(s);                                  // switched to the sample: before it is shown, so it is full
             }
             return s;
         }, s -> {
@@ -103,14 +95,14 @@ final class Models {
             fillSample(s);
             return s;
         }, s -> {
+            // the sample is not remembered as the model to open: the next start opens the user's own model again
             app.session = s;
-            app.host.set("app", SAMPLE);
             app.settingsTab.nameField.setText(SAMPLE);
             app.header.listModels();
             app.welcome.leave(s.requestCount());
             app.refresh();
             app.setStatus("This is the sample model: a small demo shop seen as a user and as an admin. Your own model is untouched; "
-                    + "switch back in Settings.", MainPanel.Level.OK);
+                    + "switch back with the model switcher in the header.", MainPanel.Level.OK);
         });
     }
 
@@ -128,16 +120,14 @@ final class Models {
         String name = s.name;
         app.async("Deleting the model '" + name + "'…", () -> {
             app.host.deleteModel(name);
-            Session next = app.host.session(SAMPLE);
-            fillSample(next);
-            return next;
+            return app.host.session(DEFAULT);                   // an empty default model (deleting "default" empties it)
         }, next -> {
             app.session = next;
-            app.host.set("app", SAMPLE);
-            app.settingsTab.nameField.setText(SAMPLE);
+            app.host.set("app", next.name);
+            app.settingsTab.nameField.setText(next.name);
             app.header.listModels();
             app.refresh();
-            app.setStatus("Deleted the model '" + name + "'. The sample model is open.", MainPanel.Level.OK);
+            app.setStatus("Deleted the model '" + name + "'. The model '" + next.name + "' is open.", MainPanel.Level.OK);
         }, t -> app.sayError("could not delete '" + name + "': " + MainPanel.messageOf(t)));
     }
 }

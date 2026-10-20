@@ -57,6 +57,7 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
     });
     private volatile boolean unloading;
     private burp2model.ui.MessageEditors editors;
+    private BurpHistory history;
 
     @Override
     public void initialize(MontoyaApi api) {
@@ -71,6 +72,7 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             api.logging().logToError("burp2model: could not prepare " + home + " (" + e.getMessage() + ")");
         }
         editors = new BurpEditors(api);
+        history = new BurpHistory(api);
         MainPanel.Host host = new MainPanel.Host() {
             @Override
             public String get(String key, String def) {
@@ -139,6 +141,11 @@ public class Burp2ModelExtension implements BurpExtension, ContextMenuItemsProvi
             @Override
             public burp2model.ui.MessageEditors editors() {
                 return editors;
+            }
+
+            @Override
+            public byte[][] captured(Session s, int id) {
+                return history.find(s, id);
             }
         };
         // Swing components belong on the Swing thread; the model itself opens in the background

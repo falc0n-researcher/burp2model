@@ -679,6 +679,34 @@ public final class Parse {
         return ex;
     }
 
+    /** How much of a body plain() shows. */
+    private static final int PLAIN_KEEP = 200_000;
+
+    /**
+     * One raw HTTP message as the viewer's panes, unmasked: {line, headers: [[name, value]...], body, truncated}. The
+     * body is de-chunked and decompressed. Only for showing what Burp captured; nothing built from it is ever stored.
+     */
+    public static Map<String, Object> plain(byte[] raw) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        Msg msg = raw == null || raw.length == 0 ? new Msg("", new byte[0]) : splitHttp(raw);
+        Head h = parseHeaders(msg.head());
+        byte[] body = msg.body();
+        if (header(h.headers(), "transfer-encoding").toLowerCase().contains("chunked")) {
+            body = dechunk(body);
+        }
+        body = decompress(body, header(h.headers(), "content-encoding")).body();
+        List<Object> headers = new ArrayList<>();
+        for (Redact.Pair p : h.headers()) {
+            headers.add(new ArrayList<>(List.of(p.name(), p.value())));
+        }
+        String text = utf8(body);
+        m.put("line", h.start().strip());
+        m.put("headers", headers);
+        m.put("body", text.length() > PLAIN_KEEP ? text.substring(0, PLAIN_KEEP) : text);
+        m.put("truncated", text.length() > PLAIN_KEEP);
+        return m;
+    }
+
     private static List<Object> headerList(List<Redact.Pair> hs) {
         List<Object> out = new ArrayList<>();
         for (Redact.Pair h : hs) {

@@ -1,10 +1,11 @@
 package burp2model.ui;
 
 import burp2model.engine.Model;
+import burp2model.engine.Session;
 import java.awt.Component;
 import javax.swing.JPanel;
 
-/** When the welcome page shows instead of the tabs: on first run and for an empty model, until the first requests arrive. */
+/** When the welcome page shows instead of the tabs: every time Burp starts, and for an empty model until the first requests arrive. */
 final class WelcomeFlow {
     private final MainPanel app;
     private final java.awt.CardLayout cards = new java.awt.CardLayout();
@@ -27,16 +28,20 @@ final class WelcomeFlow {
     }
 
     void show(boolean on) {
+        boolean appearing = on && !showing;
         showing = on;
+        if (appearing) {
+            page.focusStart();
+        }
         if (on) {
-            page.update("1".equals(app.host.get("auto", "0")), "1".equals(app.host.get("welcome.show", "0")));
+            Session s = app.session;
+            page.update("1".equals(app.host.get("auto", "0")), s == null ? null : s.name, s == null ? 0 : s.requestCount());
         }
         cards.show(center, on ? "welcome" : "tabs");
     }
 
-    /** Leave the welcome page for good (a model with `requests` in it is open). */
+    /** Leave the welcome page (a model with `requests` in it is open). */
     void leave(int requests) {
-        app.host.set("welcome.seen", "1");
         show(false);
         lastRequests = requests;
     }
@@ -47,8 +52,9 @@ final class WelcomeFlow {
         if (app.session != null && n == 0 && !showing) {
             show(true);
         } else if (showing && n > 0 && lastRequests == 0) {
-            app.host.set("welcome.seen", "1");
-            show(false);
+            show(false);                                        // the first requests arrived: show them
+        } else if (showing) {
+            show(true);                                         // keep the open model's name and size current
         }
         lastRequests = app.session == null ? -1 : n;
     }
@@ -70,21 +76,18 @@ final class WelcomeFlow {
             public void liveCapture() {
                 app.settingsTab.autoCapture.setSelected(true);
                 host.set("auto", "1");
-                page.update(true, "1".equals(host.get("welcome.show", "0")));
+                show(true);
                 app.setStatus("Live capture is on: in-scope Proxy traffic (Burp's target scope) joins the model every few seconds.", MainPanel.Level.OK);
             }
 
             @Override
             public void settings() {
-                host.set("welcome.seen", "1");
                 show(false);
                 app.tabs.setSelectedComponent(app.settingsView);
             }
 
             @Override
-            public void getStarted(boolean showOnStart) {
-                host.set("welcome.seen", "1");
-                host.set("welcome.show", showOnStart ? "1" : "0");
+            public void getStarted() {
                 show(false);
             }
         };

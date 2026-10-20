@@ -24,9 +24,7 @@ import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
 
@@ -36,13 +34,11 @@ final class QueryTab implements Tab {
     private final JTextField queryField = new JTextField();
     private final DefaultTableModel queryModel = Tables.model();
     private final JTable queryTable = Tables.table(queryModel);
-    private final JTextArea queryText = textArea();
     private final JLabel queryNote = new JLabel(" ");
     private final EvidenceViewer queryViewer = new EvidenceViewer();
     private final List<String> queryHistory = new ArrayList<>();
     private int historyPos;
     private Query.Result lastResult;
-    private final JTabbedPane queryOut = new JTabbedPane();
     private static final int QUERY_SECONDS = 20;
     private java.util.concurrent.atomic.AtomicBoolean queryStop;
     private int queryGen;
@@ -77,18 +73,32 @@ final class QueryTab implements Tab {
         queryViewer.setModel(m);
     }
 
+    /** Ready-made questions: what the button says, and the query it runs. */
+    private static final String[][] EXAMPLES = {
+        {"All endpoints", "list-apis"}, {"Code vs runtime", "reconcile"}, {"Named only in code", "static-only"},
+        {"POSTs that failed", "req.method:POST AND resp.code.gte:400"}, {"Privileged paths", "privileged"}, {"Auth surface", "auth-surface"},
+        {"Secrets (masked)", "secrets"}, {"Open questions", "unknowns"}, {"Third parties", "third-parties"},
+        {"Since the last build", "changed-since previous"}, {"Stats", "stats"}};
+
+    private final java.awt.CardLayout outCards = new java.awt.CardLayout();
+    private final JPanel out = new JPanel(outCards);
+    private final javax.swing.JTextPane answer = StyledText.pane();
+    private final JLabel resultTitle = new JLabel(" ");
+    private final JButton copy = new JButton("Copy");
+    private final JButton csv = new JButton("Save CSV…");
+    private JSplitPane split;
+
     private Component build() {
         JPanel top = new JPanel(new BorderLayout(8, 0));
-        top.setBorder(BorderFactory.createEmptyBorder(8, 10, 4, 10));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 12, 6, 12));
         queryField.setFont(Theme.mono(13f));
-        queryField.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.LINE), BorderFactory.createEmptyBorder(5, 8, 5, 8)));
+        queryField.putClientProperty("JTextField.placeholderText", "Ask a question or write a BQL filter, then press Enter  (↑ for earlier ones)");
+        queryField.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Theme.LINE), BorderFactory.createEmptyBorder(6, 9, 6, 9)));
         JButton run = new JButton("Run");
         run.setFont(Theme.font(12f, Font.BOLD));
         JButton help = new JButton("Help");
-        JButton copy = new JButton("Copy results");
-        JButton csv = new JButton("Save CSV…");
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        for (JButton b : new JButton[] {run, cancelQuery, help, copy, csv}) {
+        for (JButton b : new JButton[] {run, cancelQuery, help}) {
             buttons.add(b);
         }
         cancelQuery.setVisible(false);
@@ -100,12 +110,7 @@ final class QueryTab implements Tab {
         top.add(queryField, BorderLayout.CENTER);
         top.add(buttons, BorderLayout.EAST);
         run.addActionListener(e -> runQuery(queryField.getText()));
-        help.addActionListener(e -> runQuery("help"));
-        copy.addActionListener(e -> {
-            Tables.copy(resultTsv());
-            app.say("Copied " + queryModel.getRowCount() + " rows.");
-        });
-        csv.addActionListener(e -> saveCsv());
+        help.addActionListener(e -> app.ask("help"));
         queryField.addActionListener(e -> runQuery(queryField.getText()));
         queryField.addKeyListener(new KeyAdapter() {
             @Override
@@ -117,23 +122,46 @@ final class QueryTab implements Tab {
                 }
             }
         });
-        JPanel examples = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
-        examples.add(Widgets.muted("Try"));
-        for (String ex : new String[] {"list-apis", "reconcile", "static-only", "req.method:POST AND resp.code.gte:400", "node.type:endpoint AND node.state:STATIC_ONLY",
-            "privileged", "auth-surface", "secrets", "unknowns", "third-parties", "changed-since previous", "stats"}) {
-            JButton b = new JButton(ex.length() > 30 ? ex.substring(0, 28) + "…" : ex);
-            b.setToolTipText(ex);
+        JPanel examples = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        examples.setBorder(BorderFactory.createEmptyBorder(0, 8, 8, 12));
+        for (String[] ex : EXAMPLES) {
+            JButton b = new JButton(ex[0]);
+            b.setToolTipText(ex[1]);
             b.setFont(Theme.font(11f, Font.PLAIN));
-            b.setMargin(new Insets(1, 7, 1, 7));
-            b.addActionListener(e -> app.ask(ex));
+            b.setMargin(new Insets(2, 8, 2, 8));
+            b.addActionListener(e -> app.ask(ex[1]));
             examples.add(b);
         }
         JPanel head = new JPanel(new BorderLayout());
         head.add(top, BorderLayout.NORTH);
         head.add(examples, BorderLayout.CENTER);
-        queryNote.setBorder(BorderFactory.createEmptyBorder(2, 12, 6, 12));
+
+        // the answer: a bar saying what it is (with copy and save), then a table or a text
+        resultTitle.setFont(Theme.font(12f, Font.BOLD));
         queryNote.setFont(Theme.font(11f, Font.PLAIN));
-        head.add(queryNote, BorderLayout.SOUTH);
+        queryNote.setForeground(Theme.MUTED);
+        JPanel says = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        says.setOpaque(false);
+        says.add(resultTitle);
+        says.add(queryNote);
+        copy.setToolTipText("Copy the rows as tab-separated text");
+        copy.addActionListener(e -> {
+            Tables.copy(resultTsv());
+            app.say("Copied " + queryModel.getRowCount() + " rows.");
+        });
+        csv.addActionListener(e -> saveCsv());
+        JPanel acts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+        acts.setOpaque(false);
+        for (JButton b : new JButton[] {copy, csv}) {
+            b.setFont(Theme.font(11f, Font.PLAIN));
+            b.setMargin(new Insets(1, 8, 1, 8));
+            acts.add(b);
+        }
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1, 0, 1, 0, Theme.LINE),
+                BorderFactory.createEmptyBorder(5, 4, 5, 8)));
+        bar.add(says, BorderLayout.CENTER);
+        bar.add(acts, BorderLayout.EAST);
 
         queryTable.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting() || lastResult == null) {
@@ -142,29 +170,49 @@ final class QueryTab implements Tab {
             int i = Tables.selected(queryTable);
             if (i >= 0 && i < lastResult.rows().size()) {
                 List<Integer> evs = evidenceOf(lastResult.rows().get(i));
-                queryViewer.show(evs, evs.isEmpty() ? "" : "ev_" + evs.get(0));
+                queryViewer.show(evs, queryModel.getColumnCount() == 0 ? "" : String.valueOf(queryModel.getValueAt(i, 0)));
             }
         });
-        queryOut.addTab("Table", scroll(queryTable));
-        queryOut.addTab("Text", scroll(queryText));
+        out.add(scroll(queryTable), "table");
+        out.add(scroll(answer), "text");
+        JPanel result = new JPanel(new BorderLayout());
+        result.add(bar, BorderLayout.NORTH);
+        result.add(out, BorderLayout.CENTER);
         // until the first query, the answer area says what to type instead of standing empty
-        queryText.setText("""
-                Ask the model a question; every answer cites the requests behind it, and nothing leaves Burp.
+        StyledText.set(answer, """
+                ASK THE MODEL
+                Every answer cites the requests behind it (ev_N), runs offline, and nothing leaves Burp.
 
-                Plain questions        list-apis · privileged · auth-surface · secrets · unknowns · third-parties · stats
-                Filters (BQL)          req.method:POST AND resp.code.gte:400
-                                       node.type:endpoint AND node.state:STATIC_ONLY
-                                       resp.body.regex:"pass(word)?"
-                Graph questions        reach "POST /api/checkout"    path <a> to <b>    blast <node> depth 2
-                History                changed-since previous    provenance <node>    reaches-privileged user
+                Questions:      list-apis · privileged · auth-surface · secrets · unknowns · third-parties · stats
+                Filters (BQL):  req.method:POST AND resp.code.gte:400
+                                node.type:endpoint AND node.state:STATIC_ONLY
+                                resp.body.regex:"pass(word)?"
+                Graph:          reach "POST /api/checkout"   ·   path <a> to <b>   ·   blast <node> depth 2
+                History:        changed-since previous   ·   provenance <node>   ·   reaches-privileged user
 
-                Click an example above, type help for everything, and press ↑ for earlier queries.""");
-        queryOut.setSelectedIndex(1);
-        JSplitPane sp = split(JSplitPane.VERTICAL_SPLIT, queryOut, queryViewer, 0.5, 0.55);
+                Click a question above, type help for everything, and press ↑ for earlier queries.""");
+        showAs(false, "Ask something", "");
+        split = split(JSplitPane.VERTICAL_SPLIT, result, queryViewer, 0.5, 0.55);
         JPanel p = new JPanel(new BorderLayout());
         p.add(head, BorderLayout.NORTH);
-        p.add(sp, BorderLayout.CENTER);
+        p.add(split, BorderLayout.CENTER);
         return p;
+    }
+
+    /** Table answers keep the request viewer below them; text answers take the whole height. */
+    private void showAs(boolean table, String title, String note) {
+        resultTitle.setText(title);
+        queryNote.setForeground(Theme.MUTED);
+        queryNote.setText(note);
+        copy.setVisible(table);
+        csv.setVisible(table);
+        outCards.show(out, table ? "table" : "text");
+        if (split != null && queryViewer.isVisible() != table) {
+            queryViewer.setVisible(table);
+            if (table) {
+                split.setDividerLocation(0.55);
+            }
+        }
     }
 
     private String resultTsv() {
@@ -289,41 +337,50 @@ final class QueryTab implements Tab {
         });
     }
 
+    /** Columns that hold lists, even when an answer gives them as text. */
+    private static final java.util.Set<String> LISTS = java.util.Set.of("statuses", "roles", "credentials", "params", "parameters", "ev",
+            "evidence", "status_by_role", "names", "hosts");
+
     /** Put a query's answer on screen (Swing thread). */
     private void showResult(Query.Result r) {
         lastResult = r;
-        queryNote.setForeground(Theme.MUTED);
-        queryNote.setText(r.kind().equals("text") ? "text answer" : r.note());
-        queryText.setText(r.kind().equals("text") ? r.note() : "");
-        queryText.setCaretPosition(0);
         queryModel.setRowCount(0);
         queryModel.setColumnCount(0);
-        if (!r.kind().equals("text")) {
-            for (String c : r.columns()) {
-                queryModel.addColumn(c);
-            }
-            for (Map<String, Object> row : r.rows()) {
-                Object[] cells = new Object[r.columns().size()];
-                for (int i = 0; i < cells.length; i++) {
-                    Object v = row.get(r.columns().get(i));
-                    cells[i] = v instanceof List<?> l ? String.join(",", l.stream().map(String::valueOf).toList()) : v == null ? "" : String.valueOf(v);
-                }
-                queryModel.addRow(cells);
-            }
-            for (String col : new String[] {"method"}) {
-                Tables.render(queryTable, col, Renderers.method());
-            }
-            Tables.render(queryTable, "status", Renderers.status());
-            Tables.render(queryTable, "state", Renderers.state());
-            Tables.render(queryTable, "type", Renderers.type());
-            Tables.render(queryTable, "ev", Renderers.ids());
-            Tables.render(queryTable, "evidence", Renderers.ids());
-            for (String col : new String[] {"label", "path", "endpoint", "from", "to", "src", "dst", "url"}) {
-                Tables.render(queryTable, col, Renderers.path());
-            }
-        }
-        queryOut.setSelectedIndex(r.kind().equals("text") ? 1 : 0);
         queryViewer.clear();
+        if (r.kind().equals("text")) {
+            StyledText.set(answer, r.note());
+            showAs(false, queryField.getText().strip(), "");
+            return;
+        }
+        for (String c : r.columns()) {
+            queryModel.addColumn(c);
+        }
+        for (Map<String, Object> row : r.rows()) {
+            Object[] cells = new Object[r.columns().size()];
+            for (int i = 0; i < cells.length; i++) {
+                String col = r.columns().get(i);
+                Object v = row.get(col);
+                cells[i] = LISTS.contains(col) ? Cells.listText(v) : Cells.text(v);
+            }
+            queryModel.addRow(cells);
+        }
+        Tables.render(queryTable, "method", Renderers.method());
+        for (String col : new String[] {"status", "statuses", "status_by_role", "code"}) {
+            Tables.render(queryTable, col, Renderers.codes());
+        }
+        Tables.render(queryTable, "state", Renderers.state());
+        Tables.render(queryTable, "type", Renderers.type());
+        Tables.render(queryTable, "ev", Renderers.ids());
+        Tables.render(queryTable, "evidence", Renderers.ids());
+        for (String col : new String[] {"label", "path", "endpoint", "from", "to", "src", "dst", "url"}) {
+            Tables.render(queryTable, col, Renderers.path());
+        }
+        String note = r.note() == null ? "" : r.note();
+        showAs(true, r.rows().size() + (r.total() > r.rows().size() ? " of " + r.total() : "") + (r.rows().size() == 1 ? " row" : " rows"),
+                note + (r.rows().isEmpty() ? "" : "   ·   pick a row to see its request"));
+        if (!r.rows().isEmpty()) {
+            queryTable.setRowSelectionInterval(0, 0);
+        }
     }
 
     private int resolveBuild(String ref) {

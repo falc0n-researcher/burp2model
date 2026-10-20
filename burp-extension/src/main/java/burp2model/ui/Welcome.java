@@ -15,7 +15,6 @@ import java.awt.Rectangle;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -41,11 +40,12 @@ final class Welcome extends JPanel {
 
         void settings();
 
-        void getStarted(boolean showOnStart);
+        /** Go to the tabs, on the model that is open. */
+        void getStarted();
     }
 
     private final WelcomeArt.Button live = new WelcomeArt.Button("Turn on live capture", false, false);
-    private final JCheckBox showOnStart = new JCheckBox("Show this page every time Burp starts");
+    private final JLabel current = new JLabel(" ");
     private final JPanel steps = new JPanel(new GridLayout(1, 3, 14, 14));
     private final JPanel buttons = new JPanel(new GridLayout(2, 2, 12, 12));
     private final WelcomeArt.Button start = new WelcomeArt.Button("Get started", true, true);
@@ -100,19 +100,19 @@ final class Welcome extends JPanel {
         column.add(label("WHAT STAYS PRIVATE"));
         column.add(Box.createVerticalStrut(8));
         column.add(body("Models are kept on this machine in ~/.burp2model and hold masked requests only: cookies, tokens, keys "
-                + "and personal data are replaced before anything is stored. Nothing is sent anywhere, except Recon (only when you "
-                + "press it, to the host you name) and what you paste into your own AI. Only capture traffic you are allowed to test.", false));
+                + "and personal data are replaced before anything is stored or copied for AI. The request viewer shows the real "
+                + "values from Burp's own history, without saving them. Nothing is sent anywhere, except Recon (only when you press "
+                + "it, to the host you name). Only capture traffic you are allowed to test.", false));
         column.add(Box.createVerticalStrut(24));
 
         JPanel foot = new JPanel(new BorderLayout());
         foot.setOpaque(false);
         foot.setAlignmentX(Component.LEFT_ALIGNMENT);
-        showOnStart.setOpaque(false);
-        showOnStart.setFont(Theme.font(12f, Font.PLAIN));
-        showOnStart.setMnemonic('S');
-        foot.add(showOnStart, BorderLayout.WEST);
+        current.setFont(Theme.font(12f, Font.PLAIN));
+        current.setForeground(Theme.MUTED);
+        foot.add(current, BorderLayout.WEST);
         start.setMnemonic('G');
-        start.addActionListener(e -> actions.getStarted(showOnStart.isSelected()));
+        start.addActionListener(e -> actions.getStarted());
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         right.setOpaque(false);
         right.add(start);
@@ -180,11 +180,18 @@ final class Welcome extends JPanel {
         }
     }
 
-    /** Reflect the current state: whether live capture is already on, and the show-on-start choice. */
-    void update(boolean liveOn, boolean showEveryStart) {
+    /** Reflect the current state: whether live capture is on, and the open model (null while it opens). */
+    void update(boolean liveOn, String model, int requests) {
         live.setText(liveOn ? "Live capture is on" : "Turn on live capture");
         live.setEnabled(!liveOn);
-        showOnStart.setSelected(showEveryStart);
+        current.setText(model == null ? "Opening your model…" : requests > 0 ? "Your model '" + model + "' has " + requests + " requests."
+                : "Your model '" + model + "' is empty: send requests to it, or try the sample.");
+        String name = model == null ? "" : model.length() > 24 ? model.substring(0, 23) + "…" : model;
+        start.setText(requests > 0 ? "Open " + name : "Get started");
+    }
+
+    /** Put keyboard focus on the main button (when the page comes up, not on every refresh). */
+    void focusStart() {
         start.requestFocusInWindow();
     }
 

@@ -169,6 +169,65 @@ final class Widgets {
         }
     }
 
+    /** Like flow(), but the row wraps and the panel asks for the height of every row (FlowLayout asks for one). */
+    static JPanel wrapFlow(int gap) {
+        JPanel p = new JPanel(new WrapFlow(gap));
+        p.setOpaque(false);
+        return p;
+    }
+
+    static final class WrapFlow extends FlowLayout {
+        private static final long serialVersionUID = 1L;
+
+        WrapFlow(int gap) {
+            super(FlowLayout.LEFT, gap, gap);
+        }
+
+        @Override
+        public Dimension preferredLayoutSize(java.awt.Container target) {
+            return size(target, true);
+        }
+
+        @Override
+        public Dimension minimumLayoutSize(java.awt.Container target) {
+            Dimension d = size(target, false);
+            d.width -= getHgap() + 1;
+            return d;
+        }
+
+        private Dimension size(java.awt.Container target, boolean preferred) {
+            synchronized (target.getTreeLock()) {
+                int width = target.getWidth();
+                for (java.awt.Container c = target.getParent(); width == 0 && c != null; c = c.getParent()) {
+                    width = c.getWidth();
+                }
+                java.awt.Insets in = target.getInsets();
+                int max = (width == 0 ? Integer.MAX_VALUE : width) - in.left - in.right - getHgap() * 2;
+                int w = 0;
+                int h = 0;
+                int rowW = 0;
+                int rowH = 0;
+                for (java.awt.Component c : target.getComponents()) {
+                    if (!c.isVisible()) {
+                        continue;
+                    }
+                    Dimension d = preferred ? c.getPreferredSize() : c.getMinimumSize();
+                    if (rowW > 0 && rowW + d.width > max) {
+                        w = Math.max(w, rowW);
+                        h += rowH + getVgap();
+                        rowW = 0;
+                        rowH = 0;
+                    }
+                    rowW += d.width + getHgap();
+                    rowH = Math.max(rowH, d.height);
+                }
+                w = Math.max(w, rowW);
+                h += rowH;
+                return new Dimension(w + in.left + in.right + getHgap() * 2, h + in.top + in.bottom + getVgap() * 2);
+            }
+        }
+    }
+
     static JPanel flow(int gap) {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, gap, gap));
         p.setOpaque(false);

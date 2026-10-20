@@ -65,6 +65,7 @@ final class RolesTab implements Tab {
             }
         });
         Tables.render(rolesTable, "Endpoint", Renderers.path());
+        Tables.render(rolesTable, "Statuses", Renderers.codes());
         Tables.widths(rolesTable, 200, 340, 160, 300, 340);
         rolesNote.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
         rolesNote.setForeground(Theme.MUTED);
@@ -94,7 +95,7 @@ final class RolesTab implements Tab {
         for (String[] s : sections) {
             for (Object o : (List<Object>) r.get(s[0])) {
                 Map<String, Object> e = (Map<String, Object>) o;
-                rolesModel.addRow(new Object[] {s[1], e.get("endpoint"), String.valueOf(e.get("statuses")), e.get("unknown"), e.get("next")});
+                rolesModel.addRow(new Object[] {s[1], e.get("endpoint"), Cells.text(e.get("statuses")), e.get("unknown"), e.get("next")});
                 List<Integer> ev = new ArrayList<>();
                 for (Object x : (List<Object>) e.get("evidence")) {
                     ev.add(((Number) x).intValue());

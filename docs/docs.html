@@ -80,7 +80,7 @@ burp2model --version</pre></div>
   <p>The same model, built inside Burp: no Python, no export, nothing to run. Get <code>burp2model.jar</code> from the <a href="https://github.com/falc0n-researcher/burp2model/releases?q=extension">extension releases</a>, then in Burp choose <b>Extensions → Add → Java</b> and pick it. Burp 2023.x or later.</p>
   <ul>
     <li>Select requests in Proxy history or the Site map, right-click, <b>Send to burp2model</b>. Or turn on <b>Live</b> in the header: in-scope Proxy traffic joins the model every few seconds, a few samples of each request shape.</li>
-    <li>The tab opens on a welcome page with a sample model, so there is something to look at before your first send.</li>
+    <li>The tab opens on a welcome page every time; <b>Try the sample model</b> loads a small demo shop when you want one.</li>
     <li>Overview, ranked leads, a map that holds still, the surface as a list or site map, every masked request (in Burp's own message editor, or burp2model's view), a query console, builds and what changed, role comparison and light recon.</li>
     <li>Models live in <code>~/.burp2model/models/</code>; the header switches between them, and ⋯ imports a HAR or Burp export, exports, or deletes a model.</li>
     <li>Keyboard: <kbd>Cmd/Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> for tabs, <kbd>Cmd/Ctrl</kbd>+<kbd>F</kbd> search, <kbd>Cmd/Ctrl</kbd>+<kbd>L</kbd> query, <kbd>Alt</kbd>+<kbd>←</kbd> back.</li>
