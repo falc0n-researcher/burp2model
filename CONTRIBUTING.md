@@ -9,7 +9,7 @@ pip install -e ".[dev]"
 pytest -q                      # about two minutes; the UI tests use Chrome if it is installed
 ```
 
-The Burp extension is plain Java 17 with no dependencies besides Burp's API (see `burp-extension/README.md`). With a JDK installed, `tests/test_java_parity.py` compiles it and checks it against the Python engine.
+The Burp extension is plain Java 17 with no dependencies besides Burp's API (see `burp-extension/README.md`). With a JDK installed, `tests/test_java_parity.py` compiles it and checks it against the Python engine; `gradle -p burp-extension test` runs its own tests.
 
 ## Ground rules
 
