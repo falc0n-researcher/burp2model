@@ -79,6 +79,53 @@ final class Renderers {
         return new Badge(v -> v.matches("\\d+") ? Theme.status(Integer.parseInt(v)) : Theme.GRAY);
     }
 
+    private static final java.util.regex.Pattern CODE = java.util.regex.Pattern.compile("\\b[1-5]\\d\\d\\b");
+
+    /** Status codes, one or several ("200, 403" or "user 403 · admin 200"): each code in its colour, the rest muted. */
+    static TableCellRenderer codes() {
+        return new DefaultTableCellRenderer() {
+            private String text = "";
+            private boolean selected;
+
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus, int r, int c) {
+                super.getTableCellRendererComponent(t, v, sel, focus, r, c);
+                text = v == null ? "" : String.valueOf(v);
+                selected = sel;
+                setText("");
+                setToolTipText(text.isEmpty() ? null : text);
+                return this;
+            }
+
+            @Override
+            protected void paintComponent(Graphics g0) {
+                super.paintComponent(g0);
+                Graphics2D g = (Graphics2D) g0.create();
+                Theme.textHints(g);
+                g.setFont(Theme.mono(12f));
+                java.awt.FontMetrics fm = g.getFontMetrics();
+                int x = 8;
+                int y = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+                java.util.regex.Matcher m = CODE.matcher(text);
+                int at = 0;
+                while (m.find()) {
+                    g.setColor(selected ? getForeground() : Theme.MUTED);
+                    g.drawString(text.substring(at, m.start()), x, y);
+                    x += fm.stringWidth(text.substring(at, m.start()));
+                    g.setFont(Theme.mono(12f).deriveFont(Font.BOLD));
+                    g.setColor(selected ? getForeground() : Theme.readable(Theme.status(Integer.parseInt(m.group())), getBackground()));
+                    g.drawString(m.group(), x, y);
+                    x += g.getFontMetrics().stringWidth(m.group());
+                    g.setFont(Theme.mono(12f));
+                    at = m.end();
+                }
+                g.setColor(selected ? getForeground() : Theme.MUTED);
+                g.drawString(text.substring(at), x, y);
+                g.dispose();
+            }
+        };
+    }
+
     static TableCellRenderer type() {
         return new Badge(Theme::type);
     }

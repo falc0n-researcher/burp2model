@@ -61,7 +61,8 @@ final class BurpHistory {
         String role = (String) meta.get("role");
         byte[][] hit = null;
         for (ProxyHttpRequestResponse p : api.proxy().history()) {
-            if (method.equals(p.method()) && host.equalsIgnoreCase(p.host()) && path.equals(Redact.redactPath(p.path()).value())) {
+            HttpRequest fr = p.finalRequest();
+            if (fr != null && method.equals(fr.method()) && host.equalsIgnoreCase(fr.httpService().host()) && path.equals(Redact.redactPath(fr.path()).value())) {
                 hit = same(s, id, p.finalRequest(), p.originalResponse(), role, want);
                 if (hit == null) {
                     hit = same(s, id, p.request(), p.response(), role, want);
