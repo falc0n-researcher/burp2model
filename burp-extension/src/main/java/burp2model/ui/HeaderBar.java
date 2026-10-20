@@ -96,13 +96,13 @@ final class HeaderBar {
         more.getAccessibleContext().setAccessibleName("More actions");
         JPopupMenu moreMenu = new JPopupMenu();
         JMenuItem imp = new JMenuItem("Import HAR or Burp export…");
-        imp.addActionListener(e -> app.importFile());
+        imp.addActionListener(e -> app.data.importFile());
         JMenuItem expJson = new JMenuItem("Export model.json…");
-        expJson.addActionListener(e -> app.exportModel());
+        expJson.addActionListener(e -> app.data.exportModel());
         JMenuItem expMd = new JMenuItem("Export summary (Markdown)…");
-        expMd.addActionListener(e -> app.exportSummary());
+        expMd.addActionListener(e -> app.data.exportSummary());
         JMenuItem del = new JMenuItem("Delete this model…");
-        del.addActionListener(e -> app.deleteModel());
+        del.addActionListener(e -> app.models.delete());
         JMenuItem set = new JMenuItem("Settings");
         set.addActionListener(e -> {
             app.showWelcome(false);
@@ -119,7 +119,7 @@ final class HeaderBar {
         JButton about = new JButton("?");
         about.setToolTipText("About burp2model: the welcome page");
         about.getAccessibleContext().setAccessibleName("About burp2model");
-        about.addActionListener(e -> app.showWelcome(!app.welcomeShowing));
+        about.addActionListener(e -> app.showWelcome(!app.welcome.showing()));
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         right.setOpaque(false);
         right.add(globalSearch);
@@ -194,7 +194,7 @@ final class HeaderBar {
         }
         app.settingsTab.nameField.setText(name);
         app.host().set("app", name);
-        app.openSession(name, true);
+        app.models.open(name, true);
     }
 
     void setLive(boolean on) {

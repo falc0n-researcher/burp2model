@@ -21,7 +21,7 @@ import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
 /** One HTTP message (request or response), syntax-coloured, with Pretty and Raw views and a copy button. */
-final class HttpPane extends JPanel {
+final class HttpPane extends JPanel implements MessageView {
     private final JTextPane pane = new JTextPane();
     private final JLabel title = new JLabel();
     private final JLabel meta = new JLabel(" ");
@@ -73,13 +73,20 @@ final class HttpPane extends JPanel {
         syncButtons();
     }
 
-    void clear(String hint) {
+    @Override
+    public javax.swing.JComponent view() {
+        return this;
+    }
+
+    @Override
+    public void clear(String hint) {
         message = null;
         pane.setText(hint == null ? "" : hint);
         meta.setText(" ");
     }
 
-    void show(Map<String, Object> m) {
+    @Override
+    public void show(Map<String, Object> m) {
         message = m;
         render();
     }

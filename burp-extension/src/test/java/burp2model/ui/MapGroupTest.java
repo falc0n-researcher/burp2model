@@ -104,7 +104,7 @@ class MapGroupTest {
         assertTrue(n > 0 && sum / n < 160, "they start around the group (mean distance " + (sum / Math.max(1, n)) + ")");
         assertEquals(null, group(g, "shop.example.com /area0"));
         // and the rest of the map made room for them: nothing else is inside the disc they fill
-        double room = GraphPanel.openRadius(area0.members);
+        double room = GraphData.openRadius(area0.members);
         for (GraphPanel.V v : g.vsForTest()) {
             if (!v.node.label.contains("/area0/") && !v.node.type.equals("parameter")) {
                 assertTrue(Math.hypot(v.x - gx, v.y - gy) > room * 0.9, v.node.id + " is out of the way");

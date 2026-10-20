@@ -462,29 +462,16 @@ public final class Parse {
         }
     }
 
-    // ---- the item
+    // ---- the item, as its passes: read the wire, scan the response body, mask and record the evidence
 
-    public static Exchange item(int idx, Raw r, String role, String source, int itemNo) {
-        String method = (r.method() == null || r.method().isBlank() ? "GET" : r.method()).strip().toUpperCase();
-        String host = r.host() == null ? "" : r.host().strip().toLowerCase();
-        String protocol = r.protocol() == null || r.protocol().isBlank() ? "https" : r.protocol().strip().toLowerCase();
-        String path = r.path() == null ? "" : r.path().strip();
-        Integer status = r.status();
-        String mime = r.mime() == null ? "" : r.mime().strip();
-        if (host.isEmpty() || !host.matches("^[a-z0-9.\\-:\\[\\]]{1,255}$")) {
-            return null;
-        }
-        if (!method.matches("^[A-Z]{1,20}$")) {
-            return null;
-        }
-        byte[] reqRaw = r.request() == null ? new byte[0] : r.request();
-        byte[] respRaw = r.response() == null ? new byte[0] : r.response();
+    /** The two messages off the wire: headers parsed, bodies de-chunked and decompressed. */
+    private record Wire(Head req, Head resp, byte[] reqBody, byte[] respBody, boolean respDecoded, Integer status) {}
+
+    private static Wire wire(byte[] reqRaw, byte[] respRaw, Integer status) {
         Msg req = reqRaw.length > 0 ? splitHttp(reqRaw) : new Msg("", new byte[0]);
         Msg resp = respRaw.length > 0 ? splitHttp(respRaw) : new Msg("", new byte[0]);
         Head reqH = parseHeaders(req.head());
         Head respH = parseHeaders(resp.head());
-        List<Redact.Pair> reqHeaders = reqH.headers();
-        List<Redact.Pair> respHeaders = respH.headers();
         String respStart = respH.start();
         if (status == null && respStart.startsWith("HTTP/") && respStart.contains(" ")) {
             String[] sp = respStart.split(" ");
@@ -494,88 +481,66 @@ public final class Parse {
         }
         byte[] reqBody = req.body();
         byte[] respBody = resp.body();
-        if (header(reqHeaders, "transfer-encoding").toLowerCase().contains("chunked")) {
+        if (header(reqH.headers(), "transfer-encoding").toLowerCase().contains("chunked")) {
             reqBody = dechunk(reqBody);
         }
-        if (header(respHeaders, "transfer-encoding").toLowerCase().contains("chunked")) {
+        if (header(respH.headers(), "transfer-encoding").toLowerCase().contains("chunked")) {
             respBody = dechunk(respBody);
         }
-        reqBody = decompress(reqBody, header(reqHeaders, "content-encoding")).body();
-        Dec respDec = decompress(respBody, header(respHeaders, "content-encoding"));
-        respBody = respDec.body();
-        String reqCt = header(reqHeaders, "content-type");
-        String respCt = header(respHeaders, "content-type");
-        String reqBodyText = utf8(reqBody);
+        reqBody = decompress(reqBody, header(reqH.headers(), "content-encoding")).body();
+        Dec respDec = decompress(respBody, header(respH.headers(), "content-encoding"));
+        return new Wire(reqH, respH, reqBody, respDec.body(), respDec.ok(), status);
+    }
 
-        List<String> cookieNames = cookieNames(header(reqHeaders, "cookie"));
-        List<Map<String, Object>> setCookies = setCookies(respHeaders);
-        List<Redact.Pair> rawQuery = parseQuery(path);
-        List<String> credentials = credentials(reqHeaders, cookieNames, rawQuery);
-        Referer referer = referer(reqHeaders);
-        boolean preflight = method.equals("OPTIONS") && !header(reqHeaders, "access-control-request-method").isEmpty();
-
-        List<Redact.Fingerprint> secrets = new ArrayList<>();
-        Redact.Redacted<String> rp = Redact.redactPath(path);
-        String redPath = rp.value();
-        String ptemplate = Redact.routeTemplate(redPath, Redact.templatePath(redPath));
-        List<String[]> tech = new ArrayList<>();
+    /** Technology headers (server, x-powered-by ...), masked; their fingerprints go into secrets. */
+    private static List<String[]> techHeaders(List<Redact.Pair> respHeaders, List<Redact.Fingerprint> secrets) {
+        List<String[]> out = new ArrayList<>();
         for (Redact.Pair h : respHeaders) {
             if (TECH_HEADERS.contains(h.name().toLowerCase()) && !h.value().isEmpty()) {
-                tech.add(new String[] {h.name().toLowerCase(), trunc(h.value(), 80)});
+                Redact.Redacted<String> m = Redact.redactBody(trunc(h.value(), 80));
+                secrets.addAll(m.prints());
+                out.add(new String[] {h.name().toLowerCase(), m.value()});
             }
         }
-        Redact.Redacted<List<Redact.Pair>> reqHr = Redact.redactHeaders(reqHeaders);
-        Redact.Redacted<List<Redact.Pair>> respHr = Redact.redactHeaders(respHeaders);
-        Redact.Redacted<List<Redact.Pair>> queryR = Redact.redactParams(rawQuery);
-        Redact.Redacted<List<Redact.Pair>> bodyR = Redact.redactParams(parseBodyParams(reqBodyText, reqCt));
-        Redact.Redacted<String> reqBodyR = Redact.redactBody(trunc(reqBodyText, BODY_KEEP));
-        List<String> gql = gqlOps(ptemplate, reqBodyR.value(), reqCt);
-        List<String[]> techR = new ArrayList<>();
-        for (String[] kv : tech) {
-            Redact.Redacted<String> m = Redact.redactBody(kv[1]);
-            secrets.addAll(m.prints());
-            techR.add(new String[] {kv[0], m.value()});
-        }
+        return out;
+    }
 
-        boolean isJs = isJsResponse(mime, ptemplate, respCt);
-        boolean isHtml = isHtmlResponse(mime, respCt);
-        boolean scanTruncated = (isJs || isHtml) && (!respDec.ok() || r.truncated());
-        Set<Extract.Ref> jsRefs = new LinkedHashSet<>();
-        Set<Extract.Asset> jsAssets = new LinkedHashSet<>();
-        List<Stack.Hit> bodyHits = List.of();
-        String evBodyText = null;
-        String respBodyR;
-        Redact.Redacted<String> s6;
-        if (isJs || isHtml) {
-            byte[] scan = respBody;
-            if (scan.length > Extract.MAX_SCAN_BYTES) {
-                scan = java.util.Arrays.copyOf(scan, Extract.MAX_SCAN_BYTES);
-                scanTruncated = true;
-            }
-            BodyScan bs = scanBody(scan, isJs);
-            s6 = new Redact.Redacted<>(bs.full(), bs.prints());
-            String full = bs.full();
-            jsRefs = new LinkedHashSet<>(bs.refs());
-            if (isJs) {
-                List<String[]> arefs = new ArrayList<>(bs.assetRefs());
-                for (Redact.Pair h : respHeaders) {
-                    String n = h.name().toLowerCase();
-                    if (n.equals("sourcemap") || n.equals("x-sourcemap")) {
-                        arefs.add(new String[] {"sourcemap", h.value()});
-                        break;
-                    }
+    /** What the response body gave: the masked body, and for code and pages their references, assets and stack hits. */
+    private record RespBody(Redact.Redacted<String> masked, String kept, String evText, Set<Extract.Ref> refs, Set<Extract.Asset> assets,
+            List<Stack.Hit> hits, boolean truncated) {}
+
+    private static RespBody respBody(byte[] body, boolean isJs, boolean isHtml, boolean truncated, List<Redact.Pair> respHeaders,
+            String host, String ptemplate) {
+        if (!isJs && !isHtml) {
+            byte[] head = body.length > BODY_KEEP * 5 ? java.util.Arrays.copyOf(body, BODY_KEEP * 5) : body;
+            Redact.Redacted<String> s6 = Redact.redactBody(utf8(head));
+            return new RespBody(s6, trunc(s6.value(), BODY_KEEP), null, new LinkedHashSet<>(), new LinkedHashSet<>(), List.of(), truncated);
+        }
+        byte[] scan = body;
+        if (scan.length > Extract.MAX_SCAN_BYTES) {
+            scan = java.util.Arrays.copyOf(scan, Extract.MAX_SCAN_BYTES);
+            truncated = true;
+        }
+        BodyScan bs = scanBody(scan, isJs);
+        Set<Extract.Asset> assets = new LinkedHashSet<>();
+        if (isJs) {
+            List<String[]> arefs = new ArrayList<>(bs.assetRefs());
+            for (Redact.Pair h : respHeaders) {
+                String n = h.name().toLowerCase();
+                if (n.equals("sourcemap") || n.equals("x-sourcemap")) {
+                    arefs.add(new String[] {"sourcemap", h.value()});
+                    break;
                 }
-                jsAssets = Extract.resolveAssets(arefs, host, ptemplate);
             }
-            respBodyR = trunc(full, isJs ? CODE_KEEP : BODY_KEEP);
-            bodyHits = bs.hits();
-            evBodyText = bs.evText();
-        } else {
-            byte[] head = respBody.length > BODY_KEEP * 5 ? java.util.Arrays.copyOf(respBody, BODY_KEEP * 5) : respBody;
-            s6 = Redact.redactBody(utf8(head));
-            respBodyR = trunc(s6.value(), BODY_KEEP);
+            assets = Extract.resolveAssets(arefs, host, ptemplate);
         }
+        return new RespBody(new Redact.Redacted<>(bs.full(), bs.prints()), trunc(bs.full(), isJs ? CODE_KEEP : BODY_KEEP), bs.evText(),
+                new LinkedHashSet<>(bs.refs()), assets, bs.hits(), truncated);
+    }
 
+    /** The technology stack from response headers, every cookie name, body hits and the path. */
+    private static List<Stack.Hit> stackOf(List<Redact.Pair> respHeaders, List<Map<String, Object>> setCookies, List<String> cookieNames,
+            List<Stack.Hit> bodyHits, String redPath) {
         List<String> allCookies = new ArrayList<>();
         for (Map<String, Object> c : setCookies) {
             allCookies.add((String) c.get("name"));
@@ -585,7 +550,91 @@ public final class Parse {
         for (Redact.Pair h : respHeaders) {
             lowHeaders.put(h.name().toLowerCase(), h.value());
         }
-        List<Stack.Hit> stack = Stack.detect(lowHeaders, allCookies, bodyHits, redPath);
+        return Stack.detect(lowHeaders, allCookies, bodyHits, redPath);
+    }
+
+    /** The masked request and response panes stored as evidence. */
+    private static Map<String, Object> evidence(String method, String redPath, Head reqH, List<Redact.Pair> reqHeaders, String reqBody,
+            Head respH, Integer status, List<Redact.Pair> respHeaders, RespBody rb, boolean isJs, boolean isHtml) {
+        String[] startParts = reqH.start().split(" ", -1);
+        String ver = reqH.start().chars().filter(c -> c == ' ').count() >= 2 ? startParts[startParts.length - 1] : "HTTP/1.1";
+        int evBody = isJs ? CODE_KEEP : isHtml ? BODY_KEEP : 6000;
+        Map<String, Object> reqEv = new LinkedHashMap<>();
+        reqEv.put("line", Redact.redactNamed((method + " " + redPath + " " + ver).strip()));
+        reqEv.put("headers", headerList(reqHeaders));
+        reqEv.put("body", Redact.redactNamed(trunc(reqBody, 6000)));
+        reqEv.put("truncated", len(reqBody) > 6000);
+        Map<String, Object> respEv = new LinkedHashMap<>();
+        String respStart = respH.start();
+        String line = !respStart.isEmpty() ? respStart : (status != null ? "HTTP/1.1 " + status : "");
+        respEv.put("line", line.strip());
+        respEv.put("headers", headerList(respHeaders));
+        respEv.put("body", rb.evText() != null ? rb.evText() : Redact.redactNamed(trunc(rb.kept(), evBody)));
+        respEv.put("truncated", len(rb.kept()) > evBody || rb.truncated());
+        Map<String, Object> ev = new LinkedHashMap<>();
+        ev.put("request", reqEv);
+        ev.put("response", respEv);
+        return ev;
+    }
+
+    private static List<Extract.Ref> sortedRefs(Set<Extract.Ref> refs) {
+        List<Extract.Ref> out = new ArrayList<>(refs);
+        out.sort(Comparator.comparing((Extract.Ref x) -> x.path()).thenComparing(x -> x.method() == null ? "" : x.method())
+                .thenComparing(x -> x.host() == null ? "" : x.host()).thenComparing(Extract.Ref::kind));
+        return out;
+    }
+
+    private static List<Extract.Asset> sortedAssets(Set<Extract.Asset> assets) {
+        List<Extract.Asset> out = new ArrayList<>(assets);
+        out.sort(Comparator.comparing(Extract.Asset::kind).thenComparing(Extract.Asset::host).thenComparing(Extract.Asset::path));
+        return out;
+    }
+
+    public static Exchange item(int idx, Raw r, String role, String source, int itemNo) {
+        String method = (r.method() == null || r.method().isBlank() ? "GET" : r.method()).strip().toUpperCase();
+        String host = r.host() == null ? "" : r.host().strip().toLowerCase();
+        String protocol = r.protocol() == null || r.protocol().isBlank() ? "https" : r.protocol().strip().toLowerCase();
+        String path = r.path() == null ? "" : r.path().strip();
+        String mime = r.mime() == null ? "" : r.mime().strip();
+        if (host.isEmpty() || !host.matches("^[a-z0-9.\\-:\\[\\]]{1,255}$")) {
+            return null;
+        }
+        if (!method.matches("^[A-Z]{1,20}$")) {
+            return null;
+        }
+        Wire w = wire(r.request() == null ? new byte[0] : r.request(), r.response() == null ? new byte[0] : r.response(), r.status());
+        List<Redact.Pair> reqHeaders = w.req().headers();
+        List<Redact.Pair> respHeaders = w.resp().headers();
+        String reqCt = header(reqHeaders, "content-type");
+        String respCt = header(respHeaders, "content-type");
+        String reqBodyText = utf8(w.reqBody());
+
+        // what the request says about the client
+        List<String> cookieNames = cookieNames(header(reqHeaders, "cookie"));
+        List<Map<String, Object>> setCookies = setCookies(respHeaders);
+        List<Redact.Pair> rawQuery = parseQuery(path);
+        List<String> credentials = credentials(reqHeaders, cookieNames, rawQuery);
+        Referer referer = referer(reqHeaders);
+        boolean preflight = method.equals("OPTIONS") && !header(reqHeaders, "access-control-request-method").isEmpty();
+
+        // masking: every value is masked here, before anything is kept
+        List<Redact.Fingerprint> secrets = new ArrayList<>();
+        Redact.Redacted<String> rp = Redact.redactPath(path);
+        String redPath = rp.value();
+        String ptemplate = Redact.routeTemplate(redPath, Redact.templatePath(redPath));
+        Redact.Redacted<List<Redact.Pair>> reqHr = Redact.redactHeaders(reqHeaders);
+        Redact.Redacted<List<Redact.Pair>> respHr = Redact.redactHeaders(respHeaders);
+        Redact.Redacted<List<Redact.Pair>> queryR = Redact.redactParams(rawQuery);
+        Redact.Redacted<List<Redact.Pair>> bodyR = Redact.redactParams(parseBodyParams(reqBodyText, reqCt));
+        Redact.Redacted<String> reqBodyR = Redact.redactBody(trunc(reqBodyText, BODY_KEEP));
+        List<String> gql = gqlOps(ptemplate, reqBodyR.value(), reqCt);
+        List<String[]> tech = techHeaders(respHeaders, secrets);
+
+        // the response body: code and pages are scanned for references and stack hits
+        boolean isJs = isJsResponse(mime, ptemplate, respCt);
+        boolean isHtml = isHtmlResponse(mime, respCt);
+        RespBody rb = respBody(w.respBody(), isJs, isHtml, (isJs || isHtml) && (!w.respDecoded() || r.truncated()), respHeaders, host, ptemplate);
+        List<Stack.Hit> stack = stackOf(respHeaders, setCookies, cookieNames, rb.hits(), redPath);
 
         secrets.addAll(rp.prints());
         secrets.addAll(reqHr.prints());
@@ -593,25 +642,7 @@ public final class Parse {
         secrets.addAll(queryR.prints());
         secrets.addAll(bodyR.prints());
         secrets.addAll(reqBodyR.prints());
-        secrets.addAll(s6.prints());
-
-        String[] startParts = reqH.start().split(" ", -1);
-        String ver = reqH.start().chars().filter(c -> c == ' ').count() >= 2 ? startParts[startParts.length - 1] : "HTTP/1.1";
-        int evBody = isJs ? CODE_KEEP : isHtml ? BODY_KEEP : 6000;
-        Map<String, Object> reqEv = new LinkedHashMap<>();
-        reqEv.put("line", Redact.redactNamed((method + " " + redPath + " " + ver).strip()));
-        reqEv.put("headers", headerList(reqHr.value()));
-        reqEv.put("body", Redact.redactNamed(trunc(reqBodyR.value(), 6000)));
-        reqEv.put("truncated", len(reqBodyR.value()) > 6000);
-        Map<String, Object> respEv = new LinkedHashMap<>();
-        String line = !respStart.isEmpty() ? respStart : (status != null ? "HTTP/1.1 " + status : "");
-        respEv.put("line", line.strip());
-        respEv.put("headers", headerList(respHr.value()));
-        respEv.put("body", evBodyText != null ? evBodyText : Redact.redactNamed(trunc(respBodyR, evBody)));
-        respEv.put("truncated", len(respBodyR) > evBody || scanTruncated);
-        Map<String, Object> ev = new LinkedHashMap<>();
-        ev.put("request", reqEv);
-        ev.put("response", respEv);
+        secrets.addAll(rb.masked().prints());
 
         Exchange ex = new Exchange();
         ex.index = idx;
@@ -622,7 +653,7 @@ public final class Parse {
         ex.path = redPath;
         ex.pathTemplate = ptemplate;
         ex.rawTemplate = ptemplate;
-        ex.status = status;
+        ex.status = w.status();
         ex.mime = mime;
         ex.queryParams = queryR.value();
         ex.bodyParams = bodyR.value();
@@ -636,19 +667,14 @@ public final class Parse {
         ex.cookieNames = cookieNames;
         ex.setCookies = setCookies;
         ex.credentials = credentials;
-        ex.tech = techR;
-        List<Extract.Ref> refs = new ArrayList<>(jsRefs);
-        refs.sort(Comparator.comparing((Extract.Ref x) -> x.path()).thenComparing(x -> x.method() == null ? "" : x.method())
-                .thenComparing(x -> x.host() == null ? "" : x.host()).thenComparing(Extract.Ref::kind));
-        ex.jsRefs = refs;
-        List<Extract.Asset> assets = new ArrayList<>(jsAssets);
-        assets.sort(Comparator.comparing(Extract.Asset::kind).thenComparing(Extract.Asset::host).thenComparing(Extract.Asset::path));
-        ex.jsAssets = assets;
+        ex.tech = tech;
+        ex.jsRefs = sortedRefs(rb.refs());
+        ex.jsAssets = sortedAssets(rb.assets());
         ex.stack = stack;
-        ex.scanTruncated = scanTruncated;
+        ex.scanTruncated = rb.truncated();
         ex.gqlOps = gql;
         ex.preflight = preflight;
-        ex.setEv(ev);
+        ex.setEv(evidence(method, redPath, w.req(), reqHr.value(), reqBodyR.value(), w.resp(), w.status(), respHr.value(), rb, isJs, isHtml));
         ex.reqPath = redPath;
         return ex;
     }

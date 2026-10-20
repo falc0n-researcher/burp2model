@@ -3,7 +3,6 @@ package burp2model.ui;
 import burp2model.engine.Model;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -12,25 +11,22 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
-import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
-import javax.swing.JToggleButton;
-import javax.swing.ButtonGroup;
 import javax.swing.Timer;
 
 /**
  * The map: the model as a network you can read. Two layouts (a force-directed network and a left-to-right flow),
  * both deterministic, so the same model always draws the same way; adding requests keeps what was already placed.
- * Solid lines were seen in traffic, dashed ones found in code.
+ * Solid lines were seen in traffic, dashed ones found in code. GraphData decides what is drawn, MapLayout where,
+ * MapCanvas how; Viewport is the camera and GraphToolbar the bar above. This class holds them together.
  */
 final class GraphPanel extends JPanel {
     static final class V {
@@ -65,24 +61,17 @@ final class GraphPanel extends JPanel {
 
     record E(V a, V b, String state, String type) {}
 
-    private static final String[][] GROUPS = {
-        {"Hosts", "host"}, {"Pages", "route"}, {"Scripts", "script"}, {"Endpoints", "endpoint,operation"}, {"Parameters", "parameter"},
-        {"Third parties", "third_party"}, {"Trust", "cookie,auth,role"}, {"Tech", "tech"}};
     private static final int BIG = 1500;
     /** Above this many nodes, frames drawn while the map moves skip dashes and labels. */
     static final int FAST_PAINT = 600;
 
     final MapCanvas canvas = new MapCanvas(this);
-    private final Map<String, JCheckBox> toggles = new LinkedHashMap<>();
-    final JTextField search = new JTextField(14);
+    final Viewport view = new Viewport(canvas);
+    final GraphToolbar bar;
+    final JTextField search;
+    final JCheckBox labelsBox;
+    final JCheckBox groupBox;
     private final JLabel info = new JLabel(" ");
-    private final JToggleButton networkBtn = new JToggleButton("Network", true);
-    private final JToggleButton flowBtn = new JToggleButton("Flow");
-    private final JCheckBox codeOnly = new JCheckBox("Only code-named");
-    final JCheckBox labelsBox = new JCheckBox("Labels", true);
-    /** Large maps (over GROUP_ABOVE visible nodes) show each host's path areas as groups; double-click opens one. */
-    final JCheckBox groupBox = new JCheckBox("Group", true);
-    static final int GROUP_ABOVE = 150;
     /** Groups the user opened (they stay open across refreshes until closed or Re-layout). */
     final Set<String> expanded = new HashSet<>();
     /** Member node id -> the group key it belongs to, for the nodes of open groups (to close them again). */
@@ -102,108 +91,62 @@ final class GraphPanel extends JPanel {
     private Consumer<Model.Node> onSelect = n -> { };
     Consumer<Model.Node> onOpen = n -> { };
     final Timer sim;
-    final Timer anim;
     private int steps;
     private int maxSteps = 320;
-    double scale = 1;
-    double ox;
-    double oy;
-    boolean fitted;
     boolean flow;
     private List<V> matches = new ArrayList<>();
     private int matchAt = -1;
-    // animated view
-    private double tScale;
-    private double tox;
-    private double toy;
-    private long animStart;
-    private double fScale;
-    private double fox;
-    private double foy;
 
     GraphPanel() {
         super(new BorderLayout());
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 3));
-        for (String[] g : GROUPS) {
-            // parameters, tech and trust (roles, cookies, credentials) are off at first: each links to most of the map
-            // and turns it into a ball of lines; one click brings any of them back
-            JCheckBox c = new JCheckBox(g[0], !g[0].equals("Parameters") && !g[0].equals("Tech") && !g[0].equals("Trust"));
-            c.setFont(Theme.font(11f, Font.PLAIN));
-            c.addActionListener(e -> rebuild(false));
-            toggles.put(g[1], c);
-            bar.add(c);
-        }
-        codeOnly.setFont(Theme.font(11f, Font.PLAIN));
-        codeOnly.setToolTipText("Show only endpoints the code names but nothing called, with what names them");
-        codeOnly.addActionListener(e -> rebuild(false));
-        labelsBox.setFont(Theme.font(11f, Font.PLAIN));
-        labelsBox.addActionListener(e -> canvas.repaint());
-        groupBox.setFont(Theme.font(11f, Font.PLAIN));
-        groupBox.setToolTipText("On a large map, show each host's path areas as groups (double-click a group to open it)");
-        groupBox.addActionListener(e -> rebuild(false));
-        bar.add(codeOnly);
-        bar.add(groupBox);
-        bar.add(labelsBox);
-        ButtonGroup bg = new ButtonGroup();
-        bg.add(networkBtn);
-        bg.add(flowBtn);
-        for (JToggleButton b : new JToggleButton[] {networkBtn, flowBtn}) {
-            b.setFont(Theme.font(11f, Font.PLAIN));
-            b.setMargin(new java.awt.Insets(1, 8, 1, 8));
-            bar.add(b);
-        }
-        networkBtn.setToolTipText("Force-directed: connected things sit near each other");
-        flowBtn.setToolTipText("Left to right: host, pages, scripts, endpoints, then the rest");
-        networkBtn.addActionListener(e -> setFlow(false));
-        flowBtn.addActionListener(e -> setFlow(true));
-        search.setToolTipText("Find a node (Enter for the next match)");
-        search.putClientProperty("JTextField.placeholderText", "Find…");
-        // finding selects the match, which loads its facts and request: wait until typing pauses
-        findLater.setRepeats(false);
-        search.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                findLater.restart();
+        bar = new GraphToolbar(new GraphToolbar.Actions() {
+            @Override
+            public void rebuild() {
+                GraphPanel.this.rebuild(false);
             }
 
-            public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                findLater.restart();
+            @Override
+            public void repaint() {
+                canvas.repaint();
             }
 
-            public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                findLater.restart();
+            @Override
+            public void setFlow(boolean f) {
+                GraphPanel.this.setFlow(f);
+            }
+
+            @Override
+            public void find(boolean fresh) {
+                GraphPanel.this.find(fresh);
+            }
+
+            @Override
+            public void fit() {
+                fitAnimated();
+            }
+
+            @Override
+            public void relayout() {
+                memory.clear();
+                expanded.clear();                   // and close every opened group
+                GraphPanel.this.rebuild(true);
+            }
+
+            @Override
+            public void savePng() {
+                GraphPanel.this.savePng();
             }
         });
-        search.addActionListener(e -> {
-            boolean pending = findLater.isRunning();
-            findLater.stop();
-            find(pending);
-        });
-        bar.add(search);
-        bar.add(button("Fit", "Fit everything on screen (F)", this::fitAnimated));
-        bar.add(button("Re-layout", "Forget positions and lay the map out again", () -> {
-            memory.clear();
-            expanded.clear();                   // and close every opened group
-            rebuild(true);
-        }));
-        bar.add(button("PNG", "Save the map as an image", this::savePng));
+        search = bar.search;
+        labelsBox = bar.labelsBox;
+        groupBox = bar.groupBox;
         info.setForeground(Theme.MUTED);
         info.setFont(Theme.font(11f, Font.PLAIN));
         info.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
-        bar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.LINE));
         add(bar, BorderLayout.NORTH);
         add(canvas, BorderLayout.CENTER);
         add(info, BorderLayout.SOUTH);
         sim = new Timer(16, e -> tick());
-        anim = new Timer(14, e -> animTick());
-    }
-
-    private static JButton button(String text, String tip, Runnable r) {
-        JButton b = new JButton(text);
-        b.setFont(Theme.font(11f, Font.PLAIN));
-        b.setMargin(new java.awt.Insets(1, 8, 1, 8));
-        b.setToolTipText(tip);
-        b.addActionListener(e -> r.run());
-        return b;
     }
 
     void onSelect(Consumer<Model.Node> c) {
@@ -215,27 +158,11 @@ final class GraphPanel extends JPanel {
         onOpen = c;
     }
 
-    /** The model's nodes and edges as a fingerprint: the same structure needs no new layout. */
+    /** The structure (GraphData.structureOf) of the model on the map: the same structure needs no new layout. */
     private long structure;
 
-    private static long structureOf(Model m) {
-        long h = 0xcbf29ce484222325L;
-        for (Model.Node n : m.nodes.values()) {
-            h = (h ^ n.id.hashCode()) * 0x100000001b3L;
-            h = (h ^ n.type.hashCode()) * 0x100000001b3L;
-            h = (h ^ String.valueOf(n.attrs.get("api_state")).hashCode()) * 0x100000001b3L;
-        }
-        for (Model.Edge e : m.edges) {
-            h = (h ^ e.src.hashCode()) * 0x100000001b3L;
-            h = (h ^ e.dst.hashCode()) * 0x100000001b3L;
-            h = (h ^ e.type.hashCode()) * 0x100000001b3L;
-            h = (h ^ String.valueOf(e.state).hashCode()) * 0x100000001b3L;
-        }
-        return h ^ ((long) m.nodes.size() << 32) ^ m.edges.size();
-    }
-
     void setModel(Model m) {
-        if (m != null && model != null && structureOf(m) == structure) {
+        if (m != null && model != null && GraphData.structureOf(m) == structure) {
             // live capture added requests but nothing new to draw: keep the layout, the selection and the view
             this.model = m;
             for (V v : vs) {
@@ -247,7 +174,7 @@ final class GraphPanel extends JPanel {
             canvas.repaint();
             return;
         }
-        structure = m == null ? 0 : structureOf(m);
+        structure = m == null ? 0 : GraphData.structureOf(m);
         boolean first = model == null;
         this.model = m;
         selected = null;
@@ -260,8 +187,7 @@ final class GraphPanel extends JPanel {
 
     private void setFlow(boolean f) {
         // the toggles always say which layout is drawn, however it was switched
-        networkBtn.setSelected(!f);
-        flowBtn.setSelected(f);
+        bar.showFlow(f);
         if (flow == f) {
             return;
         }
@@ -289,100 +215,20 @@ final class GraphPanel extends JPanel {
             return;
         }
         // the new graph is built aside; the one on screen stays until the new one is placed
-        List<V> vs = new ArrayList<>();
-        List<E> es = new ArrayList<>();
-        Map<String, V> byId = new HashMap<>();
-        Set<String> types = new HashSet<>();
-        toggles.forEach((k, c) -> {
-            if (c.isSelected()) {
-                for (String t : k.split(",")) {
-                    types.add(t);
-                }
-            }
-        });
-        boolean only = codeOnly.isSelected();
-        Set<String> keep = null;
-        if (only) {
-            keep = new HashSet<>();
-            for (Model.Node n : model.nodes.values()) {
-                if ("STATIC_ONLY".equals(n.attrs.get("api_state"))) {
-                    keep.add(n.id);
-                }
-            }
-            for (Model.Edge e : model.edges) {
-                if (keep.contains(e.dst) && e.type.equals("REFERENCES")) {
-                    keep.add(e.src);
-                }
-            }
-        }
-        int cap = 0;
-        List<Model.Node> shown = new ArrayList<>();
-        for (Model.Node n : model.nodes.values()) {
-            if (types.contains(n.type) && (keep == null || keep.contains(n.id))) {
-                shown.add(n);
-                cap++;
-            }
-        }
+        GraphData.Graph g = GraphData.build(model, bar.types(), bar.codeOnly.isSelected(), groupBox.isSelected() && !flow, expanded);
+        List<V> vs = g.vs();
+        List<E> es = g.es();
         groupMembers.clear();
+        groupMembers.putAll(g.groupMembers());
         openGroupOf.clear();
-        boolean grouping = groupBox.isSelected() && !flow && keep == null && shown.size() > GROUP_ABOVE;
-        Map<String, List<Model.Node>> groups = new LinkedHashMap<>();
-        if (grouping) {
-            for (Model.Node n : shown) {
-                String k = groupKey(n, model);
-                if (k != null) {
-                    groups.computeIfAbsent(k, x -> new ArrayList<>()).add(n);
-                }
-            }
-        }
-        for (Model.Node n : shown) {
-            String k = grouping ? groupKey(n, model) : null;
-            List<Model.Node> g = k == null ? null : groups.get(k);
-            if (g != null && g.size() > 1 && !expanded.contains(k)) {
-                String gid = "group:" + k;
-                V gv = byId.get(gid);
-                if (gv == null) {
-                    gv = standIn(gid, k, g);
-                    vs.add(gv);
-                    byId.put(gid, gv);
-                    groupMembers.put(gid, g);
-                }
-                byId.put(n.id, gv);                       // edges to a member go to its group
-                continue;
-            }
-            if (g != null && g.size() > 1) {
-                openGroupOf.put(n.id, k);
-            }
-            V v = new V(n);
-            vs.add(v);
-            byId.put(n.id, v);
-        }
-        Set<String> edgeSeen = new HashSet<>();
-        for (Model.Edge e : model.edges) {
-            V a = byId.get(e.src);
-            V b = byId.get(e.dst);
-            // inside one group there is nothing to draw; between groups, one line per kind of link
-            if (a != null && b != null && a != b && edgeSeen.add(a.node.id + "\u0000" + b.node.id + "\u0000" + e.state + "\u0000" + e.type)) {
-                E ed = new E(a, b, e.state, e.type);
-                es.add(ed);
-                a.edges.add(ed);
-                b.edges.add(ed);
-                a.degree++;
-                b.degree++;
-                a.nbrs.add(b);
-                b.nbrs.add(a);
-            }
-        }
-        for (V v : vs) {
-            v.r = v.members > 0 ? 7 + Math.min(9, Math.sqrt(v.members) * 1.2) : 4 + Math.min(10, Math.sqrt(v.degree) * 1.6);
-        }
+        openGroupOf.putAll(g.openGroupOf());
         maxSteps = vs.size() > 900 ? 160 : 320;
         int gen = ++layoutGen;
         int groupCount = groupMembers.size();
         String infoText = vs.size() + " nodes · " + es.size() + " edges"
                 + (groupCount > 0 ? "   ·   " + groupCount + " groups: double-click one to open it" : "")
                 + "   ·   solid: seen in traffic · dashed: found in code   ·   scroll to zoom · drag to pan or move · double-click to focus · right-click for more"
-                + (cap > BIG && groupCount == 0 ? "   ·   a large map: turn groups off to see less" : "");
+                + (g.shown() > BIG && groupCount == 0 ? "   ·   a large map: turn groups off to see less" : "");
         // The map never animates: the layout is computed to the end and shown once. Nodes already placed keep their
         // place (they are fixed while new ones settle among them), so a refresh only adds; Re-layout starts over.
         if (!flow && vs.size() > ASYNC_LAYOUT) {
@@ -398,103 +244,34 @@ final class GraphPanel extends JPanel {
                     if (gen != layoutGen) {
                         return;                                 // a newer model arrived meanwhile
                     }
-                    install(vs, es, byId);
+                    install(g);
                     layingOut = false;
                     steps = maxSteps;
                     remember();
                     info.setText(infoText);
                     if (refit || firstMap) {
-                        fitted = false;
+                        view.fitted = false;
                     }
                     canvas.repaint();
                 });
             });
             return;
         }
-        install(vs, es, byId);
+        install(g);
         layingOut = false;
         if (flow) {
-            place();
-        } else if (MapLayout.placeAll(this.vs, memory)) {
-            steps = 0;
-        }
-        if (!flow) {
+            MapLayout.layoutFlow(this.vs);
+        } else {
+            MapLayout.placeAll(this.vs, memory);
             MapLayout.relax(vs, es, maxSteps, true, 0, maxSteps);
             remember();
         }
         steps = maxSteps;
         info.setText(infoText);
         if (refit) {
-            fitted = false;
+            view.fitted = false;
         }
         canvas.repaint();
-    }
-
-    /**
-     * Which group a node belongs to on a large map: endpoints, pages and their parameters by host and first path
-     * segment, scripts by host. Hosts, third parties, tech, roles and the rest stay on their own (null).
-     */
-    static String groupKey(Model.Node n, Model m) {
-        switch (n.type) {
-            case "endpoint", "route", "operation" -> {
-                String host = String.valueOf(n.attrs.getOrDefault("host", ""));
-                String path = String.valueOf(n.attrs.getOrDefault("path", "/"));
-                int q = path.indexOf('?');
-                path = q < 0 ? path : path.substring(0, q);
-                String[] segs = path.split("/");
-                String first = "";
-                for (String s : segs) {
-                    if (!s.isEmpty()) {
-                        first = s;
-                        break;
-                    }
-                }
-                return host + " /" + first;
-            }
-            case "parameter" -> {
-                // "param:<endpoint id>:<name>": with its endpoint's group
-                int c = n.id.lastIndexOf(':');
-                Model.Node owner = c > 6 ? m.nodes.get(n.id.substring(6, c)) : null;
-                return owner == null || owner.type.equals("parameter") ? null : groupKey(owner, m);
-            }
-            case "script" -> {
-                Object h = n.attrs.get("host");
-                if (h == null && n.id.startsWith("script:")) {
-                    int slash = n.id.indexOf('/', 7);              // "script:<host><path>"
-                    h = slash > 7 ? n.id.substring(7, slash) : n.id.substring(7);
-                }
-                return (h == null ? "" : h) + " scripts";
-            }
-            default -> {
-                return null;
-            }
-        }
-    }
-
-    /** The stand-in drawn for a closed group: its name, size, and the evidence of its first members. */
-    private V standIn(String gid, String key, List<Model.Node> members) {
-        Map<String, Integer> kinds = new HashMap<>();
-        int layer = Integer.MAX_VALUE;
-        for (Model.Node n : members) {
-            kinds.merge(n.type, 1, Integer::sum);
-            layer = Math.min(layer, n.layer);
-        }
-        String kind = kinds.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("endpoint");
-        Model.Node n = Model.Node.standIn(gid, "group", layer, key + "  (" + members.size() + ")");
-        n.attrs.put("members", (long) members.size());
-        n.attrs.put("kind", kind);
-        Set<Integer> ev = new java.util.TreeSet<>();
-        for (Model.Node x : members) {
-            ev.addAll(x.evidence);
-            if (ev.size() > 300) {
-                break;
-            }
-        }
-        n.evidence.addAll(ev);
-        V v = new V(n);
-        v.color = Theme.type(kind);
-        v.members = members.size();
-        return v;
     }
 
     /** Open a group: its members take its place, starting around where it was. */
@@ -506,7 +283,7 @@ final class GraphPanel extends JPanel {
         List<Model.Node> members = groupMembers.getOrDefault(g.node.id, List.of());
         // the rest of the map moves out by the disc's radius, all in the same direction from the group, so its shape
         // is kept; the members fill the disc, evenly (a sunflower spiral), and stay where they are put
-        double rad = openRadius(members.size());
+        double rad = GraphData.openRadius(members.size());
         double cx = g.x;
         double cy = g.y;
         Set<String> ids = new HashSet<>();
@@ -524,11 +301,6 @@ final class GraphPanel extends JPanel {
         expanded.add(key);
         selected = null;
         rebuild(true);                          // the map grew or shrank: fit it again
-    }
-
-    /** How much room an opened group of n members takes: a disc that fits them about 26 apart. */
-    static double openRadius(int n) {
-        return 30 + 15 * Math.sqrt(n);
     }
 
     /** Move every remembered position except `skip` along the line from (cx, cy) by `by` (inwards when negative, never past the centre). */
@@ -586,7 +358,7 @@ final class GraphPanel extends JPanel {
                 }
             }
             // the rest of the map closes the gap the group left
-            shiftOut(sx / c, sy / c, -openRadius(c), ids);
+            shiftOut(sx / c, sy / c, -GraphData.openRadius(c), ids);
             memory.put("group:" + key, new double[] {sx / c, sy / c, 0});
         }
         expanded.remove(key);
@@ -595,13 +367,13 @@ final class GraphPanel extends JPanel {
     }
 
     /** Put a newly built graph on screen in one step. */
-    private void install(List<V> nv, List<E> ne, Map<String, V> nb) {
+    private void install(GraphData.Graph g) {
         vs.clear();
-        vs.addAll(nv);
+        vs.addAll(g.vs());
         es.clear();
-        es.addAll(ne);
+        es.addAll(g.es());
         byId.clear();
-        byId.putAll(nb);
+        byId.putAll(g.byId());
     }
 
     /** Above this many nodes the first layout runs off the Swing thread. */
@@ -635,21 +407,6 @@ final class GraphPanel extends JPanel {
 
     // ------------------------------------------------------------------ layout
 
-
-    private void place() {
-        if (flow) {
-            MapLayout.layoutFlow(vs);
-            steps = maxSteps + 1;
-            return;
-        }
-        if (MapLayout.placeAll(vs, memory)) {
-            steps = 0;
-        }
-    }
-
-
-
-
     void remember() {
         for (V v : vs) {
             memory.put(v.node.id, new double[] {v.x, v.y, v.pinned ? 1 : 0});
@@ -661,14 +418,14 @@ final class GraphPanel extends JPanel {
             sim.stop();
             canvas.repaint();                                   // one full-quality frame once the map settles
             remember();
-            if (!fitted) {
+            if (!view.fitted) {
                 fitAnimated();
             }
             return;
         }
-        step(Math.max(0.04, 1.0 - steps / (double) maxSteps) * 0.6);
+        MapLayout.step(vs, es, Math.max(0.04, 1.0 - steps / (double) maxSteps) * 0.6);
         steps++;
-        if (!fitted && steps % 40 == 0) {
+        if (!view.fitted && steps % 40 == 0) {
             fit();
         }
         // a big map takes longer to draw than to step: draw every third step so the Swing thread keeps up with input
@@ -676,18 +433,6 @@ final class GraphPanel extends JPanel {
             canvas.repaint();
         }
     }
-
-    /** Run this many layout steps right away, so the map is already arranged when first drawn. */
-    private void relax(int n, boolean cool) {
-        MapLayout.relax(vs, es, n, cool, steps, maxSteps);
-    }
-
-
-    private void step(double temp) {
-        MapLayout.step(vs, es, temp);
-    }
-
-
 
     // ------------------------------------------------------------------ view
 
@@ -708,66 +453,24 @@ final class GraphPanel extends JPanel {
         return new double[] {minX, minY, maxX, maxY};
     }
 
-    private double[] fitView() {
-        double[] b = extent();
-        double w = Math.max(1, b[2] - b[0]) + (flow ? 260 : 110);
-        double h = Math.max(1, b[3] - b[1]) + 90;
-        double s = Math.max(0.05, Math.min(flow ? 1.4 : 2.0, Math.min(canvas.getWidth() / w, canvas.getHeight() / h)));
-        return new double[] {s, canvas.getWidth() / 2.0 - (b[0] + b[2]) / 2 * s, canvas.getHeight() / 2.0 - (b[1] + b[3]) / 2 * s};
-    }
-
     void fit() {
         if (vs.isEmpty() || canvas.getWidth() < 10) {
             return;
         }
-        double[] f = fitView();
-        scale = f[0];
-        ox = f[1];
-        oy = f[2];
-        fitted = true;
-        canvas.repaint();
+        view.jumpTo(view.fitting(extent(), flow));
+        view.fitted = true;
     }
 
     void fitAnimated() {
         if (vs.isEmpty() || canvas.getWidth() < 10) {
             return;
         }
-        double[] f = fitView();
-        animateTo(f[0], f[1], f[2]);
-        fitted = true;
-    }
-
-    private void animateTo(double s, double x, double y) {
-        fScale = scale;
-        fox = ox;
-        foy = oy;
-        tScale = s;
-        tox = x;
-        toy = y;
-        animStart = System.nanoTime();
-        anim.start();
-    }
-
-    private void animTick() {
-        double t = Math.min(1.0, (System.nanoTime() - animStart) / 240_000_000.0);
-        double e = 1 - Math.pow(1 - t, 3);
-        scale = fScale + (tScale - fScale) * e;
-        ox = fox + (tox - fox) * e;
-        oy = foy + (toy - foy) * e;
-        canvas.repaint();
-        if (t >= 1.0) {
-            anim.stop();
-        }
-    }
-
-    private void centerOn(V v) {
-        double s = Math.max(scale, 0.9);
-        animateTo(s, canvas.getWidth() / 2.0 - v.x * s, canvas.getHeight() / 2.0 - v.y * s);
+        double[] f = view.fitting(extent(), flow);
+        view.animateTo(f[0], f[1], f[2]);
+        view.fitted = true;
     }
 
     // ------------------------------------------------------------------ search and selection
-
-    private final Timer findLater = new Timer(200, e -> find(true));
 
     private void find(boolean fromTyping) {
         String q = search.getText().strip().toLowerCase();
@@ -790,7 +493,7 @@ final class GraphPanel extends JPanel {
         matchAt = (matchAt + 1) % matches.size();
         V hit = matches.get(matchAt);
         select(hit);
-        centerOn(hit);
+        view.centerOn(hit.x, hit.y);
         info.setText("match " + (matchAt + 1) + " of " + matches.size() + " — Enter for the next");
     }
 
@@ -802,18 +505,19 @@ final class GraphPanel extends JPanel {
         canvas.repaint();
     }
 
-    /** Select a node by id (from another tab). */
-    /** Stop the layout and camera timers (the extension is unloading). */
+    /** Stop the layout, camera and search timers (the extension is unloading). */
     void stop() {
         sim.stop();
-        anim.stop();
+        view.anim.stop();
+        bar.stop();
     }
 
+    /** Select a node by id (from another tab). */
     void showNode(String id) {
         V v = byId.get(id);
         if (v != null) {
             select(v);
-            centerOn(v);
+            view.centerOn(v.x, v.y);
         }
     }
 
@@ -841,7 +545,4 @@ final class GraphPanel extends JPanel {
             info.setText("could not save: " + e.getMessage());
         }
     }
-
-    // ------------------------------------------------------------------ the canvas
-
 }

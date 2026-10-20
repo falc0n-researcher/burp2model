@@ -20,7 +20,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
-/** Settings: the model, the next send, live capture, data and about, as cards whose fields keep their width. */
+/** Settings: the model, the next send, live capture, the request viewer, data and about, as cards whose fields keep their width. */
 final class SettingsTab {
     private final MainPanel app;
 
@@ -37,6 +37,8 @@ final class SettingsTab {
     final JCheckBox replaceRole = new JCheckBox("Replace this role's earlier requests when sending");
 
     final JCheckBox autoCapture = new JCheckBox("Capture proxied traffic automatically (only hosts in Burp's target scope)");
+
+    final JCheckBox burpEditor = new JCheckBox("Show requests and responses in Burp's message editor");
 
     Component build() {
         // a column of cards, at most 760 wide: a form whose fields keep their width whatever the pane does
@@ -74,13 +76,35 @@ final class SettingsTab {
         col.add(liveCard);
         col.add(javax.swing.Box.createVerticalStrut(12));
 
+        JPanel viewCard = formCard("Requests and responses");
+        c = new GridBagConstraints();
+        c.gridx = 0;
+        c.gridy = 0;
+        c.weightx = 1;
+        c.anchor = GridBagConstraints.WEST;
+        viewCard.add(burpEditor, c);
+        c.gridy = 1;
+        c.insets = new Insets(4, 24, 0, 0);
+        boolean inBurp = app.host().editors() != null;
+        viewCard.add(Widgets.muted(inBurp
+                ? "Burp's Pretty, Raw, Hex and Inspector views, over the same masked text burp2model stores. Off: burp2model's own coloured view."
+                : "Only inside Burp. Here requests show in burp2model's own view."), c);
+        burpEditor.setEnabled(inBurp);
+        burpEditor.setSelected(app.burpEditorOn());
+        burpEditor.addActionListener(e -> {
+            app.host().set("editor.burp", burpEditor.isSelected() ? "1" : "0");
+            app.applyMessageEditor();
+        });
+        col.add(viewCard);
+        col.add(javax.swing.Box.createVerticalStrut(12));
+
         JButton save = new JButton("Save settings");
         JButton export = new JButton("Export model.json…");
         JButton summaryBtn = new JButton("Export summary (Markdown)…");
         JButton importBtn = new JButton("Import HAR or Burp export…");
         JButton clear = new JButton("Clear this model");
         JButton deleteBtn = new JButton("Delete this model…");
-        deleteBtn.addActionListener(e -> app.deleteModel());
+        deleteBtn.addActionListener(e -> app.models.delete());
         JButton aboutBtn = new JButton("Welcome page");
         aboutBtn.addActionListener(e -> app.showWelcome(true));
         JPanel saveRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -123,23 +147,23 @@ final class SettingsTab {
                 app.setStatus("The model name must be letters, digits, '.', '_' or '-'.", MainPanel.Level.ERROR);
                 return;
             }
-            boolean renamed = !n.equals(app.appName());
+            boolean renamed = !n.equals(app.models.appName());
             app.host().set("app", n);
             app.host().set("role", roleField.getText().strip());
             app.host().set("scope", scopeField.getText().strip());
             app.host().set("replace", replaceRole.isSelected() ? "1" : "0");
             app.host().set("auto", autoCapture.isSelected() ? "1" : "0");
             if (renamed) {
-                app.openSession(n, true);
+                app.models.open(n, true);
             } else if (app.session() != null) {
                 app.session().scope = app.settings().scope();
             }
             app.setStatus("Settings saved.", MainPanel.Level.OK);
             app.refresh();
         });
-        export.addActionListener(e -> app.exportModel());
-        importBtn.addActionListener(e -> app.importFile());
-        summaryBtn.addActionListener(e -> app.exportSummary());
+        export.addActionListener(e -> app.data.exportModel());
+        importBtn.addActionListener(e -> app.data.importFile());
+        summaryBtn.addActionListener(e -> app.data.exportSummary());
         clear.addActionListener(e -> {
             if (app.session() != null && JOptionPane.showConfirmDialog(app, "Delete everything in the model '" + app.session().name + "'?", "burp2model",
                     JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
@@ -169,6 +193,45 @@ final class SettingsTab {
         sp.setBorder(null);
         sp.getVerticalScrollBar().setUnitIncrement(16);
         return sp;
+    }
+
+    /**
+     * Fill the fields from the saved settings, once: refreshes never touch them, so a half-typed value survives live
+     * capture. Role, scope and replace update what the next send uses as they change, and are kept as soon as the field
+     * is left; only a new model name needs Save (it opens another model).
+     */
+    void load() {
+        MainPanel.Host host = app.host();
+        nameField.setText(app.models.appName());
+        roleField.setText(host.get("role", ""));
+        scopeField.setText(host.get("scope", ""));
+        replaceRole.setSelected("1".equals(host.get("replace", "0")));
+        autoCapture.setSelected("1".equals(host.get("auto", "0")));
+        roleField.getDocument().addDocumentListener(new SimpleDoc(this::typed));
+        scopeField.getDocument().addDocumentListener(new SimpleDoc(this::typed));
+        replaceRole.addItemListener(e -> {
+            typed();
+            host.set("replace", replaceRole.isSelected() ? "1" : "0");
+        });
+        autoCapture.addItemListener(e -> {
+            host.set("auto", autoCapture.isSelected() ? "1" : "0");
+            app.header.showLive();
+        });
+        java.awt.event.FocusAdapter keep = new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                host.set("role", roleField.getText().strip());
+                host.set("scope", scopeField.getText().strip());
+            }
+        };
+        roleField.addFocusListener(keep);
+        scopeField.addFocusListener(keep);
+        typed();
+    }
+
+    /** What the next send uses, from the fields as typed (saved or not). */
+    private void typed() {
+        app.settings = MainPanel.Settings.of(roleField.getText(), scopeField.getText(), replaceRole.isSelected());
     }
 
     /** A titled card for one group of settings; rows go in with formRow. */

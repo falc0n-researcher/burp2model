@@ -414,21 +414,9 @@ public final class Query {
         return String.valueOf(v);
     }
 
-    private Predicate<Object> termPred(String target, Term t) {
-        String f = t.field();
-        String op = t.op();
-        String value = t.value();
-        Getter get;
-        String kind;
-        if (target.equals("requests")) {
-            Field fd = REQ.get(f);
-            get = fd.get();
-            kind = fd.kind();
-        } else if (target.equals("edges")) {
-            Field fd = edgeFields().get(f);
-            get = fd.get();
-            kind = fd.kind();
-        } else if (f.equals("node.evidence")) {
+    /** node.evidence, and node.role with eq or ne, test a node's lists directly rather than through a field; null for any other term. */
+    private static Predicate<Object> listPred(String f, String op, String value) {
+        if (f.equals("node.evidence")) {
             Matcher em = EVIDENCE_ID.matcher(value.strip());
             if (!em.find()) {
                 throw new QueryError("node.evidence needs an evidence id, got '" + value + "'");
@@ -438,60 +426,84 @@ public final class Query {
             }
             int ev = Integer.parseInt(em.group(1));
             return n -> ((Model.Node) n).evidence.contains(ev) == op.equals("eq");
-        } else if (f.equals("node.role")) {
-            if (op.equals("eq") || op.equals("ne")) {
-                String want = value.toLowerCase();
-                return n -> {
-                    boolean has = ((Model.Node) n).roles.stream().anyMatch(r -> r.toLowerCase().contains(want));
-                    return op.equals("eq") == has;
-                };
-            }
-            get = n -> Json.write(((Model.Node) n).roles);
-            kind = "text";
-        } else if (f.equals("node.first_build") || f.equals("node.last_build")) {
+        }
+        if (f.equals("node.role") && (op.equals("eq") || op.equals("ne"))) {
+            String want = value.toLowerCase();
+            return n -> {
+                boolean has = ((Model.Node) n).roles.stream().anyMatch(r -> r.toLowerCase().contains(want));
+                return op.equals("eq") == has;
+            };
+        }
+        return null;
+    }
+
+    /** The getter and kind (text or int) of a field on the target. */
+    private Field field(String target, String f) {
+        if (target.equals("requests")) {
+            return REQ.get(f);
+        }
+        if (target.equals("edges")) {
+            return edgeFields().get(f);
+        }
+        if (f.equals("node.role")) {
+            return new Field(n -> Json.write(((Model.Node) n).roles), "text");
+        }
+        if (f.equals("node.first_build") || f.equals("node.last_build")) {
             boolean first = f.equals("node.first_build");
-            get = n -> {
+            return new Field(n -> {
                 int[] h = history.apply(((Model.Node) n).id);
                 return h == null ? null : (long) (first ? h[0] : h[1]);
-            };
-            kind = "int";
-        } else if (f.startsWith("node.attr.")) {
+            }, "int");
+        }
+        if (f.startsWith("node.attr.")) {
             String a = f.substring("node.attr.".length());
             if (!ATTR.matcher(a).find()) {
                 throw new QueryError("bad attribute name '" + a + "'");
             }
-            get = n -> asText(((Model.Node) n).attrs.get(a));
-            kind = "text";
-        } else {
-            Field fd = NODE.get(f);
-            get = fd.get();
-            kind = fd.kind();
+            return new Field(n -> asText(((Model.Node) n).attrs.get(a)), "text");
         }
-        final Getter g = get;
-        if (kind.equals("int")) {
-            if (Set.of("cont", "ncont", "like", "regex").contains(op)) {
-                throw new QueryError(f + " is numeric; use eq ne gt gte lt lte");
+        return NODE.get(f);
+    }
+
+    private static Predicate<Object> intPred(String f, String op, String value, Getter g) {
+        if (Set.of("cont", "ncont", "like", "regex").contains(op)) {
+            throw new QueryError(f + " is numeric; use eq ne gt gte lt lte");
+        }
+        if (!value.strip().matches("[+-]?\\d+")) {
+            throw new QueryError(f + " needs a number, got '" + value + "'");
+        }
+        long v = Long.parseLong(value.strip().replace("+", ""));
+        return r -> {
+            Object x = g.get(r);
+            if (!(x instanceof Number n)) {
+                return false;
             }
-            if (!value.strip().matches("[+-]?\\d+")) {
-                throw new QueryError(f + " needs a number, got '" + value + "'");
-            }
-            long v = Long.parseLong(value.strip().replace("+", ""));
-            return r -> {
-                Object x = g.get(r);
-                if (!(x instanceof Number n)) {
-                    return false;
-                }
-                long y = n.longValue();
-                return switch (op) {
-                    case "eq" -> y == v;
-                    case "ne" -> y != v;
-                    case "gt" -> y > v;
-                    case "gte" -> y >= v;
-                    case "lt" -> y < v;
-                    default -> y <= v;
-                };
+            long y = n.longValue();
+            return switch (op) {
+                case "eq" -> y == v;
+                case "ne" -> y != v;
+                case "gt" -> y > v;
+                case "gte" -> y >= v;
+                case "lt" -> y < v;
+                default -> y <= v;
             };
+        };
+    }
+
+    /** A like pattern: * matches anything, the rest is literal, case-insensitive, whole value. */
+    private static Pattern wildcard(String value) {
+        StringBuilder sb = new StringBuilder("^");
+        String[] parts = value.split("\\*", -1);
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                sb.append(".*");
+            }
+            sb.append(Pattern.quote(parts[i]));
         }
+        return Pattern.compile(sb.append("$").toString(), Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    }
+
+    private Predicate<Object> textPred(String f, String op, String value, Getter g) {
         if (Set.of("gt", "gte", "lt", "lte").contains(op)) {
             throw new QueryError(f + " is text; " + op + " is for numbers");
         }
@@ -517,34 +529,34 @@ public final class Query {
                     Object x = g.get(r);
                     return x == null || !asText(x).toLowerCase().contains(low);
                 };
-            case "like": {
-                StringBuilder sb = new StringBuilder("^");
-                String[] parts = value.split("\\*", -1);
-                for (int i = 0; i < parts.length; i++) {
-                    if (i > 0) {
-                        sb.append(".*");
-                    }
-                    sb.append(Pattern.quote(parts[i]));
-                }
-                Pattern re = Pattern.compile(sb.append("$").toString(), Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-                return r -> {
-                    Object x = g.get(r);
-                    return x != null && re.matcher(guarded(asText(x))).find();
-                };
-            }
-            default: {
-                Pattern re;
-                try {
-                    re = Pattern.compile(value, Pattern.CASE_INSENSITIVE);
-                } catch (Exception e) {
-                    throw new QueryError("bad regex '" + value + "': " + e.getMessage());
-                }
-                return r -> {
-                    Object x = g.get(r);
-                    return x != null && re.matcher(guarded(asText(x))).find();
-                };
+            default:
+                break;
+        }
+        Pattern re;
+        if (op.equals("like")) {
+            re = wildcard(value);
+        } else {
+            try {
+                re = Pattern.compile(value, Pattern.CASE_INSENSITIVE);
+            } catch (Exception e) {
+                throw new QueryError("bad regex '" + value + "': " + e.getMessage());
             }
         }
+        return r -> {
+            Object x = g.get(r);
+            return x != null && re.matcher(guarded(asText(x))).find();
+        };
+    }
+
+    private Predicate<Object> termPred(String target, Term t) {
+        if (!target.equals("requests") && !target.equals("edges")) {
+            Predicate<Object> p = listPred(t.field(), t.op(), t.value());
+            if (p != null) {
+                return p;
+            }
+        }
+        Field fd = field(target, t.field());
+        return fd.kind().equals("int") ? intPred(t.field(), t.op(), t.value(), fd.get()) : textPred(t.field(), t.op(), t.value(), fd.get());
     }
 
     @SuppressWarnings("unchecked")
