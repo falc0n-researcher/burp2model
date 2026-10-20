@@ -36,7 +36,7 @@ pip install burp2model        # Python 3.9+, no dependencies
 
 ## Burp Suite extension
 
-Prefer to stay in Burp? The [extension](burp-extension/) builds the same model inside Burp: right-click requests, **Send to burp2model**, and the **burp2model** tab fills with the surface, ranked leads, a map, every request with its masked request and response, and a query console. It is one Java jar, with no Python and no files to export, and it is released separately from the command line tool: get `burp2model.jar` from the [releases](https://github.com/falc0n-researcher/burp2model/releases?q=extension).
+Prefer to stay in Burp? The [extension](burp-extension/) builds the same model inside Burp: right-click requests, **Send to burp2model**, and the **burp2model** tab fills with the surface, ranked leads, a map, every request and response, and a query console. It is one Java jar, with no Python and no files to export, and it is released separately from the command line tool: get `burp2model.jar` from the [releases](https://github.com/falc0n-researcher/burp2model/releases?q=extension).
 
 <img src="burp-extension/assets/overview.png" alt="The burp2model tab inside Burp" width="700">
 

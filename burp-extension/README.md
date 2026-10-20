@@ -12,7 +12,7 @@ Get `burp2model.jar` from the [extension releases](https://github.com/falc0n-res
 2. In Proxy history or Site map, select requests, right-click, **Send to burp2model**.
 3. Open the **burp2model** tab.
 
-The first time, the tab opens on a welcome page: what burp2model does, three steps to a first model, and buttons that start one (**Try the sample model** loads a small demo shop with two roles into a model of its own, so you can look around before sending anything). It comes back whenever the open model is empty, and the **?** at the top right opens it any time.
+The tab always opens on a welcome page: what burp2model does, which model is open, and buttons to start (**Try the sample model** loads a small demo shop with two roles into a model of its own; it never opens by itself). **Open** goes to your model. The **?** at the top right brings the page back.
 
 <img src="assets/welcome.png" alt="The welcome page" width="700">
 
@@ -26,14 +26,14 @@ Or turn on **Capture proxied traffic automatically** in Settings: in-scope Proxy
 | To check | Ranked leads with the reason and the request behind each, and the open questions ranked by value |
 | Map | The model as a map you can read: a network layout or a left-to-right flow that holds still (each layout is computed once, the same model always draws the same way, and new requests keep what was placed). Roles, cookies and credentials (Trust) are off at first; tick them to add them. Zoom, drag, search, hover for details, click to see a node's neighbours, double-click to focus, right-click for more; solid lines were seen in traffic, dashed ones found in code |
 | Surface | Endpoints, pages, scripts, third parties, cookies, credentials and more, as a list or a site map by path, with each thing's facts and connections |
-| Requests | Every captured request, with its masked request and response, in Burp's own message editor (or burp2model's coloured view, chosen in Settings) |
-| Query | Plain questions and BQL filters and verbs, offline; every row cites evidence; copy or save results |
+| Requests | Every captured request and response as Burp captured it (real cookies and tokens, read from Burp, never saved), in Burp's own message editor or burp2model's coloured view |
+| Query | Ready-made questions, plain questions and BQL, offline; every row cites evidence and opens its request; copy or save results |
 | Changes | Each send or snapshot is a build; see what changed between any two |
 | Roles | Send each account under its own role, then compare what they reached |
-| Recon | Light, passive recon on a host you are authorised to test: DNS, TLS, headers, robots.txt, security.txt, mail policy (only when you press the button) |
+| Recon | Light, passive recon on a host you are authorised to test, shown as cards: DNS, TLS, security headers, well-known files, mail policy (only when you press the button; the last run is kept) |
 | Settings | Cards for the model (name), the next send (role, scope, replace), live capture, requests and responses (Burp's message editor or burp2model's view), data (import a HAR or Burp export, export the model or a Markdown summary, clear or delete the model, the welcome page) and about |
 
-The header shows the open model (switch to another, or make a new one) and a **Live** button that turns live capture on and off; ⋯ holds import, export, **Delete this model…** and Settings. With no model chosen, the tab opens the sample model.
+The header shows the open model (switch to another, or make a new one) and a **Live** button that turns live capture on and off; ⋯ holds import, export, **Delete this model…** and Settings. With no model chosen, sends go to an empty model called `default`.
 
 Keyboard, while focus is in the tab: **Cmd/Ctrl+1–9, 0** switch tabs, **Cmd/Ctrl+F** searches, **Cmd/Ctrl+L** goes to the query box, **Cmd/Ctrl+Shift+C** copies the whole model for AI, **Alt+←** goes back after a jump, and **/** on the map jumps to Find.
 
@@ -59,7 +59,7 @@ provenance <node>        changed-since previous        reaches-privileged user
 
 ## Where things are stored
 
-Models are kept in `~/.burp2model/models/<name>/` and hold only masked requests and responses. The fingerprint key is in `~/.burp2model/key`. Nothing is sent anywhere, except by Recon (to the host you chose) and when you paste a package into your own AI.
+Models are kept in `~/.burp2model/models/<name>/` and hold only masked requests and responses; so do exports and Copy for AI. The real values the viewer shows come from Burp's own copy (or memory, for this session's requests) and are never written. The fingerprint key is in `~/.burp2model/key`. Nothing is sent anywhere, except by Recon (to the host you chose) and when you paste a package into your own AI.
 
 Sending the same request twice adds it once. Every rebuild starts from the same raw paths, so sending in pieces gives the same model as sending everything at once.
 
