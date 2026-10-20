@@ -46,6 +46,11 @@ public final class Exchange {
     /** Builder's cached folding key for `siblingKeyFor` (the template it was worked out from); never saved. */
     transient Object siblingKey;
     transient String siblingKeyFor;
+    /** The request and response exactly as Burp captured them, for the viewer only; kept in memory a while, never saved. */
+    transient byte[] rawRequest;
+    transient byte[] rawResponse;
+    /** The saved request's key in seen.txt (a digest of its raw bytes and role), to recognise it again in Burp; never saved here. */
+    transient String key;
     /** Builder's cached node kind for `kindFor` (the template it was worked out from); never saved. */
     transient String kind;
     transient String kindFor;

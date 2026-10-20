@@ -40,6 +40,8 @@ final class SettingsTab {
 
     final JCheckBox burpEditor = new JCheckBox("Show requests and responses in Burp's message editor");
 
+    final JCheckBox realValues = new JCheckBox("Show real cookies and tokens, as Burp captured them");
+
     Component build() {
         // a column of cards, at most 760 wide: a form whose fields keep their width whatever the pane does
         JPanel col = new JPanel();
@@ -93,6 +95,17 @@ final class SettingsTab {
         burpEditor.setSelected(app.burpEditorOn());
         burpEditor.addActionListener(e -> {
             app.host().set("editor.burp", burpEditor.isSelected() ? "1" : "0");
+            app.applyMessageEditor();
+        });
+        c.gridy = 2;
+        c.insets = new Insets(10, 0, 0, 0);
+        viewCard.add(realValues, c);
+        c.gridy = 3;
+        c.insets = new Insets(4, 24, 0, 0);
+        viewCard.add(Widgets.muted("Read from Burp's own copy when you open a request, never saved. Saved models, exports and Copy for AI stay masked."), c);
+        realValues.setSelected(app.realValuesOn());
+        realValues.addActionListener(e -> {
+            app.host().set("viewer.real", realValues.isSelected() ? "1" : "0");
             app.applyMessageEditor();
         });
         col.add(viewCard);

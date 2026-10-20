@@ -1,6 +1,7 @@
 package burp2model.ui;
 
 import burp2model.engine.Model;
+import burp2model.engine.Parse;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Font;
@@ -25,6 +26,15 @@ final class EvidenceViewer extends JPanel {
     private MessageEditors editors;
     private final JSplitPane panes;
     private final JLabel title = new JLabel(" ");
+    /** Whether the panes show the masked copy or the request as Burp captured it. */
+    private final JLabel source = new JLabel(" ");
+    private final java.awt.CardLayout cards = new java.awt.CardLayout();
+    private final JPanel cardPanel = new JPanel(cards);
+    private final JLabel emptyHint = new JLabel(" ", javax.swing.SwingConstants.CENTER);
+    /** Where the real request comes from (null: always masked), and how to look it up off the Swing thread. */
+    private java.util.function.IntFunction<byte[][]> captured;
+    private java.util.function.Consumer<Runnable> background;
+    private int showing;
     private Model model;
     private final List<Integer> current = new ArrayList<>();
 
@@ -73,8 +83,21 @@ final class EvidenceViewer extends JPanel {
         JPanel body = new JPanel(new BorderLayout());
         body.add(idScroll, BorderLayout.WEST);
         body.add(panes, BorderLayout.CENTER);
-        add(title, BorderLayout.NORTH);
-        add(body, BorderLayout.CENTER);
+        // before anything is picked, one quiet line instead of two empty panes
+        emptyHint.setForeground(Theme.MUTED);
+        emptyHint.setFont(Theme.font(12f, Font.PLAIN));
+        cardPanel.add(emptyHint, "empty");
+        cardPanel.add(body, "panes");
+        source.setFont(Theme.font(11f, Font.PLAIN));
+        source.setForeground(Theme.MUTED);
+        source.setBorder(BorderFactory.createEmptyBorder(6, 10, 4, 12));
+        JPanel head = new JPanel(new BorderLayout());
+        head.add(title, BorderLayout.CENTER);
+        head.add(source, BorderLayout.EAST);
+        head.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.LINE));
+        add(head, BorderLayout.NORTH);
+        add(cardPanel, BorderLayout.CENTER);
+        empty("Select a row above to see its request and response.");
     }
 
     /** Show requests and responses in Burp's message editors, or (null) in burp2model's own panes. */
@@ -110,9 +133,30 @@ final class EvidenceViewer extends JPanel {
     void clear() {
         list.clear();
         current.clear();
-        req.clear("Select something above to see the request behind it.");
+        req.clear("");
         resp.clear("");
         title.setText(" ");
+        empty("Select a row above to see its request and response.");
+    }
+
+    private void empty(String hint) {
+        showing++;
+        source.setText(" ");
+        emptyHint.setText(hint);
+        cards.show(cardPanel, "empty");
+    }
+
+    /**
+     * Show the request as Burp captured it (real cookies and tokens) when `captured` finds it, else the masked copy.
+     * The real values are only shown, never stored. Null turns it off.
+     */
+    void useCaptured(java.util.function.IntFunction<byte[][]> captured, java.util.function.Consumer<Runnable> background) {
+        this.captured = captured;
+        this.background = background;
+        int sel = ids.getSelectedIndex();
+        if (sel >= 0) {
+            show(sel);
+        }
     }
 
     /** Show these evidence ids; the first is selected. */
@@ -128,10 +172,10 @@ final class EvidenceViewer extends JPanel {
         }
         title.setText(heading == null || heading.isBlank() ? " " : heading);
         if (!current.isEmpty()) {
+            cards.show(cardPanel, "panes");
             ids.setSelectedIndex(0);
         } else {
-            req.clear("Named in the code, never captured: there is no request or response to show.");
-            resp.clear("");
+            empty("Named in the code, never captured: there is no request or response to show.");
         }
     }
 
@@ -159,11 +203,44 @@ final class EvidenceViewer extends JPanel {
         if (idx < 0 || idx >= current.size()) {
             return;
         }
-        Map<String, Object> ev = find(current.get(idx));
+        int id = current.get(idx);
+        Map<String, Object> ev = find(id);
         if (ev == null) {
             return;
         }
+        cards.show(cardPanel, "panes");
         req.show((Map<String, Object>) ev.get("request"));
         resp.show((Map<String, Object>) ev.get("response"));
+        int ticket = ++showing;
+        if (captured == null) {
+            source.setText("masked");
+            source.setToolTipText("Secrets are masked in what burp2model stores.");
+            return;
+        }
+        source.setText("masked · looking it up in Burp…");
+        java.util.function.IntFunction<byte[][]> from = captured;
+        background.accept(() -> {
+            byte[][] raw;
+            try {
+                raw = from.apply(id);
+            } catch (RuntimeException e) {
+                raw = null;
+            }
+            byte[][] got = raw;
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                if (ticket != showing) {
+                    return;                                     // another row was picked meanwhile
+                }
+                if (got == null) {
+                    source.setText("masked: not in Burp's history any more");
+                    source.setToolTipText("Requests from an imported file, or removed from Burp's history, are shown as stored: masked.");
+                    return;
+                }
+                req.show(Parse.plain(got[0]));
+                resp.show(Parse.plain(got[1]));
+                source.setText("as captured: real values from Burp, not saved");
+                source.setToolTipText("Shown from Burp's own copy. burp2model stores, exports and copies for AI only the masked version.");
+            });
+        });
     }
 }

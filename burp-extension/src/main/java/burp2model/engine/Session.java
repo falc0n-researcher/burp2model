@@ -203,6 +203,7 @@ public final class Session {
     public synchronized AddResult add(List<Parse.Raw> raws, String role, String label, boolean replaceRole, boolean snapshot, int perShape) throws IOException {
         if (replaceRole && role != null) {
             exchanges.removeIf(e -> role.equals(e.role));
+            forgetRaw(e -> role.equals(e.role));
             seen.removeIf(s -> s.endsWith("@" + role));
             fullRewrite = true;
             countShapes();
@@ -244,6 +245,8 @@ public final class Session {
                 seen.remove(keys[todo.get(k)]);
             } else {
                 shapes.merge(shape(parsed[k]), 1, Integer::sum);
+                keepRaw(parsed[k], raws.get(todo.get(k)));
+                parsed[k].key = keys[todo.get(k)];
                 parsed[k].item = base + added;
                 exchanges.add(parsed[k]);
                 fresh.add(parsed[k]);
@@ -259,6 +262,70 @@ public final class Session {
         pendingKeys.addAll(freshKeys);
         BuildInfo b = rebuild(label, skipped, snapshot);
         return new AddResult(added, dup, skipped, b, capped);
+    }
+
+    // ---- the requests as captured, for the viewer only: in memory, newest first to stay, never written anywhere
+
+    /** How much raw request and response data is kept in memory for the viewer; older requests are looked up in Burp. */
+    static final long RAW_BUDGET = 64L * 1024 * 1024;
+    private long rawBytes;
+    /** Exchanges that hold raw bytes, oldest first. */
+    private final java.util.ArrayDeque<Exchange> rawKept = new java.util.ArrayDeque<>();
+
+    private void keepRaw(Exchange e, Parse.Raw r) {
+        long n = (r.request() == null ? 0 : r.request().length) + (r.response() == null ? 0L : r.response().length);
+        if (n == 0 || n > RAW_BUDGET / 4) {
+            return;
+        }
+        e.rawRequest = r.request();
+        e.rawResponse = r.response() == null ? new byte[0] : r.response();
+        rawKept.add(e);
+        rawBytes += n;
+        while (rawBytes > RAW_BUDGET && !rawKept.isEmpty()) {
+            Exchange old = rawKept.poll();
+            rawBytes -= old.rawRequest.length + (long) old.rawResponse.length;
+            old.rawRequest = null;
+            old.rawResponse = null;
+        }
+    }
+
+    private void forgetRaw(java.util.function.Predicate<Exchange> which) {
+        rawKept.removeIf(e -> {
+            if (!which.test(e)) {
+                return false;
+            }
+            rawBytes -= e.rawRequest.length + (long) e.rawResponse.length;
+            e.rawRequest = null;
+            e.rawResponse = null;
+            return true;
+        });
+    }
+
+    /**
+     * Whether `r` is exactly the request saved as evidence id `id` (the same raw bytes and role), so a copy found in
+     * Burp's history can stand in for it. True when the model cannot tell (a key lost to a damaged file).
+     */
+    public synchronized boolean isSaved(int id, Parse.Raw r) {
+        if (id < 1 || id > exchanges.size() || exchanges.get(id - 1).index != id) {
+            return false;
+        }
+        Exchange e = exchanges.get(id - 1);
+        String role = e.role == null ? "" : e.role;
+        return e.key == null || e.key.equals(digest(r, role) + "@" + role);
+    }
+
+    /** The request and response behind evidence id `id` as Burp captured them, if still in memory; null otherwise. */
+    public synchronized byte[][] raw(int id) {
+        if (id < 1 || id > exchanges.size()) {
+            return null;
+        }
+        Exchange e = exchanges.get(id - 1);
+        if (e.index != id) {
+            return null;
+        }
+        byte[] rq = e.rawRequest;
+        byte[] rs = e.rawResponse;
+        return rq == null ? null : new byte[][] {rq, rs};
     }
 
     private static volatile java.util.concurrent.ForkJoinPool pool;
@@ -299,6 +366,7 @@ public final class Session {
 
     public synchronized void clear() throws IOException {
         exchanges.clear();
+        forgetRaw(e -> true);
         shapes.clear();
         roles = Set.of();
         seen.clear();
@@ -596,6 +664,11 @@ public final class Session {
             }
         }
         seen.addAll(keys);
+        if (keys.size() == exchanges.size()) {
+            for (int i = 0; i < keys.size(); i++) {
+                exchanges.get(i).key = keys.get(i);
+            }
+        }
     }
 
     /** A key is 64 hex digits, '@' and the role; a second key starting mid-line is split off. */

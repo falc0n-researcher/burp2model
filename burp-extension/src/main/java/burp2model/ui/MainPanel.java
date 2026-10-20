@@ -44,6 +44,14 @@ public final class MainPanel extends JPanel {
             return null;
         }
 
+        /**
+         * The request and response behind evidence id `id` as they were captured (real cookies and tokens), for the
+         * viewer only; null when they are gone. The extension also looks in Burp's own history.
+         */
+        default byte[][] captured(Session s, int id) {
+            return s == null ? null : s.raw(id);
+        }
+
         /** Run slow work off the Swing thread; the extension tracks it so unloading waits for it. */
         default void background(String name, Runnable task) {
             Thread t = new Thread(null, task, name, 64L * 1024 * 1024);
@@ -310,11 +318,18 @@ public final class MainPanel extends JPanel {
         return host.editors() != null && !"0".equals(host.get("editor.burp", "1"));
     }
 
-    /** Point every request and response viewer at Burp's editor or burp2model's own panes, as the setting says. */
+    /** The viewer shows requests as Burp captured them (real cookies and tokens), unless turned off in Settings. */
+    boolean realValuesOn() {
+        return !"0".equals(host.get("viewer.real", "1"));
+    }
+
+    /** Point every request and response viewer at Burp's editor or burp2model's own panes, real or masked, as the settings say. */
     void applyMessageEditor() {
         MessageEditors e = burpEditorOn() ? host.editors() : null;
+        boolean real = realValuesOn();
         for (EvidenceViewer v : viewers(this, new ArrayList<>())) {
             v.useEditors(e);
+            v.useCaptured(real ? id -> host.captured(session, id) : null, r -> host.background("burp2model-viewer", r));
         }
     }
 
