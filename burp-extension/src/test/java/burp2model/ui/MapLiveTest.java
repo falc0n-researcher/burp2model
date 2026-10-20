@@ -81,7 +81,7 @@ class MapLiveTest {
             });
         }
         // the first map's fit is animated: let it finish before reading the camera
-        javax.swing.Timer anim = (javax.swing.Timer) get(g, "anim");
+        javax.swing.Timer anim = g.view.anim;
         for (int i = 0; i < 200 && anim.isRunning(); i++) {
             Thread.sleep(10);
         }
@@ -103,8 +103,8 @@ class MapLiveTest {
             g[0].setModel(m1);
         });
         settle(g[0]);
-        double scale = (double) get(g[0], "scale");
-        double ox = (double) get(g[0], "ox");
+        double scale = g[0].view.scale;
+        double ox = g[0].view.ox;
         Map<String, double[]> before = positions(g[0]);
 
         // live capture: a few more pages, then the refresh
@@ -121,8 +121,8 @@ class MapLiveTest {
         });
         assertFalse(blank[0], "the current map stays on screen while the new one is laid out");
         settle(g[0]);
-        assertEquals(scale, (double) get(g[0], "scale"), 1e-9, "the camera did not re-fit");
-        assertEquals(ox, (double) get(g[0], "ox"), 1e-9);
+        assertEquals(scale, g[0].view.scale, 1e-9, "the camera did not re-fit");
+        assertEquals(ox, g[0].view.ox, 1e-9);
 
         Map<String, double[]> after = positions(g[0]);
         double sum = 0;

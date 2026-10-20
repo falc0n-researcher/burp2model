@@ -49,7 +49,7 @@ private final GraphPanel map;
 
     /** A big map while it moves (layout running, camera animating, being dragged) is drawn the cheap way. */
     private boolean moving() {
-        return map.vs.size() > GraphPanel.FAST_PAINT && (map.sim.isRunning() || map.anim.isRunning() || (last != null && moved));
+        return map.vs.size() > GraphPanel.FAST_PAINT && (map.sim.isRunning() || map.view.anim.isRunning() || (last != null && moved));
     }
 
     private boolean inView(V v) {
@@ -76,7 +76,7 @@ private final GraphPanel map;
                     popup(e);
                     return;
                 }
-                map.anim.stop();
+                map.view.anim.stop();
                 dragging = pick(e.getPoint());
                 last = e.getPoint();
                 moved = false;
@@ -94,11 +94,11 @@ private final GraphPanel map;
                 double dy = e.getY() - last.getY();
                 moved = moved || Math.abs(dx) + Math.abs(dy) > 2;
                 if (dragging != null) {
-                    dragging.x += dx / map.scale;
-                    dragging.y += dy / map.scale;
+                    dragging.x += dx / map.view.scale;
+                    dragging.y += dy / map.view.scale;
                 } else {
-                    map.ox += dx;
-                    map.oy += dy;
+                    map.view.ox += dx;
+                    map.view.oy += dy;
                 }
                 last = e.getPoint();
                 repaint();
@@ -168,11 +168,11 @@ private final GraphPanel map;
             @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
                 double f = Math.pow(1.18, -e.getPreciseWheelRotation());
-                double ns = Math.max(0.05, Math.min(6, map.scale * f));
-                map.ox = e.getX() - (e.getX() - map.ox) * ns / map.scale;
-                map.oy = e.getY() - (e.getY() - map.oy) * ns / map.scale;
-                map.scale = ns;
-                map.fitted = true;
+                double ns = Math.max(0.05, Math.min(6, map.view.scale * f));
+                map.view.ox = e.getX() - (e.getX() - map.view.ox) * ns / map.view.scale;
+                map.view.oy = e.getY() - (e.getY() - map.view.oy) * ns / map.view.scale;
+                map.view.scale = ns;
+                map.view.fitted = true;
                 repaint();
             }
         };
@@ -197,19 +197,19 @@ private final GraphPanel map;
                     case KeyEvent.VK_EQUALS, KeyEvent.VK_PLUS -> zoom(1.25);
                     case KeyEvent.VK_MINUS -> zoom(0.8);
                     case KeyEvent.VK_LEFT -> {
-                        map.ox += 60;
+                        map.view.ox += 60;
                         repaint();
                     }
                     case KeyEvent.VK_RIGHT -> {
-                        map.ox -= 60;
+                        map.view.ox -= 60;
                         repaint();
                     }
                     case KeyEvent.VK_UP -> {
-                        map.oy += 60;
+                        map.view.oy += 60;
                         repaint();
                     }
                     case KeyEvent.VK_DOWN -> {
-                        map.oy -= 60;
+                        map.view.oy -= 60;
                         repaint();
                     }
                     default -> {
@@ -220,10 +220,10 @@ private final GraphPanel map;
     }
 
     private void zoom(double f) {
-        double ns = Math.max(0.05, Math.min(6, map.scale * f));
-        map.ox = getWidth() / 2.0 - (getWidth() / 2.0 - map.ox) * ns / map.scale;
-        map.oy = getHeight() / 2.0 - (getHeight() / 2.0 - map.oy) * ns / map.scale;
-        map.scale = ns;
+        double ns = Math.max(0.05, Math.min(6, map.view.scale * f));
+        map.view.ox = getWidth() / 2.0 - (getWidth() / 2.0 - map.view.ox) * ns / map.view.scale;
+        map.view.oy = getHeight() / 2.0 - (getHeight() / 2.0 - map.view.oy) * ns / map.view.scale;
+        map.view.scale = ns;
         repaint();
     }
 
@@ -274,8 +274,8 @@ private final GraphPanel map;
     }
 
     private V pick(Point p) {
-        double x = (p.x - map.ox) / map.scale;
-        double y = (p.y - map.oy) / map.scale;
+        double x = (p.x - map.view.ox) / map.view.scale;
+        double y = (p.y - map.view.oy) / map.view.scale;
         V best = null;
         double bd = 1e18;
         for (V v : map.vs) {
@@ -283,7 +283,7 @@ private final GraphPanel map;
                 continue;
             }
             double d = (v.x - x) * (v.x - x) + (v.y - y) * (v.y - y);
-            double r = Math.max(v.r + 2, 8 / map.scale);
+            double r = Math.max(v.r + 2, 8 / map.view.scale);
             if (d <= r * r && d < bd) {
                 bd = d;
                 best = v;
@@ -294,7 +294,7 @@ private final GraphPanel map;
 
     @Override
     protected void paintComponent(Graphics g0) {
-        if (!map.fitted && getWidth() > 10 && !map.vs.isEmpty()) {
+        if (!map.view.fitted && getWidth() > 10 && !map.vs.isEmpty()) {
             map.fit();
         }
         Graphics2D g = (Graphics2D) g0.create();
@@ -314,11 +314,11 @@ private final GraphPanel map;
             return;
         }
         // what is on screen, in map coordinates, with a margin for node sizes and rings
-        double pad = 30 / map.scale + 20;
-        vx0 = -map.ox / map.scale - pad;
-        vy0 = -map.oy / map.scale - pad;
-        vx1 = (getWidth() - map.ox) / map.scale + pad;
-        vy1 = (getHeight() - map.oy) / map.scale + pad;
+        double pad = 30 / map.view.scale + 20;
+        vx0 = -map.view.ox / map.view.scale - pad;
+        vy0 = -map.view.oy / map.view.scale - pad;
+        vx1 = (getWidth() - map.view.ox) / map.view.scale + pad;
+        vy1 = (getHeight() - map.view.oy) / map.view.scale + pad;
         if (map.vs.isEmpty()) {
             g.setColor(Theme.muted());
             g.setFont(Theme.font(13f, Font.PLAIN));
@@ -327,8 +327,8 @@ private final GraphPanel map;
             return;
         }
         AffineTransform base = g.getTransform();
-        g.translate(map.ox, map.oy);
-        g.scale(map.scale, map.scale);
+        g.translate(map.view.ox, map.view.oy);
+        g.scale(map.view.scale, map.view.scale);
         Set<V> lit = new HashSet<>();
         if (map.selected != null) {
             lit.add(map.selected);
@@ -349,7 +349,7 @@ private final GraphPanel map;
     }
 
     private void drawEdges(Graphics2D g, Set<V> lit, boolean dimming) {
-        double sw = 1.0 / Math.sqrt(map.scale);
+        double sw = 1.0 / Math.sqrt(map.view.scale);
         Color base = Theme.fg();
         Map<String, Path2D.Double> batches = new HashMap<>();
         List<E> hot = new ArrayList<>();
@@ -365,7 +365,7 @@ private final GraphPanel map;
                 hot.add(e);
                 continue;
             }
-            if (map.scale < 0.25 && map.vs.size() > 400 && !e.state().equals("OBSERVED")) {
+            if (map.view.scale < 0.25 && map.vs.size() > 400 && !e.state().equals("OBSERVED")) {
                 continue;
             }
             Path2D.Double p = batches.computeIfAbsent(e.state(), k -> new Path2D.Double());
@@ -377,14 +377,14 @@ private final GraphPanel map;
             g.setStroke(strokeFor(b.getKey(), (float) sw));
             g.draw(b.getValue());
         }
-        g.setFont(Theme.font((float) Math.max(9, 10 / Math.sqrt(map.scale)), Font.PLAIN));
+        g.setFont(Theme.font((float) Math.max(9, 10 / Math.sqrt(map.view.scale)), Font.PLAIN));
         for (E e : hot) {
             g.setColor(Theme.ACCENT);
             g.setStroke(strokeFor(e.state(), (float) (sw * 2)));
             Path2D.Double p = new Path2D.Double();
             addEdge(p, e);
             g.draw(p);
-            if (map.scale > 0.55 && hot.size() <= 10) {
+            if (map.view.scale > 0.55 && hot.size() <= 10) {
                 double mx = (e.a().x + e.b().x) / 2;
                 double my = (e.a().y + e.b().y) / 2;
                 String t = e.type().toLowerCase().replace('_', ' ');
@@ -449,11 +449,11 @@ private final GraphPanel map;
             g.fill(shape);
         });
         // a group wears a second ring: there is more inside, a double-click away
-        g.setStroke(new BasicStroke((float) (1.4 / Math.sqrt(map.scale))));
+        g.setStroke(new BasicStroke((float) (1.4 / Math.sqrt(map.view.scale))));
         g.setColor(Theme.alpha(Theme.fg(), 110));
         g.draw(groupRings);
         // code-only rings: present but quiet, so a map of mostly code-only endpoints still shows its structure
-        float rw = (float) (1.1 / Math.sqrt(map.scale));
+        float rw = (float) (1.1 / Math.sqrt(map.view.scale));
         g.setStroke(fast ? new BasicStroke(rw) : new BasicStroke(rw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[] {2.5f, 3f}, 0f));
         g.setColor(Theme.alpha(Theme.ACCENT, 40));
         g.draw(dimRings);
@@ -461,7 +461,7 @@ private final GraphPanel map;
         g.draw(rings);
         for (V v : marked) {
             g.setColor(v.pinned && v != map.selected ? Theme.muted() : Theme.fg());
-            g.setStroke(new BasicStroke((float) ((v == map.selected ? 2.4 : 1.6) / Math.sqrt(map.scale))));
+            g.setStroke(new BasicStroke((float) ((v == map.selected ? 2.4 : 1.6) / Math.sqrt(map.view.scale))));
             g.draw(new java.awt.geom.Ellipse2D.Double(v.x - v.r - 3, v.y - v.r - 3, v.r * 2 + 6, v.r * 2 + 6));
         }
         g.setStroke(new BasicStroke(1f));
@@ -473,7 +473,7 @@ private final GraphPanel map;
             return;
         }
         // labels are drawn in map space: keep them at least 10 px on screen however far the map is zoomed out
-        g.setFont(Theme.font((float) Math.max(Math.max(9.5, 11.5 / Math.sqrt(map.scale)), 10.5 / map.scale), Font.PLAIN));
+        g.setFont(Theme.font((float) Math.max(Math.max(9.5, 11.5 / Math.sqrt(map.view.scale)), 10.5 / map.view.scale), Font.PLAIN));
         FontMetrics fm = g.getFontMetrics();
         String q = map.search.getText().strip().toLowerCase();
         List<V> cand = new ArrayList<>();
@@ -485,15 +485,15 @@ private final GraphPanel map;
                 continue;                                   // labels come back in the full-quality frame
             }
             boolean match = !q.isEmpty() && v.lower.contains(q);
-            if (v == map.selected || v == map.hover || match || (map.selected != null && lit.contains(v) && map.scale > 0.4)
-                    || (map.flow && map.scale > 0.3) || (!map.flow && v.degree >= 5 && map.scale > 0.35) || map.scale > 1.6
+            if (v == map.selected || v == map.hover || match || (map.selected != null && lit.contains(v) && map.view.scale > 0.4)
+                    || (map.flow && map.view.scale > 0.3) || (!map.flow && v.degree >= 5 && map.view.scale > 0.35) || map.view.scale > 1.6
                     || map.vs.size() <= 80 || v.members > 0) {          // a small map names everything; groups are always named
                 cand.add(v);
             }
         }
         cand.sort(Comparator.comparingInt((V v) -> v == map.selected ? 0 : v == map.hover ? 1 : 2).thenComparingInt(v -> -v.degree));
         List<Rectangle> placed = new ArrayList<>();
-        Rectangle view = new Rectangle((int) (-map.ox / map.scale) - 200, (int) (-map.oy / map.scale) - 100, (int) (getWidth() / map.scale) + 400, (int) (getHeight() / map.scale) + 200);
+        Rectangle view = new Rectangle((int) (-map.view.ox / map.view.scale) - 200, (int) (-map.view.oy / map.view.scale) - 100, (int) (getWidth() / map.view.scale) + 400, (int) (getHeight() / map.view.scale) + 200);
         int drawn = 0;
         for (V v : cand) {
             if (drawn > 140 && v != map.selected && v != map.hover) {
@@ -571,10 +571,10 @@ private final GraphPanel map;
             g.setColor(Theme.alpha(v.color, 170));
             g.fillRect((int) (mx + 6 + (v.x - b[0]) * s), (int) (my + 6 + (v.y - b[1]) * s), 2, 2);
         }
-        double vx = (-map.ox / map.scale - b[0]) * s + mx + 6;
-        double vy = (-map.oy / map.scale - b[1]) * s + my + 6;
-        double vw = getWidth() / map.scale * s;
-        double vh = getHeight() / map.scale * s;
+        double vx = (-map.view.ox / map.view.scale - b[0]) * s + mx + 6;
+        double vy = (-map.view.oy / map.view.scale - b[1]) * s + my + 6;
+        double vw = getWidth() / map.view.scale * s;
+        double vh = getHeight() / map.view.scale * s;
         g.setColor(Theme.ACCENT);
         g.setClip(mx, my, mw, mh);
         g.drawRect((int) vx, (int) vy, (int) vw, (int) vh);
