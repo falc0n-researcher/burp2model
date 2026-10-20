@@ -110,7 +110,7 @@ class PolishTest {
     @Test
     void shortcutsAreBoundOnlyInsideTheTab() throws Exception {
         MainPanel p = open(new HashMap<>(Map.of("welcome.seen", "1")));
-        int menu = MainPanel.menuMask();
+        int menu = Shortcuts.menuMask();
         var im = p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
         for (KeyStroke k : new KeyStroke[] {KeyStroke.getKeyStroke(KeyEvent.VK_1, menu), KeyStroke.getKeyStroke(KeyEvent.VK_0, menu),
             KeyStroke.getKeyStroke(KeyEvent.VK_F, menu), KeyStroke.getKeyStroke(KeyEvent.VK_L, menu),

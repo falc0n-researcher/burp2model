@@ -57,16 +57,12 @@ class WelcomeTest {
         }
     }
 
-    private static boolean showing(MainPanel p) throws Exception {
-        var f = MainPanel.class.getDeclaredField("welcomeShowing");
-        f.setAccessible(true);
-        return (boolean) f.get(p);
+    private static boolean showing(MainPanel p) {
+        return p.welcome.showing();
     }
 
-    private static Welcome.Actions actions(MainPanel p) throws Exception {
-        var m = MainPanel.class.getDeclaredMethod("welcomeActions");
-        m.setAccessible(true);
-        return (Welcome.Actions) m.invoke(p);
+    private static Welcome.Actions actions(MainPanel p) {
+        return p.welcome.actions();
     }
 
     @Test
