@@ -98,8 +98,8 @@ public final class MainPanel extends JPanel {
         welcome = new WelcomeFlow(this, tabs);
         add(welcome.center, BorderLayout.CENTER);
         add(statusBar, BorderLayout.SOUTH);
-        // first run: the welcome page until the model has something in it (decided again once the model opens)
-        showWelcome(!"1".equals(host.get("welcome.seen", "0")) || "1".equals(host.get("welcome.show", "0")));
+        // every start opens on the welcome page; the user picks the sample, an import, live capture or the open model
+        showWelcome(true);
         tabs.addChangeListener(e -> {
             Component now = tabs.getSelectedComponent();
             keys.shown(now);
